@@ -23,6 +23,7 @@ type config struct {
 	loginFailLimit int
 	loginFailWindow time.Duration
 	loginBlockTTL time.Duration
+	deviceSessionTTL time.Duration
 	keyPrefix   string
 }
 
@@ -98,6 +99,7 @@ func loadConfig() config {
 		loginFailLimit: rd.GetInt("login_fail_limit", 5),
 		loginFailWindow: time.Duration(rd.GetInt("login_fail_window_seconds", 300)) * time.Second,
 		loginBlockTTL: time.Duration(rd.GetInt("login_block_seconds", 600)) * time.Second,
+		deviceSessionTTL: time.Duration(rd.GetInt("device_session_ttl_seconds", 7200)) * time.Second,
 		keyPrefix:   rd.GetString("key_prefix", "mmo"),
 	}
 }
@@ -128,4 +130,8 @@ func LoginFailWindow() time.Duration {
 
 func LoginBlockTTL() time.Duration {
 	return cfg.loginBlockTTL
+}
+
+func DeviceSessionTTL() time.Duration {
+	return cfg.deviceSessionTTL
 }

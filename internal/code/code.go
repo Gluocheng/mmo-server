@@ -16,6 +16,9 @@ const (
 	RefreshTokenInvalid int32 = 40012
 	RefreshTokenReplay int32 = 40013
 	LoginRateLimited   int32 = 40014
+	DeviceIDRequired   int32 = 40015
+	DeviceLimitReached int32 = 40016
+	DeviceMismatch     int32 = 40017
 )
 
 func IsFail(c int32) bool {

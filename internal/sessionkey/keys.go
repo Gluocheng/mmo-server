@@ -9,4 +9,5 @@ const (
 	Token        = "token"
 	AccessToken  = "access_token"
 	RefreshToken = "refresh_token"
+	DeviceID     = "device_id"
 )

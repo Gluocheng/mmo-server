@@ -76,6 +76,10 @@
     "max_open_conns": 20,
     "max_idle_conns": 10
   },
+  "auth": {
+    "session_policy": "kick_old",
+    "max_devices_per_uid": 2
+  },
   "redis": {
     "address": "127.0.0.1:6379",
     "password": "",
@@ -91,6 +95,7 @@
     "login_fail_limit": 5,
     "login_fail_window_seconds": 300,
     "login_block_seconds": 600,
+    "device_session_ttl_seconds": 7200,
     "key_prefix": "mmo"
   }
 }

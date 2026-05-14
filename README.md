@@ -30,13 +30,13 @@
 
 1. **签发 token 对（首包可用）**  
    - Route: `gate.user.issueToken`  
-   - Body JSON: `{"nickname":"玩家1","password":"123456"}`  
+   - Body JSON: `{"nickname":"玩家1","password":"123456","deviceId":"pc-001"}`  
    - 成功返回：`{"uid":1,"accessToken":"...","accessExpireAt":1715650000,"refreshToken":"...","refreshExpireAt":1715736400}`
    - 说明：服务端会按“账号+IP”做失败限流（默认 5 次失败触发 10 分钟封禁）
 
 2. **access token 登录（首包必须之一）**  
    - Route: `gate.user.login`  
-   - Body JSON: `{"accessToken":"...","serverId":10001}`（兼容旧字段 `token`）  
+   - Body JSON: `{"accessToken":"...","serverId":10001,"deviceId":"pc-001"}`（兼容旧字段 `token`）  
    - 成功返回：`{"uid":1}`
 
 3. **刷新 access token**
@@ -49,6 +49,11 @@
    - Route: `gate.user.logout`
    - Body JSON: `{"accessToken":"...","refreshToken":"..."}`（不传时会尝试读取当前 session 缓存）
    - 成功返回：`{"ok":true}`
+
+会话并发策略（`auth.session_policy`）：
+- `kick_old`：同账号新登录会挤掉旧会话（默认）
+- `coexist`：同账号允许共存
+- `device_limit`：按设备数量限制，超过 `auth.max_devices_per_uid` 则拒绝登录
 
 5. **查角**  
    - Route: `game.player.select`  
@@ -81,6 +86,7 @@
   - `redis.login_fail_limit`
   - `redis.login_fail_window_seconds`
   - `redis.login_block_seconds`
+- 设备会话 TTL 参数：`redis.device_session_ttl_seconds`
 - 账号密码采用 `bcrypt` 哈希存储，不保存明文密码。
 
 具体字段见 `internal/protocol/protocol.go`。
