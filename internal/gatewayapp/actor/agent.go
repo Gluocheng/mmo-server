@@ -2,15 +2,18 @@ package actor
 
 import (
 	"net"
+	"strings"
 
 	cstring "github.com/cherry-game/cherry/extend/string"
 	cfacade "github.com/cherry-game/cherry/facade"
+	cprofile "github.com/cherry-game/cherry/profile"
 	clog "github.com/cherry-game/cherry/logger"
 	cactor "github.com/cherry-game/cherry/net/actor"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	pmessage "github.com/cherry-game/cherry/net/parser/pomelo/message"
 	cproto "github.com/cherry-game/cherry/net/proto"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
 )
@@ -19,6 +22,10 @@ const (
 	loginRoute        = "gate.user.login"
 	issueTokenRoute   = "gate.user.issueToken"
 	refreshTokenRoute = "gate.user.refreshToken"
+
+	policyKickOld    = "kick_old"
+	policyCoexist    = "coexist"
+	policyDeviceLimit = "device_limit"
 )
 
 var beforeEnterRoutes = map[string]struct{}{
@@ -102,6 +109,11 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 		return
 	}
+	deviceID := strings.TrimSpace(req.DeviceID)
+	if deviceID == "" {
+		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.DeviceIDRequired)
+		return
+	}
 	accessToken := req.AccessToken
 	if accessToken == "" {
 		accessToken = req.Token
@@ -120,6 +132,7 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 	authReq := &protocol.TokenLoginRequest{
 		AccessToken: accessToken,
 		ServerID:    req.ServerID,
+		DeviceID:    deviceID,
 	}
 	errCode := p.App().ActorSystem().CallWait(p.PathString(), target, "authToken", authReq, rsp)
 	if code.IsFail(errCode) {
@@ -130,14 +143,37 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 		return
 	}
-	if _, err := pomelo.Bind(session.Sid, rsp.UID); err != nil {
+
+	policy, maxDevices := sessionPolicyConfig()
+	if policy == policyDeviceLimit {
+		allowed, err := persistence.RegisterDeviceSession(rsp.UID, deviceID, maxDevices)
+		if err != nil {
+			clog.Warnf("register device session fail uid=%d device=%s err=%v", rsp.UID, deviceID, err)
+			pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
+			return
+		}
+		if !allowed {
+			pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.DeviceLimitReached)
+			return
+		}
+	}
+
+	oldAgent, err := pomelo.Bind(session.Sid, rsp.UID)
+	if err != nil {
 		clog.Warnf("bind uid fail: %v", err)
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 		return
 	}
+	if policy == policyKickOld {
+		if oldAgent != nil {
+			oldAgent.Kick(notLoginKick, true)
+		}
+		p.kickUIDOnOtherGates(rsp.UID)
+	}
 	agent.Session().Set(sessionkey.ServerID, cstring.ToString(req.ServerID))
 	agent.Session().Set(sessionkey.AccessToken, accessToken)
 	agent.Session().Set(sessionkey.Token, accessToken)
+	agent.Session().Set(sessionkey.DeviceID, deviceID)
 	pomelo.Response(p, session.AgentPath, session.Sid, session.GetMID(), rsp)
 }
 
@@ -215,10 +251,14 @@ func (p *AgentActor) logout(session *cproto.Session, req *protocol.LogoutRequest
 		return
 	}
 
+	if session.Uid > 0 {
+		_ = persistence.RemoveDeviceSession(session.Uid, agent.Session().GetString(sessionkey.DeviceID))
+	}
 	agent.Unbind()
 	agent.Session().Remove(sessionkey.Token)
 	agent.Session().Remove(sessionkey.AccessToken)
 	agent.Session().Remove(sessionkey.RefreshToken)
+	agent.Session().Remove(sessionkey.DeviceID)
 	agent.Session().Remove(sessionkey.PlayerID)
 	agent.Session().Remove(sessionkey.ServerID)
 	pomelo.Response(p, session.AgentPath, session.Sid, session.GetMID(), rsp)
@@ -237,6 +277,9 @@ func (p *AgentActor) setSession(req *protocol.StringKeyValue) {
 
 func (p *AgentActor) OnSessionClose(agent *pomelo.Agent) {
 	session := agent.Session()
+	if session.Uid > 0 {
+		_ = persistence.RemoveDeviceSession(session.Uid, session.GetString(sessionkey.DeviceID))
+	}
 	serverID := session.GetString(sessionkey.ServerID)
 	if serverID == "" {
 		p.Exit()
@@ -292,4 +335,27 @@ func mapAuthCode(remoteCode int32, fallback int32) int32 {
 		return remoteCode
 	}
 	return fallback
+}
+
+func sessionPolicyConfig() (policy string, maxDevices int) {
+	authCfg := cprofile.GetConfig("auth")
+	policy = strings.TrimSpace(authCfg.GetString("session_policy", policyKickOld))
+	maxDevices = authCfg.GetInt("max_devices_per_uid", 2)
+	if maxDevices < 1 {
+		maxDevices = 1
+	}
+	return policy, maxDevices
+}
+
+func (p *AgentActor) kickUIDOnOtherGates(uid int64) {
+	rsp := &cproto.PomeloKick{
+		Uid:    uid,
+		Reason: []byte{},
+		Close:  true,
+	}
+	members := p.App().Discovery().ListByType(p.App().NodeType(), p.App().NodeID())
+	for _, member := range members {
+		target := cfacade.NewPath(member.GetNodeID(), "user")
+		p.Call(target, pomelo.KickFuncName, rsp)
+	}
 }

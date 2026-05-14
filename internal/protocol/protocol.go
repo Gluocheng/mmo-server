@@ -4,6 +4,7 @@ package protocol
 type IssueTokenRequest struct {
 	Nickname string `json:"nickname"`
 	Password string `json:"password"`
+	DeviceID string `json:"deviceId"`
 	// ClientIP 由网关注入，客户端无需传
 	ClientIP string `json:"clientIp"`
 }
@@ -22,6 +23,7 @@ type TokenLoginRequest struct {
 	AccessToken string `json:"accessToken"`
 	Token       string `json:"token"`
 	ServerID    int32  `json:"serverId"`
+	DeviceID    string `json:"deviceId"`
 }
 
 type TokenLoginResponse struct {

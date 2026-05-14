@@ -34,6 +34,11 @@ func (p *ActorSession) issueToken(req *protocol.IssueTokenRequest) (*protocol.Is
 		return nil, code.LoginRateLimited
 	}
 
+	deviceID := strings.TrimSpace(req.DeviceID)
+	if deviceID == "" {
+		return nil, code.DeviceIDRequired
+	}
+
 	uid, err := persistence.FindOrCreateAccount(req.Nickname, req.Password)
 	if err != nil || uid < 1 {
 		_ = persistence.RecordLoginFailure(req.ClientIP, req.Nickname)
@@ -43,7 +48,7 @@ func (p *ActorSession) issueToken(req *protocol.IssueTokenRequest) (*protocol.Is
 		return nil, code.LoginFail
 	}
 	_ = persistence.ClearLoginFailure(req.ClientIP, req.Nickname)
-	accessToken, accessExpireAt, refreshToken, refreshExpireAt, err := persistence.IssueTokenPair(uid)
+	accessToken, accessExpireAt, refreshToken, refreshExpireAt, err := persistence.IssueTokenPair(uid, deviceID)
 	if err != nil {
 		return nil, code.LoginFail
 	}
@@ -70,8 +75,15 @@ func (p *ActorSession) authToken(req *protocol.TokenLoginRequest) (*protocol.Tok
 	if req.ServerID < 1 {
 		return nil, code.InvalidServer
 	}
-	uid, err := persistence.VerifyAccessToken(accessToken)
+	deviceID := strings.TrimSpace(req.DeviceID)
+	if deviceID == "" {
+		return nil, code.DeviceIDRequired
+	}
+	uid, _, err := persistence.VerifyAccessToken(accessToken, deviceID)
 	if err != nil || uid < 1 {
+		if errors.Is(err, persistence.ErrDeviceMismatch) {
+			return nil, code.DeviceMismatch
+		}
 		if errors.Is(err, persistence.ErrAccessTokenInvalid) {
 			return nil, code.AccessTokenInvalid
 		}
@@ -84,7 +96,7 @@ func (p *ActorSession) refreshToken(req *protocol.RefreshTokenRequest) (*protoco
 	if req == nil || strings.TrimSpace(req.RefreshToken) == "" {
 		return nil, code.LoginFail
 	}
-	accessToken, accessExpireAt, refreshToken, refreshExpireAt, err := persistence.RotateTokenPairByRefreshToken(req.RefreshToken)
+	accessToken, accessExpireAt, refreshToken, refreshExpireAt, _, err := persistence.RotateTokenPairByRefreshToken(req.RefreshToken)
 	if err != nil {
 		if errors.Is(err, persistence.ErrRefreshTokenReplay) {
 			return nil, code.RefreshTokenReplay
