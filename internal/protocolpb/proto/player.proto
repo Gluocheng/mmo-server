@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+message PlayerInfo {
+  int64 player_id = 1 [json_name = "playerId"];
+  string name = 2 [json_name = "name"];
+}
+
+message PlayerSelectResponse {
+  repeated PlayerInfo list = 1 [json_name = "list"];
+}
+
+message PlayerCreateRequest {
+  string name = 1 [json_name = "name"];
+}
+
+message PlayerCreateResponse {
+  PlayerInfo player = 1 [json_name = "player"];
+}

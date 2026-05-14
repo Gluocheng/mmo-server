@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+message IssueTokenRequest {
+  string nickname = 1 [json_name = "nickname"];
+  string password = 2 [json_name = "password"];
+  string device_id = 3 [json_name = "deviceId"];
+  string client_ip = 4 [json_name = "clientIp"];
+}
+
+message IssueTokenResponse {
+  int64 uid = 1 [json_name = "uid"];
+  string access_token = 2 [json_name = "accessToken"];
+  int64 access_expire_at = 3 [json_name = "accessExpireAt"];
+  string refresh_token = 4 [json_name = "refreshToken"];
+  int64 refresh_expire_at = 5 [json_name = "refreshExpireAt"];
+}
+
+message TokenLoginRequest {
+  string access_token = 1 [json_name = "accessToken"];
+  string token = 2 [json_name = "token"];
+  int32 server_id = 3 [json_name = "serverId"];
+  string device_id = 4 [json_name = "deviceId"];
+}
+
+message TokenLoginResponse {
+  int64 uid = 1 [json_name = "uid"];
+}
+
+message LogoutRequest {
+  string access_token = 1 [json_name = "accessToken"];
+  string refresh_token = 2 [json_name = "refreshToken"];
+  string token = 3 [json_name = "token"];
+}
+
+message LogoutResponse {
+  bool ok = 1 [json_name = "ok"];
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1 [json_name = "refreshToken"];
+}
+
+message RefreshTokenResponse {
+  string access_token = 1 [json_name = "accessToken"];
+  int64 access_expire_at = 2 [json_name = "accessExpireAt"];
+  string refresh_token = 3 [json_name = "refreshToken"];
+  int64 refresh_expire_at = 4 [json_name = "refreshExpireAt"];
+}

@@ -18,7 +18,7 @@ func Run(profileFilePath, nodeID string) {
 	cherrySnowflake.SetDefaultNode(serverID)
 
 	app := cherry.Configure(profileFilePath, nodeID, false, cherry.Cluster)
-	app.SetSerializer(cserializer.NewJSON())
+	app.SetSerializer(cserializer.NewProtobuf())
 	app.AddActors(&player.ActorPlayers{})
 	app.Startup()
 }

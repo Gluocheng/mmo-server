@@ -11,7 +11,7 @@ import (
 // Run 启动网关节点（WebSocket + Pomelo 协议）
 func Run(profileFilePath, nodeID string) {
 	app := cherry.Configure(profileFilePath, nodeID, true, cherry.Cluster)
-	app.SetSerializer(cserializer.NewJSON())
+	app.SetSerializer(cserializer.NewProtobuf())
 
 	agentActor := pomelo.NewActor("user")
 	agentActor.AddConnector(cconnector.NewWS(app.Address()))

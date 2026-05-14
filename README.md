@@ -24,31 +24,33 @@
 
 网关 WebSocket 地址：`ws://127.0.0.1:10100`（与 profile 中 `gate-1` 的 `address` 一致）。
 
-## 客户端协议（Pomelo + JSON）
+## 客户端协议（Pomelo + Protobuf）
 
-序列化方式为 **JSON**。路由格式：`nodeType.handlerName.method`。
+业务包体使用 **Protobuf 二进制**（`google.golang.org/protobuf`），由三节点 `app.SetSerializer(NewProtobuf())` 统一序列化；与旧 JSON 客户端 **不兼容**，需同步升级客户端编解码。
+
+路由格式仍为：`nodeType.handlerName.method`。
 
 1. **签发 token 对（首包可用）**  
    - Route: `gate.user.issueToken`  
-   - Body JSON: `{"nickname":"玩家1","password":"123456","deviceId":"pc-001"}`  
-   - 成功返回：`{"uid":1,"accessToken":"...","accessExpireAt":1715650000,"refreshToken":"...","refreshExpireAt":1715736400}`
+   - Body: `IssueTokenRequest` 的 protobuf 编码（字段语义同原 JSON：`nickname`、`password`、`deviceId`；`clientIp` 由网关注入）  
+   - 成功返回：`IssueTokenResponse`（`uid`、`accessToken`、`accessExpireAt`、`refreshToken`、`refreshExpireAt`）  
    - 说明：服务端会按“账号+IP”做失败限流（默认 5 次失败触发 10 分钟封禁）
 
 2. **access token 登录（首包必须之一）**  
    - Route: `gate.user.login`  
-   - Body JSON: `{"accessToken":"...","serverId":10001,"deviceId":"pc-001"}`（兼容旧字段 `token`）  
-   - 成功返回：`{"uid":1}`
+   - Body: `TokenLoginRequest`（`accessToken` 或兼容字段 `token`、`serverId`、`deviceId`）  
+   - 成功返回：`TokenLoginResponse`（`uid`）
 
 3. **刷新 access token**
    - Route: `gate.user.refreshToken`
-   - Body JSON: `{"refreshToken":"..."}`
-   - 成功返回：`{"accessToken":"...","accessExpireAt":1715651000,"refreshToken":"...","refreshExpireAt":1715737400}`
+   - Body: `RefreshTokenRequest`（`refreshToken`）
+   - 成功返回：`RefreshTokenResponse`
    - 说明：refresh token 为单次使用，刷新成功后会返回新的 refresh token（旧的立即失效）
 
 4. **登出（使 access/refresh 失效）**
    - Route: `gate.user.logout`
-   - Body JSON: `{"accessToken":"...","refreshToken":"..."}`（不传时会尝试读取当前 session 缓存）
-   - 成功返回：`{"ok":true}`
+   - Body: `LogoutRequest`（`accessToken` / `refreshToken` / 兼容 `token`；不传时会尝试读取当前 session 缓存）
+   - 成功返回：`LogoutResponse`（`ok`）
 
 会话并发策略（`auth.session_policy`）：
 - `kick_old`：同账号新登录会挤掉旧会话（默认）
@@ -57,28 +59,29 @@
 
 5. **查角**  
    - Route: `game.player.select`  
-   - Body: `{}`
-   - 返回：`{"list":[...]}`（当前账号的角色列表，演示版单角色）
+   - Body: `google.protobuf.Empty`（空消息）  
+   - 返回：`PlayerSelectResponse`
 
 6. **创角**  
    - Route: `game.player.create`  
-   - Body: `{"name":"Knight"}`
-   - 返回：`{"player":{"playerId":1,"name":"Knight"}}`
+   - Body: `PlayerCreateRequest`（`name`）  
+   - 返回：`PlayerCreateResponse`
 
 7. **进入场景**  
    - Route: `game.player.enter`  
-   - Body: `{"playerId":1,"sceneId":1}` 或 `{"sceneId":1}`  
-   - 成功返回：`{"sceneId":1,"players":[...]}`（当前在线 uid 列表）
+   - Body: `EnterGameRequest`（可选 `playerId`、`sceneId`）  
+   - 成功返回：`EnterGameResponse`（`sceneId`、`players`）
 
 8. **移动（同场景广播）**  
    - Route: `game.player.move`  
-   - Body: `{"x":1,"y":2,"z":0}`  
-   - 其他在线客户端会收到 Push：`route = onMove`，body 为 `MoveBroadcast`（含 `uid` 与坐标）
+   - Body: `MoveRequest`（`x`/`y`/`z`）  
+   - 成功返回：`google.protobuf.Empty`  
+   - 其他在线客户端会收到 Push：`route = onMove`，body 为 `MoveBroadcast`（`uid` 与坐标）
 
 说明：
 - 网关会限制未完成“进入场景”的玩家请求，除 `select/create/enter` 外会被拒绝。
 - `accounts` / `players` 表会在服务首次启动时自动迁移创建。
-- `account:nickname` 与 `player:uid` 数据会写入 Redis 缓存（带 TTL）。
+- `account:nickname` 与 `player:uid` 数据会写入 Redis 缓存（带 TTL）；`PlayerInfo` 缓存值为 **protojson** 文本，与 Pomelo 包体编码相互独立。
 - access token 会写入 Redis（默认 TTL 15 分钟，可通过 `redis.access_ttl_seconds` 调整）。
 - refresh token 会写入 Redis（默认 TTL 24 小时，可通过 `redis.refresh_ttl_seconds` 调整）。
 - refresh token 刷新采用原子消费（`GETDEL`），并记录已消费标记，避免重放。
@@ -89,7 +92,22 @@
 - 设备会话 TTL 参数：`redis.device_session_ttl_seconds`
 - 账号密码采用 `bcrypt` 哈希存储，不保存明文密码。
 
-具体字段见 `internal/protocol/protocol.go`。
+`.proto` 定义见 `internal/protocolpb/proto/`；Go 侧对外类型别名见 `internal/protocol/types.go`。
+
+### 重新生成 `internal/protocolpb/gen`
+
+需安装 [Docker](https://docs.docker.com/get-docker/)，在仓库根目录执行：
+
+```powershell
+powershell -File scripts/genproto.ps1
+```
+
+或等价命令：
+
+```powershell
+docker run --rm -v "${PWD}:/work" -w /work namely/protoc-all:1.51_1 `
+  -d internal/protocolpb/proto -l go -o internal/protocolpb/gen --go-source-relative
+```
 
 ## 构建
 
@@ -113,6 +131,9 @@ go test ./...
 | `cmd/login` | 登录节点（账号密码签发 token + token 验证） |
 | `cmd/game` | 游戏节点（场景占位 + 移动广播） |
 | `configs/mmo-cluster.json` | 集群与节点配置（`discovery.mode=default` + NATS） |
+| `internal/protocolpb/proto` | 业务 Pomelo 包体 `.proto` 定义 |
+| `internal/protocolpb/gen` | `protoc-gen-go` 生成代码（勿手改） |
+| `internal/protocol` | 对外类型别名（`types.go`），业务 import 入口 |
 | `../cherry-framework` | Cherry 框架源码（与 `go.mod` 中 `replace` 对应） |
 
 ## 后续扩展建议
