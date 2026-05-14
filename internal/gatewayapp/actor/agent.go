@@ -34,9 +34,7 @@ var beforeEnterRoutes = map[string]struct{}{
 	"game.player.enter":  {},
 }
 
-var notLoginKick = &struct {
-	Code int32 `json:"code"`
-}{Code: code.PlayerDenyLogin}
+var notLoginKick = &protocol.CodeOnly{Code: code.PlayerDenyLogin}
 
 func loginTargetPath(app cfacade.IApplication) string {
 	list := app.Discovery().ListByType("login")
@@ -76,7 +74,7 @@ func (p *AgentActor) issueToken(session *cproto.Session, req *protocol.IssueToke
 	}
 	rsp := &protocol.IssueTokenResponse{}
 	reqCopy := *req
-	reqCopy.ClientIP = clientIPFromRemoteAddr(agent.RemoteAddr())
+	reqCopy.ClientIp = clientIPFromRemoteAddr(agent.RemoteAddr())
 	errCode := p.App().ActorSystem().CallWait(p.PathString(), target, "issueToken", &reqCopy, rsp)
 	if code.IsFail(errCode) {
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), mapAuthCode(errCode, code.LoginRPCFail))
@@ -109,7 +107,7 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 		return
 	}
-	deviceID := strings.TrimSpace(req.DeviceID)
+	deviceID := strings.TrimSpace(req.DeviceId)
 	if deviceID == "" {
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.DeviceIDRequired)
 		return
@@ -131,24 +129,24 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 	rsp := &protocol.TokenLoginResponse{}
 	authReq := &protocol.TokenLoginRequest{
 		AccessToken: accessToken,
-		ServerID:    req.ServerID,
-		DeviceID:    deviceID,
+		ServerId:    req.ServerId,
+		DeviceId:    deviceID,
 	}
 	errCode := p.App().ActorSystem().CallWait(p.PathString(), target, "authToken", authReq, rsp)
 	if code.IsFail(errCode) {
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), mapAuthCode(errCode, code.LoginRPCFail))
 		return
 	}
-	if rsp.UID < 1 {
+	if rsp.Uid < 1 {
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 		return
 	}
 
 	policy, maxDevices := sessionPolicyConfig()
 	if policy == policyDeviceLimit {
-		allowed, err := persistence.RegisterDeviceSession(rsp.UID, deviceID, maxDevices)
+		allowed, err := persistence.RegisterDeviceSession(rsp.Uid, deviceID, maxDevices)
 		if err != nil {
-			clog.Warnf("register device session fail uid=%d device=%s err=%v", rsp.UID, deviceID, err)
+			clog.Warnf("register device session fail uid=%d device=%s err=%v", rsp.Uid, deviceID, err)
 			pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 			return
 		}
@@ -158,7 +156,7 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 		}
 	}
 
-	oldAgent, err := pomelo.Bind(session.Sid, rsp.UID)
+	oldAgent, err := pomelo.Bind(session.Sid, rsp.Uid)
 	if err != nil {
 		clog.Warnf("bind uid fail: %v", err)
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
@@ -168,9 +166,9 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 		if oldAgent != nil {
 			oldAgent.Kick(notLoginKick, true)
 		}
-		p.kickUIDOnOtherGates(rsp.UID)
+		p.kickUIDOnOtherGates(rsp.Uid)
 	}
-	agent.Session().Set(sessionkey.ServerID, cstring.ToString(req.ServerID))
+	agent.Session().Set(sessionkey.ServerID, cstring.ToString(req.ServerId))
 	agent.Session().Set(sessionkey.AccessToken, accessToken)
 	agent.Session().Set(sessionkey.Token, accessToken)
 	agent.Session().Set(sessionkey.DeviceID, deviceID)
@@ -242,7 +240,7 @@ func (p *AgentActor) logout(session *cproto.Session, req *protocol.LogoutRequest
 		RefreshToken: refreshToken,
 	}
 	errCode := p.App().ActorSystem().CallWait(p.PathString(), target, "logout", logoutReq, rsp)
-	if code.IsFail(errCode) || !rsp.OK {
+	if code.IsFail(errCode) || !rsp.Ok {
 		if code.IsFail(errCode) {
 			pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), mapAuthCode(errCode, code.LoginFail))
 		} else {

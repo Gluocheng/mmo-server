@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+// StringKeyValue 用于跨节点同步网关 session 字段
+message StringKeyValue {
+  string key = 1 [json_name = "key"];
+  string value = 2 [json_name = "value"];
+}
+
+// CodeOnly 用于 Kick 等仅需业务码的负载（对齐原 JSON { "code": n }）
+message CodeOnly {
+  int32 code = 1 [json_name = "code"];
+}

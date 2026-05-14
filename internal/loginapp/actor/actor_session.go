@@ -30,30 +30,30 @@ func (p *ActorSession) issueToken(req *protocol.IssueTokenRequest) (*protocol.Is
 	if req == nil || strings.TrimSpace(req.Nickname) == "" || strings.TrimSpace(req.Password) == "" {
 		return nil, code.LoginFail
 	}
-	if blocked, err := persistence.IsLoginBlocked(req.ClientIP, req.Nickname); err == nil && blocked {
+	if blocked, err := persistence.IsLoginBlocked(req.ClientIp, req.Nickname); err == nil && blocked {
 		return nil, code.LoginRateLimited
 	}
 
-	deviceID := strings.TrimSpace(req.DeviceID)
+	deviceID := strings.TrimSpace(req.DeviceId)
 	if deviceID == "" {
 		return nil, code.DeviceIDRequired
 	}
 
 	uid, err := persistence.FindOrCreateAccount(req.Nickname, req.Password)
 	if err != nil || uid < 1 {
-		_ = persistence.RecordLoginFailure(req.ClientIP, req.Nickname)
+		_ = persistence.RecordLoginFailure(req.ClientIp, req.Nickname)
 		if errors.Is(err, persistence.ErrInvalidPassword) {
 			return nil, code.InvalidPassword
 		}
 		return nil, code.LoginFail
 	}
-	_ = persistence.ClearLoginFailure(req.ClientIP, req.Nickname)
+	_ = persistence.ClearLoginFailure(req.ClientIp, req.Nickname)
 	accessToken, accessExpireAt, refreshToken, refreshExpireAt, err := persistence.IssueTokenPair(uid, deviceID)
 	if err != nil {
 		return nil, code.LoginFail
 	}
 	return &protocol.IssueTokenResponse{
-		UID:             uid,
+		Uid:             uid,
 		AccessToken:     accessToken,
 		AccessExpireAt:  accessExpireAt,
 		RefreshToken:    refreshToken,
@@ -72,10 +72,10 @@ func (p *ActorSession) authToken(req *protocol.TokenLoginRequest) (*protocol.Tok
 	if accessToken == "" {
 		return nil, code.LoginFail
 	}
-	if req.ServerID < 1 {
+	if req.ServerId < 1 {
 		return nil, code.InvalidServer
 	}
-	deviceID := strings.TrimSpace(req.DeviceID)
+	deviceID := strings.TrimSpace(req.DeviceId)
 	if deviceID == "" {
 		return nil, code.DeviceIDRequired
 	}
@@ -89,7 +89,7 @@ func (p *ActorSession) authToken(req *protocol.TokenLoginRequest) (*protocol.Tok
 		}
 		return nil, code.LoginFail
 	}
-	return &protocol.TokenLoginResponse{UID: uid}, code.OK
+	return &protocol.TokenLoginResponse{Uid: uid}, code.OK
 }
 
 func (p *ActorSession) refreshToken(req *protocol.RefreshTokenRequest) (*protocol.RefreshTokenResponse, int32) {
@@ -126,5 +126,5 @@ func (p *ActorSession) logout(req *protocol.LogoutRequest) (*protocol.LogoutResp
 	if err := persistence.RevokeTokens(accessToken, refreshToken); err != nil {
 		return nil, code.LoginFail
 	}
-	return &protocol.LogoutResponse{OK: true}, code.OK
+	return &protocol.LogoutResponse{Ok: true}, code.OK
 }

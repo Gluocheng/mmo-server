@@ -13,6 +13,7 @@ import (
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type actorPlayer struct {
@@ -43,7 +44,8 @@ func (p *actorPlayer) selectPlayer(session *cproto.Session, _ *protocol.None) {
 		return
 	}
 	if ok {
-		rsp.List = append(rsp.List, info)
+		pi := info
+		rsp.List = append(rsp.List, &pi)
 	}
 	p.Response(session, rsp)
 }
@@ -63,7 +65,8 @@ func (p *actorPlayer) createPlayer(session *cproto.Session, req *protocol.Player
 		p.ResponseCode(session, code.PlayerCreateFail)
 		return
 	}
-	p.Response(session, &protocol.PlayerCreateResponse{Player: info})
+	pi := info
+	p.Response(session, &protocol.PlayerCreateResponse{Player: &pi})
 }
 
 func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequest) {
@@ -81,7 +84,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
-	if req != nil && req.PlayerID > 0 && req.PlayerID != info.PlayerID {
+	if req != nil && req.PlayerId > 0 && req.PlayerId != info.PlayerId {
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
@@ -89,16 +92,16 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 	// 回写网关 session，启用后续 gameplay 路由
 	p.Call(session.ActorPath(), "setSession", &protocol.StringKeyValue{
 		Key:   sessionkey.PlayerID,
-		Value: cstring.ToString(info.PlayerID),
+		Value: cstring.ToString(info.PlayerId),
 	})
 
 	sceneID := world.DefaultSceneID
-	if req != nil && req.SceneID > 0 {
-		sceneID = req.SceneID
+	if req != nil && req.SceneId > 0 {
+		sceneID = req.SceneId
 	}
 	_ = sceneID // 当前仅单场景
 	all := world.Enter(session.Uid, session.AgentPath)
-	p.Response(session, &protocol.EnterGameResponse{SceneID: world.DefaultSceneID, Players: all})
+	p.Response(session, &protocol.EnterGameResponse{SceneId: world.DefaultSceneID, Players: all})
 }
 
 func (p *actorPlayer) move(session *cproto.Session, req *protocol.MoveRequest) {
@@ -111,11 +114,11 @@ func (p *actorPlayer) move(session *cproto.Session, req *protocol.MoveRequest) {
 		return
 	}
 	b := &protocol.MoveBroadcast{
-		UID: session.Uid,
+		Uid: session.Uid,
 		X:   req.X,
 		Y:   req.Y,
 		Z:   req.Z,
 	}
 	world.BroadcastMove(p, session.Uid, b)
-	p.Response(session, &struct{}{})
+	p.Response(session, &emptypb.Empty{})
 }

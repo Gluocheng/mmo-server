@@ -2,14 +2,16 @@ package persistence
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/example/mmo-server/internal/protocol"
+	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
 )
+
+var playerCacheJSON = protojson.MarshalOptions{EmitUnpopulated: true}
 
 func playerUIDKey(uid int64) string {
 	return fmt.Sprintf("%s:player:uid:%d", KeyPrefix(), uid)
@@ -29,7 +31,7 @@ func GetPlayerByUID(uid int64) (protocol.PlayerInfo, bool, error) {
 	cacheKey := playerUIDKey(uid)
 	if raw, err := rdb.Get(ctx, cacheKey).Bytes(); err == nil {
 		var player protocol.PlayerInfo
-		if jsonErr := json.Unmarshal(raw, &player); jsonErr == nil && player.PlayerID > 0 {
+		if jsonErr := protojson.Unmarshal(raw, &player); jsonErr == nil && player.GetPlayerId() > 0 {
 			return player, true, nil
 		}
 	}
@@ -44,10 +46,10 @@ func GetPlayerByUID(uid int64) (protocol.PlayerInfo, bool, error) {
 	}
 
 	player := protocol.PlayerInfo{
-		PlayerID: model.PlayerID,
+		PlayerId: model.PlayerID,
 		Name:     model.Name,
 	}
-	b, _ := json.Marshal(player)
+	b, _ := playerCacheJSON.Marshal(&player)
 	_ = rdb.Set(ctx, cacheKey, b, CacheTTL()).Err()
 	return player, true, nil
 }
@@ -82,16 +84,16 @@ func CreatePlayer(uid int64, name string) (protocol.PlayerInfo, bool, error) {
 			return protocol.PlayerInfo{}, false, err
 		}
 		return protocol.PlayerInfo{
-			PlayerID: existed.PlayerID,
+			PlayerId: existed.PlayerID,
 			Name:     existed.Name,
 		}, false, nil
 	}
 
 	player := protocol.PlayerInfo{
-		PlayerID: model.PlayerID,
+		PlayerId: model.PlayerID,
 		Name:     model.Name,
 	}
-	b, _ := json.Marshal(player)
+	b, _ := playerCacheJSON.Marshal(&player)
 	_ = rdb.Set(ctx, playerUIDKey(uid), b, CacheTTL()).Err()
 	return player, true, nil
 }

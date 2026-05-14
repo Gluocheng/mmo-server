@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+message EnterGameRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+  int32 scene_id = 2 [json_name = "sceneId"];
+}
+
+message EnterGameResponse {
+  int32 scene_id = 1 [json_name = "sceneId"];
+  repeated int64 players = 2 [json_name = "players"];
+}
+
+message MoveRequest {
+  float x = 1 [json_name = "x"];
+  float y = 2 [json_name = "y"];
+  float z = 3 [json_name = "z"];
+}
+
+message MoveBroadcast {
+  int64 uid = 1 [json_name = "uid"];
+  float x = 2 [json_name = "x"];
+  float y = 3 [json_name = "y"];
+  float z = 4 [json_name = "z"];
+}
