@@ -36,4 +36,4 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 )
 
-replace github.com/cherry-game/cherry => ../cherry-framework
+replace github.com/cherry-game/cherry => ./cherry-framework
