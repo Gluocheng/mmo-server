@@ -134,10 +134,24 @@ go test ./...
 | `internal/protocolpb/proto` | 业务 Pomelo 包体 `.proto` 定义 |
 | `internal/protocolpb/gen` | `protoc-gen-go` 生成代码（勿手改） |
 | `internal/protocol` | 对外类型别名（`types.go`），业务 import 入口 |
+| `internal/persistence` | MySQL（GORM）表 `accounts` / `players`、Redis 缓存与 token；`Init()` 时 `AutoMigrate`（见 `store.go`、`models.go`、`account.go`、`player.go`） |
 | `../cherry-framework` | Cherry 框架源码（与 `go.mod` 中 `replace` 对应） |
+
+## 帐号与角色持久化（已具备）
+
+- **帐号**：登录签发 token 前经 `FindOrCreateAccount` 写入/校验 `accounts`（`bcrypt` 密码），昵称维度 Redis 缓存。
+- **角色**：演示为 **每帐号单角色**（`players.uid` 唯一）；`GetPlayerByUID` / `CreatePlayer` 读写 MySQL，命中后写 Redis（`player:uid`，protojson）。
+- Token 会话仍以 Redis 为主（`token.go`），与上表数据层不同。
 
 ## 后续扩展建议
 
-- 持久化帐号/角色（MySQL + GORM 等）
 - 将 `discovery.mode` 换为 `nats` 并增加 master 节点做注册发现
 - AOI、战斗、聊天等按子系统增量迭代
+
+### 后续可选（需另立规格与实现计划）
+
+以下会牵动表结构、协议或 `select/create/enter` 语义，落地前请单独评审：
+
+- **一账号多角**：去掉 `players.uid` 唯一、列表查询与进场 `playerId` 语义收紧等。
+- **帐号/角色扩展字段**：等级、最后登录、封禁等；生产可引入版本化迁移（如 `golang-migrate`）替代仅靠 `AutoMigrate`。
+- **持久化集成测试**：如 testcontainers / CI 条件跳过 + 本地脚本；连接池与慢查询可观测。
