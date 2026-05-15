@@ -1,6 +1,6 @@
 # MMO 后端骨架（Cherry）
 
-基于 [cherry-game/cherry](https://github.com/cherry-game/cherry) 的 Actor + 集群（NATS）的最小可运行示例：**网关 → 登录服（账号密码签发 access+refresh）→ 游戏服（选角/创角 + 进场景 + 移动广播）**。
+基于 [cherry-game/cherry](https://github.com/cherry-game/cherry) 的 Actor + 集群（NATS）的最小可运行示例：**discovery master（注册发现）→ 网关 → 登录服（账号密码签发 access+refresh）→ 游戏服（选角/创角 + 进场景 + 移动广播）**。
 
 本仓库 `mmo-server` 通过 `replace` 引用同级的 `cherry-framework` 源码（由计划中的克隆步骤得到）。
 
@@ -18,15 +18,19 @@
 1. 启动 MySQL，并创建库：`mmo`
 2. 启动 Redis
 3. 启动 NATS：`nats-server`（或等价命令）
-4. 启动登录：`go run ./cmd/login -path=configs/mmo-cluster.json -node=login-1`
-5. 启动游戏：`go run ./cmd/game -path=configs/mmo-cluster.json -node=10001`
-6. 启动网关：`go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-1`
+4. **启动 discovery master**（须最先于其他业务节点，且 `cluster.nats.master_node_id` 与 `-node` 一致）：  
+   `go run ./cmd/master -path=configs/mmo-cluster.json -node=master-1`
+5. 启动登录：`go run ./cmd/login -path=configs/mmo-cluster.json -node=login-1`
+6. 启动游戏：`go run ./cmd/game -path=configs/mmo-cluster.json -node=10001`
+7. 启动网关：`go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-1`
+
+集群发现：`configs/mmo-cluster.json` 中 `cluster.discovery.mode` 为 **`nats`**，由 **单 master**（`node.master` 中的 `master-1`）维护成员注册；其余节点通过 NATS 向 master 注册并同步成员列表（见 Cherry `net/discovery/component_master.go`）。
 
 网关 WebSocket 地址：`ws://127.0.0.1:10100`（与 profile 中 `gate-1` 的 `address` 一致）。
 
 ## 客户端协议（Pomelo + Protobuf）
 
-业务包体使用 **Protobuf 二进制**（`google.golang.org/protobuf`），由三节点 `app.SetSerializer(NewProtobuf())` 统一序列化；与旧 JSON 客户端 **不兼容**，需同步升级客户端编解码。
+业务包体使用 **Protobuf 二进制**（`google.golang.org/protobuf`），由各节点 `app.SetSerializer(NewProtobuf())` 统一序列化；与旧 JSON 客户端 **不兼容**，需同步升级客户端编解码。
 
 路由格式仍为：`nodeType.handlerName.method`。
 
@@ -115,6 +119,7 @@ docker run --rm -v "${PWD}:/work" -w /work namely/protoc-all:1.51_1 `
 go build -o bin/gateway.exe ./cmd/gateway
 go build -o bin/login.exe ./cmd/login
 go build -o bin/game.exe ./cmd/game
+go build -o bin/master.exe ./cmd/master
 ```
 
 ## 测试
@@ -130,11 +135,13 @@ go test ./...
 | `cmd/gateway` | 网关节点（WebSocket + Pomelo） |
 | `cmd/login` | 登录节点（账号密码签发 token + token 验证） |
 | `cmd/game` | 游戏节点（场景占位 + 移动广播） |
-| `configs/mmo-cluster.json` | 集群与节点配置（`discovery.mode=default` + NATS） |
+| `cmd/master` | Discovery master（仅 NATS 注册发现，无业务路由） |
+| `configs/mmo-cluster.json` | 集群与节点配置（`discovery.mode=nats`、`cluster.nats.master_node_id` + NATS） |
 | `internal/protocolpb/proto` | 业务 Pomelo 包体 `.proto` 定义 |
 | `internal/protocolpb/gen` | `protoc-gen-go` 生成代码（勿手改） |
 | `internal/protocol` | 对外类型别名（`types.go`），业务 import 入口 |
 | `internal/persistence` | MySQL（GORM）表 `accounts` / `players`、Redis 缓存与 token；`Init()` 时 `AutoMigrate`（见 `store.go`、`models.go`、`account.go`、`player.go`） |
+| `internal/masterapp` | Master 节点入口（`Run` 仅装配 Cluster + Discovery） |
 | `../cherry-framework` | Cherry 框架源码（与 `go.mod` 中 `replace` 对应） |
 
 ## 帐号与角色持久化（已具备）
@@ -145,7 +152,6 @@ go test ./...
 
 ## 后续扩展建议
 
-- 将 `discovery.mode` 换为 `nats` 并增加 master 节点做注册发现
 - AOI、战斗、聊天等按子系统增量迭代
 
 ### 后续可选（需另立规格与实现计划）
