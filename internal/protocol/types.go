@@ -32,6 +32,8 @@ type (
 	BagListResponse      = pb.BagListResponse
 	BagAddRequest        = pb.BagAddRequest
 	BagRemoveRequest     = pb.BagRemoveRequest
+	BagMoveRequest       = pb.BagMoveRequest
+	BagSplitRequest      = pb.BagSplitRequest
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

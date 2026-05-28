@@ -5,8 +5,9 @@ package mmo.protocol.v1;
 option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
 
 message BagItem {
-  int32 item_id = 1 [json_name = "itemId"];
-  int32 count = 2 [json_name = "count"];
+  int32 slot = 1 [json_name = "slot"];
+  int32 item_id = 2 [json_name = "itemId"];
+  int32 count = 3 [json_name = "count"];
 }
 
 message BagListResponse {
@@ -19,6 +20,18 @@ message BagAddRequest {
 }
 
 message BagRemoveRequest {
-  int32 item_id = 1 [json_name = "itemId"];
+  int32 slot = 1 [json_name = "slot"];
+  int32 item_id = 2 [json_name = "itemId"];
+  int32 count = 3 [json_name = "count"];
+  bool by_slot = 4 [json_name = "bySlot"];
+}
+
+message BagMoveRequest {
+  int32 from_slot = 1 [json_name = "fromSlot"];
+  int32 to_slot = 2 [json_name = "toSlot"];
+}
+
+message BagSplitRequest {
+  int32 from_slot = 1 [json_name = "fromSlot"];
   int32 count = 2 [json_name = "count"];
 }
