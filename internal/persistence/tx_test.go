@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func resetStoreForTest(t *testing.T) *gorm.DB {
+func resetDBForTest(t *testing.T) *gorm.DB {
 	t.Helper()
 	gdb, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -19,19 +19,22 @@ func resetStoreForTest(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := gdb.AutoMigrate(&Account{}, &Player{}); err != nil {
+	if err := autoMigrateModels(gdb); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
 	oldDB := db
+	oldRDB := rdb
 	oldInitErr := initErr
 	hadInit := oldDB != nil
 	db = gdb
+	rdb = nil
 	once = sync.Once{}
 	initErr = nil
 
 	t.Cleanup(func() {
 		db = oldDB
+		rdb = oldRDB
 		initErr = oldInitErr
 		once = sync.Once{}
 		if hadInit {
@@ -39,6 +42,10 @@ func resetStoreForTest(t *testing.T) *gorm.DB {
 		}
 	})
 	return gdb
+}
+
+func resetStoreForTest(t *testing.T) *gorm.DB {
+	return resetDBForTest(t)
 }
 
 func TestWithinTxCommits(t *testing.T) {

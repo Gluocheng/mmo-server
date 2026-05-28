@@ -114,7 +114,38 @@ func main() {
 	}
 	fmt.Printf("enter OK sceneId=%d online=%d\n", enterRsp.SceneId, len(enterRsp.Players))
 
-	// 5) move (no need to wait push)
+	// 5) bag add
+	addReq := &protocol.BagAddRequest{ItemId: 1001, Count: 2}
+	addRspMsg, err := c.Request("game.bag.add", addReq)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "bag add failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	bagRsp := &protocol.BagListResponse{}
+	if err := c.Serializer().Unmarshal(addRspMsg.Data, bagRsp); err != nil {
+		fmt.Fprintf(os.Stderr, "unmarshal BagListResponse failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	fmt.Printf("bag add OK items=%d\n", len(bagRsp.Items))
+
+	// 6) bag list
+	listRspMsg, err := c.Request("game.bag.list", &emptypb.Empty{})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "bag list failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	bagRsp = &protocol.BagListResponse{}
+	if err := c.Serializer().Unmarshal(listRspMsg.Data, bagRsp); err != nil {
+		fmt.Fprintf(os.Stderr, "unmarshal BagListResponse failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	fmt.Printf("bag list OK items=%d\n", len(bagRsp.Items))
+
+	// 7) move (no need to wait push)
 	_, err = c.Request("game.player.move", &protocol.MoveRequest{X: 1, Y: 2, Z: 0})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "move failed: %v\n", err)
@@ -129,4 +160,3 @@ func main() {
 
 	select {}
 }
-

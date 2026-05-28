@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/example/mmo-server/internal/gtime"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -139,8 +139,8 @@ func issueTokenPairWithUID(ctx context.Context, uid int64, deviceID string) (acc
 	if err != nil {
 		return "", 0, "", 0, err
 	}
-	accessExpireAt = time.Now().Add(AccessTTL()).Unix()
-	refreshExpireAt = time.Now().Add(RefreshTTL()).Unix()
+	accessExpireAt = gtime.Now().Add(AccessTTL()).Unix()
+	refreshExpireAt = gtime.Now().Add(RefreshTTL()).Unix()
 	tokenValue := buildTokenValue(uid, deviceID)
 	if err := rdb.Set(ctx, accessTokenKey(accessToken), tokenValue, AccessTTL()).Err(); err != nil {
 		return "", 0, "", 0, err

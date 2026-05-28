@@ -2,10 +2,11 @@ package gameapp
 
 import (
 	"github.com/cherry-game/cherry"
+	cherrySnowflake "github.com/cherry-game/cherry/extend/snowflake"
 	cstring "github.com/cherry-game/cherry/extend/string"
 	cherryUtils "github.com/cherry-game/cherry/extend/utils"
-	cherrySnowflake "github.com/cherry-game/cherry/extend/snowflake"
 	cserializer "github.com/cherry-game/cherry/net/serializer"
+	"github.com/example/mmo-server/internal/gameapp/bag"
 	"github.com/example/mmo-server/internal/gameapp/chat"
 	"github.com/example/mmo-server/internal/gameapp/player"
 )
@@ -22,5 +23,6 @@ func Run(profileFilePath, nodeID string) {
 	app.SetSerializer(cserializer.NewProtobuf())
 	app.AddActors(&player.ActorPlayers{})
 	app.AddActors(&chat.ActorChats{})
+	app.AddActors(&bag.ActorBags{})
 	app.Startup()
 }

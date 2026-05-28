@@ -27,7 +27,11 @@ type (
 	RefreshTokenRequest  = pb.RefreshTokenRequest
 	RefreshTokenResponse = pb.RefreshTokenResponse
 	ChatSendRequest      = pb.ChatSendRequest
-	ChatBroadcast         = pb.ChatBroadcast
+	ChatBroadcast        = pb.ChatBroadcast
+	BagItem              = pb.BagItem
+	BagListResponse      = pb.BagListResponse
+	BagAddRequest        = pb.BagAddRequest
+	BagRemoveRequest     = pb.BagRemoveRequest
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。
