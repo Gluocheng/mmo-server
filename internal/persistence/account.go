@@ -7,9 +7,9 @@ import (
 
 	"fmt"
 
-	"log"
-
 	"strconv"
+
+	clog "github.com/cherry-game/cherry/logger"
 
 	"strings"
 
@@ -87,7 +87,7 @@ func scheduleAccountCacheRefresh(ctx context.Context, nickname string, uid int64
 
 		if err := rdb.Set(commitCtx, cacheKey, value, CacheTTL()).Err(); err != nil {
 
-			log.Printf("persistence: after commit account cache failed nickname=%s err=%v", nickname, err)
+			clog.Warnf("persistence: after commit account cache failed nickname=%s err=%v", nickname, err)
 
 		}
 

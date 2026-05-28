@@ -2,8 +2,8 @@ package persistence
 
 import (
 	"context"
-	"log"
 
+	clog "github.com/cherry-game/cherry/logger"
 	"gorm.io/gorm"
 )
 
@@ -30,7 +30,7 @@ func WithinTx(ctx context.Context, fn func(ctx context.Context) error) error {
 		txCtx := context.WithValue(ctx, txDBKey{}, tx)
 		txCtx = context.WithValue(txCtx, txHooksKey{}, hooks)
 		if err := fn(txCtx); err != nil {
-			log.Printf("persistence: tx rollback: %v", err)
+			clog.Debugf("persistence: tx rollback: %v", err)
 			return err
 		}
 		committed = true
@@ -80,7 +80,7 @@ func runAfterCommitHooks(ctx context.Context, hooks []func(context.Context)) {
 		func(h func(context.Context)) {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("persistence: after commit hook panic: %v", r)
+					clog.Errorf("persistence: after commit hook panic: %v", r)
 				}
 			}()
 			h(ctx)
