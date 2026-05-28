@@ -7,6 +7,7 @@ import (
 	"time"
 
 	cprofile "github.com/cherry-game/cherry/profile"
+	"github.com/example/mmo-server/internal/gtime"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -78,10 +79,11 @@ func Init() error {
 			return
 		}
 
-		if err = gdb.WithContext(ctx).AutoMigrate(&Account{}, &Player{}); err != nil {
+		if err = autoMigrateModels(gdb.WithContext(ctx)); err != nil {
 			initErr = err
 			return
 		}
+		gtime.LoadBiasFromRedis(ctx, rdb, cfg.keyPrefix)
 		db = gdb
 	})
 	return initErr

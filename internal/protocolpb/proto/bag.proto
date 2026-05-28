@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+message BagItem {
+  int32 item_id = 1 [json_name = "itemId"];
+  int32 count = 2 [json_name = "count"];
+}
+
+message BagListResponse {
+  repeated BagItem items = 1 [json_name = "items"];
+}
+
+message BagAddRequest {
+  int32 item_id = 1 [json_name = "itemId"];
+  int32 count = 2 [json_name = "count"];
+}
+
+message BagRemoveRequest {
+  int32 item_id = 1 [json_name = "itemId"];
+  int32 count = 2 [json_name = "count"];
+}

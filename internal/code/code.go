@@ -21,6 +21,9 @@ const (
 	DeviceIDRequired    int32 = 40015 // 缺少设备 ID（issueToken/login 必填）
 	DeviceLimitReached  int32 = 40016 // 同帐号在线设备数达上限（device_limit 策略）
 	DeviceMismatch      int32 = 40017 // 设备 ID 与签发令牌时不一致
+	BagItemInvalid      int32 = 40018 // 物品 ID 或数量非法
+	BagItemNotEnough    int32 = 40019 // 背包物品数量不足
+	BagLoadFail         int32 = 40020 // 背包加载失败
 )
 
 func IsFail(c int32) bool {
