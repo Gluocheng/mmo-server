@@ -6,16 +6,17 @@ import (
 
 	cstring "github.com/cherry-game/cherry/extend/string"
 	cfacade "github.com/cherry-game/cherry/facade"
-	cprofile "github.com/cherry-game/cherry/profile"
 	clog "github.com/cherry-game/cherry/logger"
 	cactor "github.com/cherry-game/cherry/net/actor"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	pmessage "github.com/cherry-game/cherry/net/parser/pomelo/message"
 	cproto "github.com/cherry-game/cherry/net/proto"
+	cprofile "github.com/cherry-game/cherry/profile"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -23,8 +24,8 @@ const (
 	issueTokenRoute   = "gate.user.issueToken"
 	refreshTokenRoute = "gate.user.refreshToken"
 
-	policyKickOld    = "kick_old"
-	policyCoexist    = "coexist"
+	policyKickOld     = "kick_old"
+	policyCoexist     = "coexist"
 	policyDeviceLimit = "device_limit"
 )
 
@@ -73,9 +74,9 @@ func (p *AgentActor) issueToken(session *cproto.Session, req *protocol.IssueToke
 		return
 	}
 	rsp := &protocol.IssueTokenResponse{}
-	reqCopy := *req
+	reqCopy := proto.Clone(req).(*protocol.IssueTokenRequest)
 	reqCopy.ClientIp = clientIPFromRemoteAddr(agent.RemoteAddr())
-	errCode := p.App().ActorSystem().CallWait(p.PathString(), target, "issueToken", &reqCopy, rsp)
+	errCode := p.App().ActorSystem().CallWait(p.PathString(), target, "issueToken", reqCopy, rsp)
 	if code.IsFail(errCode) {
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), mapAuthCode(errCode, code.LoginRPCFail))
 		return
