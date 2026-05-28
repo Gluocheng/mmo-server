@@ -1,6 +1,7 @@
 package world
 
 import (
+	"math"
 	"sync"
 
 	cfacade "github.com/cherry-game/cherry/facade"
@@ -12,17 +13,33 @@ import (
 // DefaultSceneID 演示用固定场景
 const DefaultSceneID = int32(1)
 
-var (
-	mu     sync.RWMutex
-	inRoom = make(map[int64]string) // uid -> agentPath
+const (
+	aoiRadius = float32(15) // 演示用 AOI 半径
 )
 
-func Enter(uid int64, agentPath string) []int64 {
+type playerState struct {
+	agentPath string
+	sceneID   int32
+	x, y, z   float32
+}
+
+var (
+	mu     sync.RWMutex
+	inRoom = make(map[int64]playerState) // uid -> state
+)
+
+func Enter(uid int64, agentPath string, sceneID int32) []int64 {
 	mu.Lock()
 	defer mu.Unlock()
-	inRoom[uid] = agentPath
+	inRoom[uid] = playerState{
+		agentPath: agentPath,
+		sceneID:   sceneID,
+	}
 	out := make([]int64, 0, len(inRoom))
-	for u := range inRoom {
+	for u, st := range inRoom {
+		if st.sceneID != sceneID {
+			continue
+		}
 		out = append(out, u)
 	}
 	return out
@@ -36,11 +53,26 @@ func Leave(uid int64) {
 
 func BroadcastMove(sender cfacade.IActor, fromUID int64, m *protocol.MoveBroadcast) {
 	mu.RLock()
-	peers := make(map[int64]string, len(inRoom))
-	for u, path := range inRoom {
-		if u != fromUID {
-			peers[u] = path
+	from, ok := inRoom[fromUID]
+	if !ok {
+		mu.RUnlock()
+		return
+	}
+	from.x, from.y, from.z = m.X, m.Y, m.Z
+	inRoom[fromUID] = from
+
+	peers := make(map[int64]string)
+	for u, st := range inRoom {
+		if u == fromUID {
+			continue
 		}
+		if st.sceneID != from.sceneID {
+			continue
+		}
+		if !withinAOI(from.x, from.z, st.x, st.z) {
+			continue
+		}
+		peers[u] = st.agentPath
 	}
 	mu.RUnlock()
 
@@ -48,4 +80,10 @@ func BroadcastMove(sender cfacade.IActor, fromUID int64, m *protocol.MoveBroadca
 		pomelo.PushWithUID(sender, path, uid, "onMove", m)
 	}
 	clog.Debugf("broadcast move to %d peers", len(peers))
+}
+
+func withinAOI(x1, z1, x2, z2 float32) bool {
+	dx := float64(x1 - x2)
+	dz := float64(z1 - z2)
+	return math.Sqrt(dx*dx+dz*dz) <= float64(aoiRadius)
 }
