@@ -38,7 +38,7 @@ func newToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
-func IssueTokenPair(uid int64, deviceID string) (accessToken string, accessExpireAt int64, refreshToken string, refreshExpireAt int64, err error) {
+func IssueTokenPairContext(parent context.Context, uid int64, deviceID string) (accessToken string, accessExpireAt int64, refreshToken string, refreshExpireAt int64, err error) {
 	if err = Init(); err != nil {
 		return "", 0, "", 0, err
 	}
@@ -50,12 +50,16 @@ func IssueTokenPair(uid int64, deviceID string) (accessToken string, accessExpir
 		return "", 0, "", 0, fmt.Errorf("device id empty")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 	return issueTokenPairWithUID(ctx, uid, deviceID)
 }
 
-func VerifyAccessToken(token, requestDeviceID string) (int64, string, error) {
+func IssueTokenPair(uid int64, deviceID string) (accessToken string, accessExpireAt int64, refreshToken string, refreshExpireAt int64, err error) {
+	return IssueTokenPairContext(context.Background(), uid, deviceID)
+}
+
+func VerifyAccessTokenContext(parent context.Context, token, requestDeviceID string) (int64, string, error) {
 	if err := Init(); err != nil {
 		return 0, "", err
 	}
@@ -64,7 +68,7 @@ func VerifyAccessToken(token, requestDeviceID string) (int64, string, error) {
 	if token == "" {
 		return 0, "", fmt.Errorf("token empty")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 	raw, err := rdb.Get(ctx, accessTokenKey(token)).Result()
 	if err == redis.Nil {
@@ -83,7 +87,11 @@ func VerifyAccessToken(token, requestDeviceID string) (int64, string, error) {
 	return uid, tokenDeviceID, nil
 }
 
-func RotateTokenPairByRefreshToken(refreshToken string) (accessToken string, accessExpireAt int64, newRefreshToken string, refreshExpireAt int64, deviceID string, err error) {
+func VerifyAccessToken(token, requestDeviceID string) (int64, string, error) {
+	return VerifyAccessTokenContext(context.Background(), token, requestDeviceID)
+}
+
+func RotateTokenPairByRefreshTokenContext(parent context.Context, refreshToken string) (accessToken string, accessExpireAt int64, newRefreshToken string, refreshExpireAt int64, deviceID string, err error) {
 	if err = Init(); err != nil {
 		return "", 0, "", 0, "", err
 	}
@@ -92,7 +100,7 @@ func RotateTokenPairByRefreshToken(refreshToken string) (accessToken string, acc
 		return "", 0, "", 0, "", fmt.Errorf("refresh token empty")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 	raw, err := rdb.GetDel(ctx, refreshTokenKey(refreshToken)).Result()
 	if err == redis.Nil {
@@ -116,6 +124,10 @@ func RotateTokenPairByRefreshToken(refreshToken string) (accessToken string, acc
 		return "", 0, "", 0, "", err
 	}
 	return accessToken, accessExpireAt, newRefreshToken, refreshExpireAt, deviceID, nil
+}
+
+func RotateTokenPairByRefreshToken(refreshToken string) (accessToken string, accessExpireAt int64, newRefreshToken string, refreshExpireAt int64, deviceID string, err error) {
+	return RotateTokenPairByRefreshTokenContext(context.Background(), refreshToken)
 }
 
 func issueTokenPairWithUID(ctx context.Context, uid int64, deviceID string) (accessToken string, accessExpireAt int64, refreshToken string, refreshExpireAt int64, err error) {
@@ -160,7 +172,7 @@ func parseTokenValue(raw string) (int64, string, error) {
 	return uid, deviceID, nil
 }
 
-func RevokeTokens(accessToken, refreshToken string) error {
+func RevokeTokensContext(parent context.Context, accessToken, refreshToken string) error {
 	if err := Init(); err != nil {
 		return err
 	}
@@ -169,7 +181,7 @@ func RevokeTokens(accessToken, refreshToken string) error {
 	if accessToken == "" && refreshToken == "" {
 		return fmt.Errorf("token empty")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 	keys := make([]string, 0, 2)
 	if accessToken != "" {
@@ -179,4 +191,8 @@ func RevokeTokens(accessToken, refreshToken string) error {
 		keys = append(keys, refreshTokenKey(refreshToken))
 	}
 	return rdb.Del(ctx, keys...).Err()
+}
+
+func RevokeTokens(accessToken, refreshToken string) error {
+	return RevokeTokensContext(context.Background(), accessToken, refreshToken)
 }

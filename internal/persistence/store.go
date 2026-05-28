@@ -14,17 +14,18 @@ import (
 )
 
 type config struct {
-	mysqlDSN    string
-	maxOpenConn int
-	maxIdleConn int
-	cacheTTL    time.Duration
-	accessTTL   time.Duration
-	refreshTTL  time.Duration
-	loginFailLimit int
-	loginFailWindow time.Duration
-	loginBlockTTL time.Duration
+	mysqlDSN         string
+	maxOpenConn      int
+	maxIdleConn      int
+	cacheTTL         time.Duration
+	opTimeout        time.Duration
+	accessTTL        time.Duration
+	refreshTTL       time.Duration
+	loginFailLimit   int
+	loginFailWindow  time.Duration
+	loginBlockTTL    time.Duration
 	deviceSessionTTL time.Duration
-	keyPrefix   string
+	keyPrefix        string
 }
 
 var (
@@ -90,17 +91,18 @@ func loadConfig() config {
 	my := cprofile.GetConfig("mysql")
 	rd := cprofile.GetConfig("redis")
 	return config{
-		mysqlDSN:    my.GetString("dsn", ""),
-		maxOpenConn: my.GetInt("max_open_conns", 20),
-		maxIdleConn: my.GetInt("max_idle_conns", 10),
-		cacheTTL:    time.Duration(rd.GetInt("cache_ttl_seconds", 600)) * time.Second,
-		accessTTL:   time.Duration(rd.GetInt("access_ttl_seconds", 900)) * time.Second,
-		refreshTTL:  time.Duration(rd.GetInt("refresh_ttl_seconds", rd.GetInt("token_ttl_seconds", 86400))) * time.Second,
-		loginFailLimit: rd.GetInt("login_fail_limit", 5),
-		loginFailWindow: time.Duration(rd.GetInt("login_fail_window_seconds", 300)) * time.Second,
-		loginBlockTTL: time.Duration(rd.GetInt("login_block_seconds", 600)) * time.Second,
+		mysqlDSN:         my.GetString("dsn", ""),
+		maxOpenConn:      my.GetInt("max_open_conns", 20),
+		maxIdleConn:      my.GetInt("max_idle_conns", 10),
+		cacheTTL:         time.Duration(rd.GetInt("cache_ttl_seconds", 600)) * time.Second,
+		opTimeout:        time.Duration(rd.GetInt("op_timeout_seconds", 2)) * time.Second,
+		accessTTL:        time.Duration(rd.GetInt("access_ttl_seconds", 900)) * time.Second,
+		refreshTTL:       time.Duration(rd.GetInt("refresh_ttl_seconds", rd.GetInt("token_ttl_seconds", 86400))) * time.Second,
+		loginFailLimit:   rd.GetInt("login_fail_limit", 5),
+		loginFailWindow:  time.Duration(rd.GetInt("login_fail_window_seconds", 300)) * time.Second,
+		loginBlockTTL:    time.Duration(rd.GetInt("login_block_seconds", 600)) * time.Second,
 		deviceSessionTTL: time.Duration(rd.GetInt("device_session_ttl_seconds", 7200)) * time.Second,
-		keyPrefix:   rd.GetString("key_prefix", "mmo"),
+		keyPrefix:        rd.GetString("key_prefix", "mmo"),
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 )
 
 func normalizeIP(ip string) string {
@@ -31,21 +30,25 @@ func loginBlockKey(ip, nickname string) string {
 	return fmt.Sprintf("%s:login:block:%s:%s", KeyPrefix(), normalizeIP(ip), normalizeNickname(nickname))
 }
 
-func IsLoginBlocked(ip, nickname string) (bool, error) {
+func IsLoginBlockedContext(parent context.Context, ip, nickname string) (bool, error) {
 	if err := Init(); err != nil {
 		return false, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 	n, err := rdb.Exists(ctx, loginBlockKey(ip, nickname)).Result()
 	return n > 0, err
 }
 
-func RecordLoginFailure(ip, nickname string) error {
+func IsLoginBlocked(ip, nickname string) (bool, error) {
+	return IsLoginBlockedContext(context.Background(), ip, nickname)
+}
+
+func RecordLoginFailureContext(parent context.Context, ip, nickname string) error {
 	if err := Init(); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 
 	failKey := loginFailKey(ip, nickname)
@@ -62,11 +65,19 @@ func RecordLoginFailure(ip, nickname string) error {
 	return nil
 }
 
-func ClearLoginFailure(ip, nickname string) error {
+func RecordLoginFailure(ip, nickname string) error {
+	return RecordLoginFailureContext(context.Background(), ip, nickname)
+}
+
+func ClearLoginFailureContext(parent context.Context, ip, nickname string) error {
 	if err := Init(); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 	return rdb.Del(ctx, loginFailKey(ip, nickname), loginBlockKey(ip, nickname)).Err()
+}
+
+func ClearLoginFailure(ip, nickname string) error {
+	return ClearLoginFailureContext(context.Background(), ip, nickname)
 }

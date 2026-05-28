@@ -44,8 +44,8 @@ func (p *actorPlayer) selectPlayer(session *cproto.Session, _ *protocol.None) {
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
-	if ok {
-		rsp.List = append(rsp.List, proto.Clone(&info).(*protocol.PlayerInfo))
+	if ok && info != nil {
+		rsp.List = append(rsp.List, proto.Clone(info).(*protocol.PlayerInfo))
 	}
 	p.Response(session, rsp)
 }
@@ -55,17 +55,17 @@ func (p *actorPlayer) createPlayer(session *cproto.Session, req *protocol.Player
 		p.ResponseCode(session, code.PlayerCreateFail)
 		return
 	}
-	info, created, err := persistence.CreatePlayer(session.Uid, req.Name)
+	info, created, err := persistence.CreatePlayerForUID(session.Uid, req.Name)
 	if err != nil {
 		clog.Warnf("create player fail uid=%d err=%v", session.Uid, err)
 		p.ResponseCode(session, code.PlayerCreateFail)
 		return
 	}
-	if !created {
+	if !created || info == nil {
 		p.ResponseCode(session, code.PlayerCreateFail)
 		return
 	}
-	p.Response(session, &protocol.PlayerCreateResponse{Player: proto.Clone(&info).(*protocol.PlayerInfo)})
+	p.Response(session, &protocol.PlayerCreateResponse{Player: proto.Clone(info).(*protocol.PlayerInfo)})
 }
 
 func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequest) {
@@ -79,7 +79,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
-	if !ok {
+	if !ok || info == nil {
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
