@@ -3,11 +3,11 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
+	"log"
 
 	"github.com/example/mmo-server/internal/protocol"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
 
@@ -17,83 +17,116 @@ func playerUIDKey(uid int64) string {
 	return fmt.Sprintf("%s:player:uid:%d", KeyPrefix(), uid)
 }
 
-func GetPlayerByUID(uid int64) (protocol.PlayerInfo, bool, error) {
-	if err := Init(); err != nil {
-		return protocol.PlayerInfo{}, false, err
-	}
-	if uid < 1 {
-		return protocol.PlayerInfo{}, false, nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	cacheKey := playerUIDKey(uid)
-	if raw, err := rdb.Get(ctx, cacheKey).Bytes(); err == nil {
-		var player protocol.PlayerInfo
-		if jsonErr := protojson.Unmarshal(raw, &player); jsonErr == nil && player.GetPlayerId() > 0 {
-			return player, true, nil
-		}
-	}
-
-	var model Player
-	err := db.WithContext(ctx).Where("uid = ?", uid).First(&model).Error
-	if err == gorm.ErrRecordNotFound {
-		return protocol.PlayerInfo{}, false, nil
-	}
-	if err != nil {
-		return protocol.PlayerInfo{}, false, err
-	}
-
-	player := protocol.PlayerInfo{
+func playerInfoFromModel(model Player) *protocol.PlayerInfo {
+	return &protocol.PlayerInfo{
 		PlayerId: model.PlayerID,
 		Name:     model.Name,
 	}
-	b, _ := playerCacheJSON.Marshal(&player)
-	_ = rdb.Set(ctx, cacheKey, b, CacheTTL()).Err()
-	return player, true, nil
 }
 
-func CreatePlayer(uid int64, name string) (protocol.PlayerInfo, bool, error) {
-	if err := Init(); err != nil {
-		return protocol.PlayerInfo{}, false, err
+func schedulePlayerCacheRefresh(ctx context.Context, uid int64, player *protocol.PlayerInfo) {
+	if rdb == nil {
+		return
 	}
-	name = strings.TrimSpace(name)
-	if uid < 1 || name == "" {
-		return protocol.PlayerInfo{}, false, nil
+	b, err := playerCacheJSON.Marshal(player)
+	if err != nil {
+		log.Printf("persistence: marshal player cache failed uid=%d err=%v", uid, err)
+		return
+	}
+	cacheKey := playerUIDKey(uid)
+	AfterCommit(ctx, func(commitCtx context.Context) {
+		if err := rdb.Set(commitCtx, cacheKey, b, CacheTTL()).Err(); err != nil {
+			log.Printf("persistence: after commit player cache failed uid=%d err=%v", uid, err)
+		}
+	})
+}
+
+func writePlayerCache(ctx context.Context, uid int64, player *protocol.PlayerInfo) {
+	if rdb == nil {
+		return
+	}
+	b, err := playerCacheJSON.Marshal(player)
+	if err != nil {
+		return
+	}
+	_ = rdb.Set(ctx, playerUIDKey(uid), b, CacheTTL()).Err()
+}
+
+func getPlayerByUIDFromDB(ctx context.Context, uid int64) (*protocol.PlayerInfo, bool, error) {
+	var model Player
+	err := DBFromContext(ctx).WithContext(ctx).Where("uid = ?", uid).First(&model).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return playerInfoFromModel(model), true, nil
+}
+
+func GetPlayerByUIDContext(parent context.Context, uid int64) (*protocol.PlayerInfo, bool, error) {
+	if err := ensureDB(); err != nil {
+		return nil, false, err
+	}
+	if uid < 1 {
+		return nil, false, nil
 	}
 
-	if old, found, err := GetPlayerByUID(uid); err != nil {
-		return protocol.PlayerInfo{}, false, err
-	} else if found {
-		return old, false, nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
+
+	if rdb != nil {
+		cacheKey := playerUIDKey(uid)
+		if raw, err := rdb.Get(ctx, cacheKey).Bytes(); err == nil {
+			var player protocol.PlayerInfo
+			if jsonErr := protojson.Unmarshal(raw, &player); jsonErr == nil && player.GetPlayerId() > 0 {
+				return proto.Clone(&player).(*protocol.PlayerInfo), true, nil
+			}
+		}
+	}
+
+	player, found, err := getPlayerByUIDFromDB(ctx, uid)
+	if err != nil || !found {
+		return player, found, err
+	}
+	writePlayerCache(ctx, uid, player)
+	return proto.Clone(player).(*protocol.PlayerInfo), true, nil
+}
+
+func GetPlayerByUID(uid int64) (*protocol.PlayerInfo, bool, error) {
+	return GetPlayerByUIDContext(context.Background(), uid)
+}
+
+func createPlayerInTx(ctx context.Context, uid int64, name string) (*protocol.PlayerInfo, bool, error) {
+	if old, found, err := getPlayerByUIDFromDB(ctx, uid); err != nil {
+		return nil, false, err
+	} else if found {
+		return proto.Clone(old).(*protocol.PlayerInfo), false, nil
+	}
 
 	model := Player{
 		UID:  uid,
 		Name: name,
 	}
-	if err := db.WithContext(ctx).Create(&model).Error; err != nil {
-		// 并发创建兜底
+	if err := DBFromContext(ctx).WithContext(ctx).Create(&model).Error; err != nil {
 		var existed Player
-		qErr := db.WithContext(ctx).Where("uid = ?", uid).First(&existed).Error
+		qErr := DBFromContext(ctx).WithContext(ctx).Where("uid = ?", uid).First(&existed).Error
 		if qErr != nil {
-			return protocol.PlayerInfo{}, false, err
+			return nil, false, err
 		}
-		return protocol.PlayerInfo{
-			PlayerId: existed.PlayerID,
-			Name:     existed.Name,
-		}, false, nil
+		return playerInfoFromModel(existed), false, nil
 	}
 
-	player := protocol.PlayerInfo{
-		PlayerId: model.PlayerID,
-		Name:     model.Name,
-	}
-	b, _ := playerCacheJSON.Marshal(&player)
-	_ = rdb.Set(ctx, playerUIDKey(uid), b, CacheTTL()).Err()
+	player := playerInfoFromModel(model)
+	schedulePlayerCacheRefresh(ctx, uid, player)
 	return player, true, nil
+}
+
+func CreatePlayerContext(parent context.Context, uid int64, name string) (*protocol.PlayerInfo, bool, error) {
+	return CreatePlayerForUIDContext(parent, uid, name)
+}
+
+// CreatePlayer 兼容入口，委托给 CreatePlayerForUID。
+func CreatePlayer(uid int64, name string) (*protocol.PlayerInfo, bool, error) {
+	return CreatePlayerContext(context.Background(), uid, name)
 }

@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
-	"time"
 
 	cprofile "github.com/cherry-game/cherry/profile"
 	"github.com/redis/go-redis/v9"
@@ -22,7 +21,7 @@ var registerDeviceScript = redis.NewScript(registerDeviceLua)
 
 // RegisterDeviceSession 设备会话注册（原子检查并写入）
 // 返回值: allowed=true 允许登录; false 表示超出设备数量限制
-func RegisterDeviceSession(uid int64, deviceID string, maxDevices int) (bool, error) {
+func RegisterDeviceSessionContext(parent context.Context, uid int64, deviceID string, maxDevices int) (bool, error) {
 	if err := Init(); err != nil {
 		return false, err
 	}
@@ -37,7 +36,7 @@ func RegisterDeviceSession(uid int64, deviceID string, maxDevices int) (bool, er
 		maxDevices = 1
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 
 	key := deviceSetKey(uid)
@@ -48,7 +47,11 @@ func RegisterDeviceSession(uid int64, deviceID string, maxDevices int) (bool, er
 	return rsp == 1, nil
 }
 
-func RemoveDeviceSession(uid int64, deviceID string) error {
+func RegisterDeviceSession(uid int64, deviceID string, maxDevices int) (bool, error) {
+	return RegisterDeviceSessionContext(context.Background(), uid, deviceID, maxDevices)
+}
+
+func RemoveDeviceSessionContext(parent context.Context, uid int64, deviceID string) error {
 	if err := Init(); err != nil {
 		return err
 	}
@@ -59,7 +62,7 @@ func RemoveDeviceSession(uid int64, deviceID string) error {
 	if deviceID == "" {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := opContext(parent)
 	defer cancel()
 	key := deviceSetKey(uid)
 	if err := rdb.SRem(ctx, key, deviceID).Err(); err != nil {
@@ -70,6 +73,10 @@ func RemoveDeviceSession(uid int64, deviceID string) error {
 		_ = rdb.Del(ctx, key).Err()
 	}
 	return nil
+}
+
+func RemoveDeviceSession(uid int64, deviceID string) error {
+	return RemoveDeviceSessionContext(context.Background(), uid, deviceID)
 }
 
 func SessionPolicyConfig() (policy string, maxDevices int) {
