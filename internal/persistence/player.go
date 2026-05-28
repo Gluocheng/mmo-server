@@ -3,8 +3,8 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"log"
 
+	clog "github.com/cherry-game/cherry/logger"
 	"github.com/example/mmo-server/internal/protocol"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -30,13 +30,13 @@ func schedulePlayerCacheRefresh(ctx context.Context, uid int64, player *protocol
 	}
 	b, err := playerCacheJSON.Marshal(player)
 	if err != nil {
-		log.Printf("persistence: marshal player cache failed uid=%d err=%v", uid, err)
+		clog.Warnf("persistence: marshal player cache failed uid=%d err=%v", uid, err)
 		return
 	}
 	cacheKey := playerUIDKey(uid)
 	AfterCommit(ctx, func(commitCtx context.Context) {
 		if err := rdb.Set(commitCtx, cacheKey, b, CacheTTL()).Err(); err != nil {
-			log.Printf("persistence: after commit player cache failed uid=%d err=%v", uid, err)
+			clog.Warnf("persistence: after commit player cache failed uid=%d err=%v", uid, err)
 		}
 	})
 }
