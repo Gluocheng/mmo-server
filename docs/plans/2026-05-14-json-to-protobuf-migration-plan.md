@@ -1,55 +1,41 @@
-# MMO JSON 到 Protobuf 迁移计划
+﻿# MMO JSON 鍒?Protobuf 杩佺Щ璁″垝
 
-## 目标
+## 鐩爣
 
-在不影响当前可运行链路的前提下，将高频消息从 JSON 迁移到 Protobuf，降低带宽与序列化开销；中低频管理协议保留在后续阶段迁移。
+鍦ㄤ笉褰卞搷褰撳墠鍙繍琛岄摼璺殑鍓嶆彁涓嬶紝灏嗛珮棰戞秷鎭粠 JSON 杩佺Щ鍒?Protobuf锛岄檷浣庡甫瀹戒笌搴忓垪鍖栧紑閿€锛涗腑浣庨绠＄悊鍗忚淇濈暀鍦ㄥ悗缁樁娈佃縼绉汇€?
+## 鑼冨洿
 
-## 范围
+- 绗竴闃舵锛歚scene` / `move` 楂樻秷鎭鐜囬摼璺?- 绗簩闃舵锛歚player` 涓氬姟閾捐矾锛堟煡瑙?鍒涜/杩涘満锛?- 绗笁闃舵锛歚auth` 閾捐矾锛坕ssue/login/refresh/logout锛?
+## 杩佺Щ姝ラ
 
-- 第一阶段：`scene` / `move` 高消息频率链路
-- 第二阶段：`player` 业务链路（查角/创角/进场）
-- 第三阶段：`auth` 链路（issue/login/refresh/logout）
-
-## 迁移步骤
-
-- [ ] 冻结现有协议字段，避免迁移过程中频繁改名
-- [ ] 新建 proto 目录：`internal/protocolpb/proto/`
-- [ ] 按领域定义 proto 文件：
-  - [ ] `common.proto`
+- [ ] 鍐荤粨鐜版湁鍗忚瀛楁锛岄伩鍏嶈縼绉昏繃绋嬩腑棰戠箒鏀瑰悕
+- [ ] 鏂板缓 proto 鐩綍锛歚internal/protocolpb/proto/`
+- [ ] 鎸夐鍩熷畾涔?proto 鏂囦欢锛?  - [ ] `common.proto`
   - [ ] `scene.proto`
   - [ ] `player.proto`
   - [ ] `auth.proto`
-- [ ] 生成 Go 代码到：`internal/protocolpb/gen/`
-- [ ] 替换业务代码中的协议类型（先从 scene 开始）：
-  - [ ] `internal/gameapp/player/actor_player.go`
+- [ ] 鐢熸垚 Go 浠ｇ爜鍒帮細`internal/protocolpb/gen/`
+- [ ] 鏇挎崲涓氬姟浠ｇ爜涓殑鍗忚绫诲瀷锛堝厛浠?scene 寮€濮嬶級锛?  - [ ] `internal/gameapp/player/actor_player.go`
   - [ ] `internal/gatewayapp/actor/agent.go`
   - [ ] `internal/loginapp/actor/actor_session.go`
-- [ ] 统一切换序列化器为 Protobuf（节点级一致）：
-  - [ ] `internal/gatewayapp/app.go`
+- [ ] 缁熶竴鍒囨崲搴忓垪鍖栧櫒涓?Protobuf锛堣妭鐐圭骇涓€鑷达級锛?  - [ ] `internal/gatewayapp/app.go`
   - [ ] `internal/loginapp/app.go`
   - [ ] `internal/gameapp/app.go`
-- [ ] 更新 README 协议示例与生成命令
-
-## 兼容与风险控制
-
-- [ ] 关键路由可加版本后缀（例如 `game.player.move.v2`）进行灰度
-- [ ] 删除字段前使用 `reserved`，禁止复用历史字段号
-- [ ] 避免跨节点出现 JSON/Protobuf 混序列化状态
-
-## 验证清单
+- [ ] 鏇存柊 README 鍗忚绀轰緥涓庣敓鎴愬懡浠?
+## 鍏煎涓庨闄╂帶鍒?
+- [ ] 鍏抽敭璺敱鍙姞鐗堟湰鍚庣紑锛堜緥濡?`game.player.move.v2`锛夎繘琛岀伆搴?- [ ] 鍒犻櫎瀛楁鍓嶄娇鐢?`reserved`锛岀姝㈠鐢ㄥ巻鍙插瓧娈靛彿
+- [ ] 閬垮厤璺ㄨ妭鐐瑰嚭鐜?JSON/Protobuf 娣峰簭鍒楀寲鐘舵€?
+## 楠岃瘉娓呭崟
 
 - [ ] `go test ./...`
 - [ ] `go build -o bin/gateway.exe ./cmd/gateway`
 - [ ] `go build -o bin/login.exe ./cmd/login`
 - [ ] `go build -o bin/game.exe ./cmd/game`
-- [ ] 手工联调闭环：
-  - [ ] `issueToken`
+- [ ] 鎵嬪伐鑱旇皟闂幆锛?  - [ ] `issueToken`
   - [ ] `login`
   - [ ] `select/create/enter`
-  - [ ] `move` 广播
+  - [ ] `move` 骞挎挱
 
-## 里程碑
-
-1. M1：`scene` 协议迁移完成并通过压测
-2. M2：`player` 协议迁移完成并稳定运行
-3. M3：`auth` 协议迁移完成并文档齐全
+## 閲岀▼纰?
+1. M1锛歚scene` 鍗忚杩佺Щ瀹屾垚骞堕€氳繃鍘嬫祴
+2. M2锛歚player` 鍗忚杩佺Щ瀹屾垚骞剁ǔ瀹氳繍琛?3. M3锛歚auth` 鍗忚杩佺Щ瀹屾垚骞舵枃妗ｉ綈鍏?
