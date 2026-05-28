@@ -95,18 +95,14 @@ function Start-MMONode {
         throw "binary not found: $exe (run with -Build)"
     }
     $args = @("-path=$Profile", "-node=$NodeID")
-    $out = Join-Path $root "logs/$ProcessName.out"
-    $err = Join-Path $root "logs/$ProcessName.err"
     Start-Process `
         -FilePath $exe `
         -ArgumentList $args `
         -WorkingDirectory $root `
-        -RedirectStandardOutput $out `
-        -RedirectStandardError $err `
         -WindowStyle Hidden | Out-Null
     Start-Sleep -Seconds $WaitSec
     if (-not (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue)) {
-        throw "[$ProcessName] failed to start, see logs/$ProcessName.err"
+        throw "[$ProcessName] failed to start, see logs/$ProcessName.log"
     }
     Write-Host "[$ProcessName] started (node=$NodeID)."
 }
@@ -132,7 +128,7 @@ Start-MMONode -ProcessName "game"    -NodeID "10001"    -WaitSec 2
 Start-MMONode -ProcessName "gateway" -NodeID "gate-1"   -WaitSec 3
 
 if (-not (Test-PortOpen 10100)) {
-    Write-Warning "[gateway] 10100 not open yet — check logs/gateway.err"
+    Write-Warning "[gateway] 10100 not open yet — check logs/gateway.log"
 } else {
     Write-Host "[gateway] ws://127.0.0.1:10100"
 }

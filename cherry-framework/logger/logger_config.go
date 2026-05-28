@@ -64,12 +64,12 @@ func NewConfig(jsonConfig cfacade.ProfileJSON) (*Config, error) {
 	}
 
 	if config.EnableWriteFile {
-		if config.FileLinkPath == "" {
+		if config.FileLinkPath == "" && jsonConfig.Get("file_link_path").LastError() != nil {
 			defaultValue := fmt.Sprintf("logs/%s.log", config.LogLevel)
 			config.FileLinkPath = jsonConfig.GetString("file_link_path", defaultValue)
 		}
 
-		if config.FilePathFormat == "" {
+		if config.FilePathFormat == "" && jsonConfig.Get("file_path_format").LastError() != nil {
 			defaultValue := fmt.Sprintf("logs/%s_%s.log", config.LogLevel, "%Y%m%d%H%M")
 			config.FilePathFormat = jsonConfig.GetString("file_path_format", defaultValue)
 		}
