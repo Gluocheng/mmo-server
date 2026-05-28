@@ -1,0 +1,27 @@
+name: go
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build binaries
+        run: |
+          mkdir -p bin
+          go build -o bin/gateway ./cmd/gateway
+          go build -o bin/login ./cmd/login
+          go build -o bin/game ./cmd/game
+          go build -o bin/master ./cmd/master
