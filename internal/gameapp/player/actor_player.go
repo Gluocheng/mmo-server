@@ -13,6 +13,7 @@ import (
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -44,8 +45,7 @@ func (p *actorPlayer) selectPlayer(session *cproto.Session, _ *protocol.None) {
 		return
 	}
 	if ok {
-		pi := info
-		rsp.List = append(rsp.List, &pi)
+		rsp.List = append(rsp.List, proto.Clone(&info).(*protocol.PlayerInfo))
 	}
 	p.Response(session, rsp)
 }
@@ -65,8 +65,7 @@ func (p *actorPlayer) createPlayer(session *cproto.Session, req *protocol.Player
 		p.ResponseCode(session, code.PlayerCreateFail)
 		return
 	}
-	pi := info
-	p.Response(session, &protocol.PlayerCreateResponse{Player: &pi})
+	p.Response(session, &protocol.PlayerCreateResponse{Player: proto.Clone(&info).(*protocol.PlayerInfo)})
 }
 
 func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequest) {
@@ -99,9 +98,8 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 	if req != nil && req.SceneId > 0 {
 		sceneID = req.SceneId
 	}
-	_ = sceneID // 当前仅单场景
-	all := world.Enter(session.Uid, session.AgentPath)
-	p.Response(session, &protocol.EnterGameResponse{SceneId: world.DefaultSceneID, Players: all})
+	all := world.Enter(session.Uid, session.AgentPath, sceneID)
+	p.Response(session, &protocol.EnterGameResponse{SceneId: sceneID, Players: all})
 }
 
 func (p *actorPlayer) move(session *cproto.Session, req *protocol.MoveRequest) {
