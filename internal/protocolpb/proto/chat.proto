@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+message ChatSendRequest {
+  string text = 1 [json_name = "text"];
+}
+
+message ChatBroadcast {
+  int64 uid = 1 [json_name = "uid"];
+  string text = 2 [json_name = "text"];
+}
+
