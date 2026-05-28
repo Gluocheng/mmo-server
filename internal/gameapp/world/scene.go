@@ -51,6 +51,16 @@ func Leave(uid int64) {
 	delete(inRoom, uid)
 }
 
+func SceneID(uid int64) (int32, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
+	st, ok := inRoom[uid]
+	if !ok {
+		return 0, false
+	}
+	return st.sceneID, true
+}
+
 func BroadcastMove(sender cfacade.IActor, fromUID int64, m *protocol.MoveBroadcast) {
 	mu.RLock()
 	from, ok := inRoom[fromUID]
@@ -86,4 +96,23 @@ func withinAOI(x1, z1, x2, z2 float32) bool {
 	dx := float64(x1 - x2)
 	dz := float64(z1 - z2)
 	return math.Sqrt(dx*dx+dz*dz) <= float64(aoiRadius)
+}
+
+func BroadcastChat(sender cfacade.IActor, fromUID int64, sceneID int32, m *protocol.ChatBroadcast) {
+	mu.RLock()
+	peers := make(map[int64]string)
+	for u, st := range inRoom {
+		if u == fromUID {
+			continue
+		}
+		if st.sceneID != sceneID {
+			continue
+		}
+		peers[u] = st.agentPath
+	}
+	mu.RUnlock()
+
+	for uid, path := range peers {
+		pomelo.PushWithUID(sender, path, uid, "onChat", m)
+	}
 }

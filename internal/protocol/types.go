@@ -26,6 +26,8 @@ type (
 	LogoutResponse       = pb.LogoutResponse
 	RefreshTokenRequest  = pb.RefreshTokenRequest
 	RefreshTokenResponse = pb.RefreshTokenResponse
+	ChatSendRequest      = pb.ChatSendRequest
+	ChatBroadcast         = pb.ChatBroadcast
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

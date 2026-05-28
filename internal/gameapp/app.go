@@ -6,6 +6,7 @@ import (
 	cherryUtils "github.com/cherry-game/cherry/extend/utils"
 	cherrySnowflake "github.com/cherry-game/cherry/extend/snowflake"
 	cserializer "github.com/cherry-game/cherry/net/serializer"
+	"github.com/example/mmo-server/internal/gameapp/chat"
 	"github.com/example/mmo-server/internal/gameapp/player"
 )
 
@@ -20,5 +21,6 @@ func Run(profileFilePath, nodeID string) {
 	app := cherry.Configure(profileFilePath, nodeID, false, cherry.Cluster)
 	app.SetSerializer(cserializer.NewProtobuf())
 	app.AddActors(&player.ActorPlayers{})
+	app.AddActors(&chat.ActorChats{})
 	app.Startup()
 }
