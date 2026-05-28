@@ -145,6 +145,25 @@ func main() {
 	}
 	fmt.Printf("bag list OK items=%d\n", len(bagRsp.Items))
 
+	// 6b) bag move + split smoke
+	if len(bagRsp.Items) > 0 {
+		fromSlot := bagRsp.Items[0].Slot
+		moveReq := &protocol.BagMoveRequest{FromSlot: fromSlot, ToSlot: fromSlot + 1}
+		if _, err := c.Request("game.bag.move", moveReq); err != nil {
+			fmt.Fprintf(os.Stderr, "bag move failed: %v\n", err)
+			exitCode = 1
+			return
+		}
+		fmt.Println("bag move OK")
+		splitReq := &protocol.BagSplitRequest{FromSlot: fromSlot + 1, Count: 1}
+		if _, err := c.Request("game.bag.split", splitReq); err != nil {
+			fmt.Fprintf(os.Stderr, "bag split failed: %v\n", err)
+			exitCode = 1
+			return
+		}
+		fmt.Println("bag split OK")
+	}
+
 	// 7) move (no need to wait push)
 	_, err = c.Request("game.player.move", &protocol.MoveRequest{X: 1, Y: 2, Z: 0})
 	if err != nil {

@@ -128,9 +128,11 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 进场 | `game.player.enter` | `EnterGameRequest` | `EnterGameResponse` |
 | 移动 | `game.player.move` | `MoveRequest` | `Empty`；同场景 AOI 内 Push `onMove`（`MoveBroadcast`） |
 | 聊天 | `game.chat.send` | `ChatSendRequest` | `Empty`；同场景 Push `onChat`（`ChatBroadcast`） |
-| 背包列表 | `game.bag.list` | `google.protobuf.Empty` | `BagListResponse` |
-| 背包发放 | `game.bag.add` | `BagAddRequest` | `BagListResponse`（当前背包） |
-| 背包扣除 | `game.bag.remove` | `BagRemoveRequest` | `BagListResponse`（当前背包） |
+| 背包列表 | `game.bag.list` | `google.protobuf.Empty` | `BagListResponse`（`BagItem` 含 `slot`） |
+| 背包发放 | `game.bag.add` | `BagAddRequest` | `BagListResponse` + Push `onBagChange` |
+| 背包扣除 | `game.bag.remove` | `BagRemoveRequest` | `BagListResponse` + Push `onBagChange` |
+| 背包移动 | `game.bag.move` | `BagMoveRequest`（`fromSlot` / `toSlot`） | `BagListResponse` + Push `onBagChange` |
+| 背包拆分 | `game.bag.split` | `BagSplitRequest`（`fromSlot` / `count`） | `BagListResponse` + Push `onBagChange` |
 
 说明：
 
@@ -138,11 +140,13 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 未完成 `enter` 时，除 `select` / `create` / `enter` 外请求会被网关拒绝
 - 移动广播带简单 **AOI 半径过滤**（默认 15，见 `internal/gameapp/world/scene.go`）
 - 聊天为同场景全员广播（无 AOI 裁剪）
-- 背包须已 `enter`；同 `item_id` 堆叠，单格上限 9999；`add`/`remove` 成功后返回最新 `BagListResponse`
+- 背包须已 `enter`；**32 固定槽位**（`slot` 0–31）；同 `item_id` 优先堆叠，单格上限 9999，满则占空槽
+- `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
+- `add` / `remove` / `move` / `split` 成功后 RPC 返回最新背包，并 Push `onBagChange`（同 `BagListResponse`）
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40020`，`0` 为成功）。背包相关：`40018` 参数非法、`40019` 数量不足、`40020` 加载失败。网关对登录服 RPC 返回码会做映射透传。
+定义与注释见 `internal/code/code.go`（`40001`–`40022`，`0` 为成功）。背包相关：`40018` 参数非法、`40019` 数量不足、`40020` 加载失败、`40021` 槽位非法、`40022` 背包已满。网关对登录服 RPC 返回码会做映射透传。
 
 ### 重新生成 Protobuf Go 代码
 
@@ -222,8 +226,10 @@ CI：`.github/workflows/go.yml`（`go test` + 四节点 `go build`）。
 - `auth.session_policy`、`auth.max_devices_per_uid`
 - `redis.*`（TTL、限流、`key_prefix`）
 
+## 功能计划与进度
+
+后续迭代在 [`docs/plans/README.md`](docs/plans/README.md) 维护：每项功能对应 plan 文件与 `done` / `in_progress` / `planned` 状态。新功能开工前先更新计划再实现。
+
 ## 后续扩展
 
-可按子系统增量迭代：战斗、背包、匹配、更完整 AOI 等。
-
-若需 **一账号多角**、角色扩展字段或版本化 DB 迁移，应单独评审表结构与 `select/create/enter` 语义后再改。
+Backlog 见 `docs/plans/`（物品表、战斗、多角、DB 迁移等）。若需 **一账号多角** 或版本化迁移，须先更新对应 backlog plan 并评审后再改表与协议。

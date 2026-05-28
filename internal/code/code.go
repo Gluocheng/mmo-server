@@ -24,6 +24,8 @@ const (
 	BagItemInvalid      int32 = 40018 // 物品 ID 或数量非法
 	BagItemNotEnough    int32 = 40019 // 背包物品数量不足
 	BagLoadFail         int32 = 40020 // 背包加载失败
+	BagSlotInvalid      int32 = 40021 // 槽位非法或源槽为空
+	BagFull             int32 = 40022 // 背包槽位已满
 )
 
 func IsFail(c int32) bool {
