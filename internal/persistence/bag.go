@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	clog "github.com/cherry-game/cherry/logger"
+	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/protocol"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -25,6 +26,7 @@ var (
 	ErrBagInvalid     = errors.New("bag item invalid")    // itemId/count 非法或 move 合并失败
 	ErrBagSlotInvalid = errors.New("bag slot invalid")    // 槽位越界或源槽为空
 	ErrBagFull        = errors.New("bag full")            // 无空槽可放入
+	ErrItemNotFound   = errors.New("item not found in config")
 )
 
 var bagCacheJSON = protojson.MarshalOptions{EmitUnpopulated: true}
@@ -41,10 +43,29 @@ func validateSlot(slot int32) error {
 }
 
 func validateBagItem(itemID, count int32) error {
-	if itemID < 1 || count < 1 || count > MaxBagStack {
+	if itemID < 1 || count < 1 {
+		return ErrBagInvalid
+	}
+	if err := gcruntime.ValidateItemID(itemID); err != nil {
+		return ErrItemNotFound
+	}
+	max := effectiveMaxStack(itemID)
+	if max < 1 || count > max {
 		return ErrBagInvalid
 	}
 	return nil
+}
+
+// effectiveMaxStack 取 min(全局硬顶, 配置 max_stack)。
+func effectiveMaxStack(itemID int32) int32 {
+	ms := gcruntime.MaxStack(itemID)
+	if ms < 1 {
+		return 0
+	}
+	if ms > MaxBagStack {
+		return MaxBagStack
+	}
+	return ms
 }
 
 func bagListFromModels(models []InventoryItem) *protocol.BagListResponse {
@@ -199,7 +220,7 @@ func addOrStackItemInTx(ctx context.Context, playerID int64, itemID, count int32
 		if remaining < 1 {
 			break
 		}
-		room := MaxBagStack - stacks[i].Count
+		room := effectiveMaxStack(itemID) - stacks[i].Count
 		if room < 1 {
 			continue
 		}
@@ -218,8 +239,9 @@ func addOrStackItemInTx(ctx context.Context, playerID int64, itemID, count int32
 			return err
 		}
 		put := remaining
-		if put > MaxBagStack {
-			put = MaxBagStack
+		maxStack := effectiveMaxStack(itemID)
+		if put > maxStack {
+			put = maxStack
 		}
 		if err := txDB.Create(&InventoryItem{
 			PlayerID: playerID,
@@ -386,7 +408,8 @@ func moveItemInTx(ctx context.Context, playerID int64, fromSlot, toSlot int32) e
 		return txDB.Model(from).Update("slot", toSlot).Error
 	}
 	if to.ItemID == from.ItemID {
-		room := MaxBagStack - to.Count
+		maxStack := effectiveMaxStack(from.ItemID)
+		room := maxStack - to.Count
 		if room < 1 {
 			return ErrBagInvalid
 		}

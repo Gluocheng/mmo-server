@@ -115,5 +115,9 @@
     "login_block_seconds": 600,
     "device_session_ttl_seconds": 7200,
     "key_prefix": "mmo"
+  },
+  "gameconfig": {
+    "allow_reload": true,
+    "import_data_dir": "gameconfig/gen/data"
   }
 }

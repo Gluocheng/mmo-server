@@ -2,6 +2,8 @@ package persistence
 
 import (
 	"gorm.io/gorm"
+
+	"github.com/example/mmo-server/gameconfig/pkg/schema"
 )
 
 func autoMigrateModels(db *gorm.DB) error {
@@ -10,6 +12,9 @@ func autoMigrateModels(db *gorm.DB) error {
 		&Player{},
 		&InventoryItem{},
 	); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(schema.Models()...); err != nil {
 		return err
 	}
 	return migrateInventorySlots(db)

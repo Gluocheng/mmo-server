@@ -26,6 +26,9 @@ const (
 	BagLoadFail         int32 = 40020 // 背包加载失败
 	BagSlotInvalid      int32 = 40021 // 槽位非法或源槽为空
 	BagFull             int32 = 40022 // 背包槽位已满
+	ItemNotFound        int32 = 40023 // 道具 id 不在配置表
+	ConfigReloadDenied  int32 = 40024 // 未开启配置 reload
+	ConfigReloadFail    int32 = 40025 // 配置 reload 失败
 )
 
 func IsFail(c int32) bool {

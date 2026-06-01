@@ -1,0 +1,7 @@
+# 道具表 CSV（策划编辑；Luban 可用 item.xlsx 替代）
+# 列：id,name,type,max_stack,stackable,discardable,bind_type
+id,name,type,max_stack,stackable,discardable,bind_type
+1001,小型生命药水,consumable,99,true,true,none
+1002,铜币袋,material,9999,true,true,none
+2001,新手木剑,equipment,1,false,true,none
+3001,任务信件,quest,1,false,false,none

@@ -151,6 +151,8 @@ func (p *actorBag) respondBagError(session *cproto.Session, playerID int64, err 
 		p.ResponseCode(session, code.BagSlotInvalid)
 	case errors.Is(err, persistence.ErrBagFull):
 		p.ResponseCode(session, code.BagFull)
+	case errors.Is(err, persistence.ErrItemNotFound):
+		p.ResponseCode(session, code.ItemNotFound)
 	default:
 		clog.Warnf("bag op fail player_id=%d err=%v", playerID, err)
 		p.ResponseCode(session, code.BagLoadFail)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <topmodule name="cfg"/>
+  <group name="c" default="1"/>
+  <group name="s" default="1"/>
+  <service name="server" manager="Tables" group="s"/>
+  <import name="item"/>
+  <import name="Tables"/>
+</root>
