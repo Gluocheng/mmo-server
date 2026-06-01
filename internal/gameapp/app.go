@@ -12,6 +12,7 @@ import (
 	"github.com/example/mmo-server/internal/gameapp/bag"
 	"github.com/example/mmo-server/internal/gameapp/chat"
 	"github.com/example/mmo-server/internal/gameapp/config"
+	"github.com/example/mmo-server/internal/gameapp/gm"
 	"github.com/example/mmo-server/internal/gameapp/player"
 	"github.com/example/mmo-server/internal/persistence"
 )
@@ -31,6 +32,7 @@ func Run(profileFilePath, nodeID string) {
 	app.AddActors(&chat.ActorChats{})
 	app.AddActors(&bag.ActorBags{})
 	app.AddActors(&config.ActorConfig{})
+	app.AddActors(&gm.ActorGM{})
 	app.Startup()
 }
 

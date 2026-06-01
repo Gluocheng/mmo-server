@@ -1,4 +1,4 @@
-# 停止 MMO 四节点（gateway -> game -> login -> master）
+# 停止 MMO 五节点（gm -> gateway -> game -> login -> master）
 # 用法:
 #   powershell -ExecutionPolicy Bypass -File scripts/stop.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts/stop.ps1 -StopNats
@@ -27,7 +27,8 @@ function Stop-MMOProcess {
 
 Write-Host "=== MMO server stop ==="
 
-# 先停网关，再停后端，最后 master
+# 先停 GM，再停网关，再后端，最后 master
+Stop-MMOProcess "gm"
 Stop-MMOProcess "gateway"
 Stop-MMOProcess "game"
 Stop-MMOProcess "login"
