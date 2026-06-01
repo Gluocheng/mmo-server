@@ -139,3 +139,11 @@ func LoginBlockTTL() time.Duration {
 func DeviceSessionTTL() time.Duration {
 	return cfg.deviceSessionTTL
 }
+
+// DB 返回全局 GORM 实例（会先 Init）。
+func DB() (*gorm.DB, error) {
+	if err := ensureDB(); err != nil {
+		return nil, err
+	}
+	return db, nil
+}

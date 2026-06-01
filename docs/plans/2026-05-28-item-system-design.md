@@ -1,7 +1,7 @@
 # 道具系统 策划文档
 
-> **Status:** draft  
-> **说明：** 待评审；确认后改为 `approved` 再创建实施计划与写代码。  
+> **Status:** superseded  
+> **说明：** 已由 [`2026-06-01-gameconfig-design.md`](2026-06-01-gameconfig-design.md) 替代（Excel→MySQL→runtime 方案）。  
 > **依赖（已实现）：** [背包系统策划](2026-05-28-bag-system-design.md)  
 > **实施计划：** （策划通过后创建）[`2026-05-28-item-system.md`](2026-05-28-item-system.md)
 

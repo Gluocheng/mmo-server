@@ -5,11 +5,20 @@ import (
 	"errors"
 	"testing"
 
+	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/protocol"
 )
 
+func resetBagTestDB(t *testing.T) {
+	t.Helper()
+	gdb := resetDBForTest(t)
+	if err := gcruntime.SeedTestItems(context.Background(), gdb); err != nil {
+		t.Fatalf("seed gameconfig: %v", err)
+	}
+}
+
 func TestAddOrStackItem(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 1001
 
 	if err := AddOrStackItem(playerID, 10, 2); err != nil {
@@ -29,7 +38,7 @@ func TestAddOrStackItem(t *testing.T) {
 }
 
 func TestRemoveItemNotEnough(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 1002
 
 	if err := AddOrStackItem(playerID, 1, 1); err != nil {
@@ -42,7 +51,7 @@ func TestRemoveItemNotEnough(t *testing.T) {
 }
 
 func TestRemoveItemDeletesRow(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 1003
 
 	if err := AddOrStackItem(playerID, 7, 4); err != nil {
@@ -61,7 +70,7 @@ func TestRemoveItemDeletesRow(t *testing.T) {
 }
 
 func TestBagTxRollback(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 1004
 	ctx := context.Background()
 
@@ -85,7 +94,7 @@ func TestBagTxRollback(t *testing.T) {
 }
 
 func TestValidateBagItemMaxStack(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 1005
 
 	if err := AddOrStackItem(playerID, 1, MaxBagStack); err != nil {
@@ -108,7 +117,7 @@ func TestValidateBagItemMaxStack(t *testing.T) {
 }
 
 func TestMoveItemToEmptySlot(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 2001
 
 	if err := AddOrStackItem(playerID, 5, 3); err != nil {
@@ -132,7 +141,7 @@ func TestMoveItemToEmptySlot(t *testing.T) {
 }
 
 func TestMoveItemSwap(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 2002
 
 	if err := AddOrStackItem(playerID, 1, 2); err != nil {
@@ -168,7 +177,7 @@ func TestMoveItemSwap(t *testing.T) {
 }
 
 func TestSplitItem(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 2003
 
 	if err := AddOrStackItem(playerID, 9, 10); err != nil {
@@ -202,7 +211,7 @@ func TestSplitItem(t *testing.T) {
 }
 
 func TestBagFull(t *testing.T) {
-	resetDBForTest(t)
+	resetBagTestDB(t)
 	const playerID int64 = 2004
 
 	for i := int32(0); i < MaxBagSlots; i++ {

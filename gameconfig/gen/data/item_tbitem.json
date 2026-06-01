@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1001,
+    "name": "小型生命药水",
+    "type": "consumable",
+    "max_stack": 99,
+    "stackable": true,
+    "discardable": true,
+    "bind_type": "none"
+  },
+  {
+    "id": 1002,
+    "name": "铜币袋",
+    "type": "material",
+    "max_stack": 9999,
+    "stackable": true,
+    "discardable": true,
+    "bind_type": "none"
+  },
+  {
+    "id": 2001,
+    "name": "新手木剑",
+    "type": "equipment",
+    "max_stack": 1,
+    "stackable": false,
+    "discardable": true,
+    "bind_type": "none"
+  },
+  {
+    "id": 3001,
+    "name": "任务信件",
+    "type": "quest",
+    "max_stack": 1,
+    "stackable": false,
+    "discardable": false,
+    "bind_type": "none"
+  }
+]
