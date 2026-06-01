@@ -1,4 +1,4 @@
-# 启动 MMO 四节点（master -> login -> game -> gateway）
+# 启动 MMO 五节点（master -> login -> game -> gateway -> gm）
 # 用法（在仓库根目录）:
 #   powershell -ExecutionPolicy Bypass -File scripts/start.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -Build
@@ -29,7 +29,8 @@ function Ensure-Binaries {
         @{ Name = "master";  Path = "cmd/master" },
         @{ Name = "login";   Path = "cmd/login" },
         @{ Name = "game";    Path = "cmd/game" },
-        @{ Name = "gateway"; Path = "cmd/gateway" }
+        @{ Name = "gateway"; Path = "cmd/gateway" },
+        @{ Name = "gm";      Path = "cmd/gm" }
     )
     $needBuild = $Build
     foreach ($t in $targets) {
@@ -80,6 +81,36 @@ function Ensure-Nats {
     Write-Host "[nats] ready."
 }
 
+function Start-GMNode {
+    param(
+        [string]$HTTPAddr = ":9080",
+        [string]$NATSAddr = "nats://127.0.0.1:4222",
+        [string]$Prefix = "mmo",
+        [string]$GameNode = "10001",
+        [int]$WaitSec = 2
+    )
+    $procName = "gm"
+    if (Get-Process -Name $procName -ErrorAction SilentlyContinue) {
+        Write-Host "[gm] already running, skip."
+        return
+    }
+    $exe = Join-Path $root "bin/gm.exe"
+    if (-not (Test-Path $exe)) {
+        throw "binary not found: $exe (run with -Build)"
+    }
+    $args = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode")
+    Start-Process `
+        -FilePath $exe `
+        -ArgumentList $args `
+        -WorkingDirectory $root `
+        -WindowStyle Hidden | Out-Null
+    Start-Sleep -Seconds $WaitSec
+    if (-not (Get-Process -Name $procName -ErrorAction SilentlyContinue)) {
+        throw "[gm] failed to start, see logs/gm.log"
+    }
+    Write-Host "[gm] started (http=$HTTPAddr, game=$GameNode)."
+}
+
 function Start-MMONode {
     param(
         [string]$ProcessName,
@@ -127,10 +158,18 @@ Start-MMONode -ProcessName "login"   -NodeID "login-1"  -WaitSec 2
 Start-MMONode -ProcessName "game"    -NodeID "10001"    -WaitSec 2
 Start-MMONode -ProcessName "gateway" -NodeID "gate-1"   -WaitSec 3
 
+Start-GMNode
+
 if (-not (Test-PortOpen 10100)) {
     Write-Warning "[gateway] 10100 not open yet — check logs/gateway.log"
 } else {
     Write-Host "[gateway] ws://127.0.0.1:10100"
+}
+
+if (-not (Test-PortOpen 9080)) {
+    Write-Warning "[gm] 9080 not open yet — check logs/gm.log"
+} else {
+    Write-Host "[gm] http://127.0.0.1:9080/gm/config/reload"
 }
 
 Write-Host "=== all nodes started ==="
