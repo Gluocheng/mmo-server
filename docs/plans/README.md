@@ -29,7 +29,6 @@
 | done | 持久化 GORM 模型拆分 | [2026-05-28-persistence-models-split.md](2026-05-28-persistence-models-split.md) | `model_*.go` + `migrate.go` |
 | done | persistence 日志统一 clog | — | 业务码 `40001–40022` |
 | done | 策划配表（Excel→MySQL→runtime） | [2026-06-01-gameconfig-design.md](2026-06-01-gameconfig-design.md) | 实施 [2026-06-01-gameconfig.md](2026-06-01-gameconfig.md) |
-| done | GM 独立管理进程（HTTP + NATS） | [2026-06-01-gm-process-design.md](2026-06-01-gm-process-design.md) | 实施 [2026-06-01-gm-process.md](2026-06-01-gm-process.md) |
 | superseded | 道具系统（JSON 文件方案） | [2026-05-28-item-system-design.md](2026-05-28-item-system-design.md) | 已由 gameconfig 策划替代 |
 | planned | 战斗骨架 | [backlog-combat.md](backlog-combat.md) | — |
 | planned | 一账号多角 | [backlog-multi-character.md](backlog-multi-character.md) | 表结构 + 协议评审 |
