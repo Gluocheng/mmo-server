@@ -1,0 +1,87 @@
+# 本地预发布栈：NATS + 五服务
+# MySQL/Redis 使用本机或已有 Docker 容器暴露到宿主机的 3306/6379。
+# 用法见 README「本地 Docker CI/CD」与 scripts/cicd.ps1
+
+name: mmo-server
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    restart: unless-stopped
+
+  import-config:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/import-config
+      - -profile=/app/configs/mmo-docker.json
+      - -data-dir=/app/gameconfig/gen/data
+    restart: "no"
+
+  master:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/master
+      - -path=/app/configs/mmo-docker.json
+      - -node=master-1
+    depends_on:
+      nats:
+        condition: service_started
+      import-config:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  login:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/login
+      - -path=/app/configs/mmo-docker.json
+      - -node=login-1
+    depends_on:
+      master:
+        condition: service_started
+    restart: unless-stopped
+
+  game:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/game
+      - -path=/app/configs/mmo-docker.json
+      - -node=10001
+    depends_on:
+      master:
+        condition: service_started
+      login:
+        condition: service_started
+      import-config:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  gateway:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/gateway
+      - -path=/app/configs/mmo-docker.json
+      - -node=gate-1
+    ports:
+      - "10100:10100"
+    depends_on:
+      game:
+        condition: service_started
+    restart: unless-stopped
+
+  gm:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/gm
+      - -http=:9080
+      - -nats=nats://nats:4222
+      - -prefix=mmo
+      - -game=10001
+    ports:
+      - "${GM_HTTP_PORT:-19080}:9080"
+    depends_on:
+      game:
+        condition: service_started
+      nats:
+        condition: service_started
+    restart: unless-stopped

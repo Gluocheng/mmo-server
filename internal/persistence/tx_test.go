@@ -187,6 +187,24 @@ func TestFindOrCreateAccountInTxCreatesAndFinds(t *testing.T) {
 	}
 }
 
+func TestFindOrCreateAccountInTxUsesGeneratedUID(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	var uid int64
+	if err := WithinTx(ctx, func(txCtx context.Context) error {
+		var err error
+		uid, err = findOrCreateAccountInTx(txCtx, "generated", "secret")
+		return err
+	}); err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	if uid <= playerIDInitialValue {
+		t.Fatalf("expected generated snowflake uid, got %d", uid)
+	}
+}
+
 func TestFindOrCreateAccountInTxInvalidPassword(t *testing.T) {
 	resetStoreForTest(t)
 	ctx := context.Background()
@@ -232,5 +250,82 @@ func TestCreatePlayerInTxDuplicateUID(t *testing.T) {
 		return nil
 	}); err != nil {
 		t.Fatalf("second WithinTx: %v", err)
+	}
+}
+
+func TestAutoMigrateInitializesPlayerIDSequenceAboveHistory(t *testing.T) {
+	gdb, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := gdb.AutoMigrate(&Player{}); err != nil {
+		t.Fatalf("pre migrate players: %v", err)
+	}
+	if err := gdb.Create(&Player{PlayerID: 120345, UID: 9001, Name: "Old"}).Error; err != nil {
+		t.Fatalf("seed player: %v", err)
+	}
+
+	if err := autoMigrateModels(gdb); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	var seq IDSequence
+	if err := gdb.Where("name = ?", sequencePlayerID).First(&seq).Error; err != nil {
+		t.Fatalf("load player_id sequence: %v", err)
+	}
+	if seq.NextValue != 120346 {
+		t.Fatalf("expected sequence next value 120346, got %d", seq.NextValue)
+	}
+}
+
+func TestNextPlayerIDInTxAllocatesShortSequentialIDs(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	var first, second int64
+	if err := WithinTx(ctx, func(txCtx context.Context) error {
+		var err error
+		first, err = nextPlayerIDInTx(txCtx)
+		if err != nil {
+			return err
+		}
+		second, err = nextPlayerIDInTx(txCtx)
+		return err
+	}); err != nil {
+		t.Fatalf("allocate player ids: %v", err)
+	}
+
+	if first != playerIDInitialValue {
+		t.Fatalf("expected first player_id %d, got %d", playerIDInitialValue, first)
+	}
+	if second != first+1 {
+		t.Fatalf("expected sequential player_id %d, got %d", first+1, second)
+	}
+}
+
+func TestNextPlayerIDInTxRollsBackSequence(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	_ = WithinTx(ctx, func(txCtx context.Context) error {
+		if _, err := nextPlayerIDInTx(txCtx); err != nil {
+			return err
+		}
+		return errors.New("rollback sequence")
+	})
+
+	var got int64
+	if err := WithinTx(ctx, func(txCtx context.Context) error {
+		var err error
+		got, err = nextPlayerIDInTx(txCtx)
+		return err
+	}); err != nil {
+		t.Fatalf("allocate after rollback: %v", err)
+	}
+
+	if got != playerIDInitialValue {
+		t.Fatalf("expected rollback to keep next player_id %d, got %d", playerIDInitialValue, got)
 	}
 }

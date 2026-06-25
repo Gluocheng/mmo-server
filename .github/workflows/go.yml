@@ -25,3 +25,14 @@ jobs:
           go build -o bin/login ./cmd/login
           go build -o bin/game ./cmd/game
           go build -o bin/master ./cmd/master
+          go build -o bin/gm ./cmd/gm
+          go build -o bin/import-config ./gameconfig/cmd/import
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker build
+        run: docker build -t mmo-server:ci .

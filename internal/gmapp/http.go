@@ -24,9 +24,37 @@ type configReloadRsp struct {
 	Tables  int64  `json:"tables,omitempty"`
 }
 
+// healthRsp HTTP 健康检查响应体。
+type healthRsp struct {
+	Code          int32  `json:"code"`
+	Message       string `json:"message"`
+	NATSConnected bool   `json:"natsConnected"`
+	RemoteSubject string `json:"remoteSubject"`
+	TargetPath    string `json:"targetPath"`
+}
+
 // registerRoutes 注册 HTTP 路由。
 func (a *App) registerRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/gm/health", a.handleHealth)
 	mux.HandleFunc("/gm/config/reload", a.handleConfigReload)
+}
+
+// handleHealth 提供浏览器可直接访问的后台健康检查。
+func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, healthRsp{
+			Code:    -1,
+			Message: "method not allowed, use GET",
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, healthRsp{
+		Code:          0,
+		Message:       "ok",
+		NATSConnected: a.natsConn != nil && a.natsConn.IsConnected(),
+		RemoteSubject: a.remoteSubject,
+		TargetPath:    a.targetPath,
+	})
 }
 
 // handleConfigReload 接收配置热更请求，通过 NATS 转发到 game 节点 actor。

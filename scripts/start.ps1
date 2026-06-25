@@ -3,8 +3,10 @@
 #   powershell -ExecutionPolicy Bypass -File scripts/start.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -Build
 #   powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -SkipDockerNats
+#   powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -GMPort 19080
 param(
     [string]$Profile = "configs/mmo-cluster.json",
+    [int]$GMPort = 9080,
     [switch]$Build,
     [switch]$SkipDockerNats
 )
@@ -158,7 +160,7 @@ Start-MMONode -ProcessName "login"   -NodeID "login-1"  -WaitSec 2
 Start-MMONode -ProcessName "game"    -NodeID "10001"    -WaitSec 2
 Start-MMONode -ProcessName "gateway" -NodeID "gate-1"   -WaitSec 3
 
-Start-GMNode
+Start-GMNode -HTTPAddr ":$GMPort"
 
 if (-not (Test-PortOpen 10100)) {
     Write-Warning "[gateway] 10100 not open yet — check logs/gateway.log"
@@ -166,10 +168,10 @@ if (-not (Test-PortOpen 10100)) {
     Write-Host "[gateway] ws://127.0.0.1:10100"
 }
 
-if (-not (Test-PortOpen 9080)) {
-    Write-Warning "[gm] 9080 not open yet — check logs/gm.log"
+if (-not (Test-PortOpen $GMPort)) {
+    Write-Warning "[gm] $GMPort not open yet — check logs/gm.log"
 } else {
-    Write-Host "[gm] http://127.0.0.1:9080/gm/config/reload"
+    Write-Host "[gm] http://127.0.0.1:$GMPort/gm/config/reload"
 }
 
 Write-Host "=== all nodes started ==="

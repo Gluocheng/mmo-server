@@ -29,7 +29,10 @@
 | done | 持久化 GORM 模型拆分 | [2026-05-28-persistence-models-split.md](2026-05-28-persistence-models-split.md) | `model_*.go` + `migrate.go` |
 | done | persistence 日志统一 clog | — | 业务码 `40001–40022` |
 | done | 策划配表（Excel→MySQL→runtime） | [2026-06-01-gameconfig-design.md](2026-06-01-gameconfig-design.md) | 实施 [2026-06-01-gameconfig.md](2026-06-01-gameconfig.md) |
+| done | GM 独立管理进程（HTTP + NATS） | [2026-06-01-gm-process-design.md](2026-06-01-gm-process-design.md) | 实施 [2026-06-01-gm-process.md](2026-06-01-gm-process.md) |
+| done | 本地 Docker CI/CD 一条龙 | [2026-06-25-local-docker-cicd-design.md](2026-06-25-local-docker-cicd-design.md) | 实施 [2026-06-25-local-docker-cicd.md](2026-06-25-local-docker-cicd.md) |
 | superseded | 道具系统（JSON 文件方案） | [2026-05-28-item-system-design.md](2026-05-28-item-system-design.md) | 已由 gameconfig 策划替代 |
+| done | 全局 ID 生成策略 | [2026-06-25-global-id-design.md](2026-06-25-global-id-design.md) | 实施 [2026-06-25-global-id.md](2026-06-25-global-id.md) |
 | planned | 战斗骨架 | [backlog-combat.md](backlog-combat.md) | — |
 | planned | 一账号多角 | [backlog-multi-character.md](backlog-multi-character.md) | 表结构 + 协议评审 |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |

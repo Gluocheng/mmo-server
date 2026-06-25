@@ -129,7 +129,14 @@ func findOrCreateAccountInTx(ctx context.Context, nickname, password string) (in
 
 	}
 
+	uid, err := nextUID()
+	if err != nil {
+		return 0, err
+	}
+
 	acc = Account{
+
+		UID: uid,
 
 		Nickname: nickname,
 
