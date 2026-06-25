@@ -57,7 +57,7 @@ func TestGetPlayerByUIDContextHonorsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := GetPlayerByUIDContext(ctx, 1)
+	_, err := ListPlayersByUIDContext(ctx, 1)
 	if err == nil {
 		t.Fatal("expected canceled context error")
 	}
