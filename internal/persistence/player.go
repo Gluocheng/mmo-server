@@ -104,9 +104,15 @@ func createPlayerInTx(ctx context.Context, uid int64, name string) (*protocol.Pl
 		return proto.Clone(old).(*protocol.PlayerInfo), false, nil
 	}
 
+	playerID, err := nextPlayerIDInTx(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
 	model := Player{
-		UID:  uid,
-		Name: name,
+		PlayerID: playerID,
+		UID:      uid,
+		Name:     name,
 	}
 	if err := DBFromContext(ctx).WithContext(ctx).Create(&model).Error; err != nil {
 		var existed Player

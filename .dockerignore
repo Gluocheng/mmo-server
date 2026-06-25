@@ -1,0 +1,16 @@
+.git
+.github
+.cursor
+.idea
+.codewhale
+.worktrees
+bin/
+logs/
+.release/
+*.exe
+**/*_test.go
+docs/
+scripts/
+README.md
+AGENTS.md
+LICENSE

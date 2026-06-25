@@ -1,0 +1,123 @@
+{
+  "env": "mmo-docker",
+  "debug": true,
+  "print_level": "info",
+  "cluster": {
+    "discovery": {
+      "mode": "nats"
+    },
+    "nats": {
+      "prefix": "mmo",
+      "master_node_id": "master-1",
+      "address": "nats://nats:4222",
+      "reconnect_delay": 1,
+      "max_reconnects": 0,
+      "request_timeout": 5,
+      "user": "",
+      "password": ""
+    }
+  },
+  "node": {
+    "master": [
+      {
+        "node_id": "master-1",
+        "address": "",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "master_log"
+        }
+      }
+    ],
+    "gate": [
+      {
+        "node_id": "gate-1",
+        "address": ":10100",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "gate_log"
+        }
+      }
+    ],
+    "login": [
+      {
+        "node_id": "login-1",
+        "address": "",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "login_log"
+        }
+      }
+    ],
+    "game": [
+      {
+        "node_id": "10001",
+        "address": "",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "game_log"
+        }
+      }
+    ]
+  },
+  "logger": {
+    "gate_log": {
+      "level": "info",
+      "enable_console": true,
+      "enable_write_file": false,
+      "file_link_path": "",
+      "file_path_format": "logs/gate.log"
+    },
+    "login_log": {
+      "level": "info",
+      "enable_console": true,
+      "enable_write_file": false,
+      "file_link_path": "",
+      "file_path_format": "logs/login.log"
+    },
+    "game_log": {
+      "level": "info",
+      "enable_console": true,
+      "enable_write_file": false,
+      "file_link_path": "",
+      "file_path_format": "logs/game.log"
+    },
+    "master_log": {
+      "level": "info",
+      "enable_console": true,
+      "enable_write_file": false,
+      "file_link_path": "",
+      "file_path_format": "logs/master.log"
+    }
+  },
+  "mysql": {
+    "dsn": "root:123456@tcp(host.docker.internal:3306)/mmo?charset=utf8mb4&parseTime=True&loc=Local",
+    "max_open_conns": 20,
+    "max_idle_conns": 10
+  },
+  "auth": {
+    "session_policy": "kick_old",
+    "max_devices_per_uid": 2
+  },
+  "redis": {
+    "address": "host.docker.internal:6379",
+    "password": "",
+    "db": 3,
+    "pool_size": 16,
+    "dial_timeout": 3,
+    "read_timeout": 2,
+    "write_timeout": 2,
+    "cache_ttl_seconds": 600,
+    "access_ttl_seconds": 900,
+    "refresh_ttl_seconds": 86400,
+    "token_ttl_seconds": 86400,
+    "login_fail_limit": 5,
+    "login_fail_window_seconds": 300,
+    "login_block_seconds": 600,
+    "device_session_ttl_seconds": 7200,
+    "key_prefix": "mmo"
+  },
+  "gameconfig": {
+    "allow_reload": true,
+    "import_data_dir": "gameconfig/gen/data"
+  }
+}

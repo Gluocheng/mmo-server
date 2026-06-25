@@ -13,9 +13,13 @@ import (
 
 func main() {
 	var (
-		ws      = flag.String("ws", "127.0.0.1:10100", "gateway websocket host:port")
-		timeout = flag.Duration("timeout", 3*time.Second, "request timeout")
-		once    = flag.Bool("once", true, "run a single smoke request sequence and exit")
+		ws       = flag.String("ws", "127.0.0.1:10100", "gateway websocket host:port")
+		nickname = flag.String("nickname", "player1", "account nickname")
+		password = flag.String("password", "123456", "account password")
+		deviceID = flag.String("device", "pc-001", "device id")
+		player   = flag.String("player", "", "player name, default to nickname")
+		timeout  = flag.Duration("timeout", 3*time.Second, "request timeout")
+		once     = flag.Bool("once", true, "run a single smoke request sequence and exit")
 	)
 	flag.Parse()
 
@@ -35,9 +39,9 @@ func main() {
 
 	// 1) issueToken
 	issueReq := &protocol.IssueTokenRequest{
-		Nickname: "player1",
-		Password: "123456",
-		DeviceId: "pc-001",
+		Nickname: *nickname,
+		Password: *password,
+		DeviceId: *deviceID,
 	}
 	issueRspMsg, err := c.Request("gate.user.issueToken", issueReq)
 	if err != nil {
@@ -62,7 +66,7 @@ func main() {
 	loginReq := &protocol.TokenLoginRequest{
 		AccessToken: issueRsp.AccessToken,
 		ServerId:    10001,
-		DeviceId:    "pc-001",
+		DeviceId:    *deviceID,
 	}
 	loginRspMsg, err := c.Request("gate.user.login", loginReq)
 	if err != nil {
@@ -98,8 +102,37 @@ func main() {
 	}
 	fmt.Printf("select OK players=%d\n", len(selectRsp.List))
 
+	var playerID int64
+	if len(selectRsp.List) > 0 {
+		playerID = selectRsp.List[0].PlayerId
+	} else {
+		playerName := *player
+		if playerName == "" {
+			playerName = *nickname
+		}
+		createRspMsg, err := c.Request("game.player.create", &protocol.PlayerCreateRequest{Name: playerName})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "create player failed: %v\n", err)
+			exitCode = 1
+			return
+		}
+		createRsp := &protocol.PlayerCreateResponse{}
+		if err := c.Serializer().Unmarshal(createRspMsg.Data, createRsp); err != nil {
+			fmt.Fprintf(os.Stderr, "unmarshal PlayerCreateResponse failed: %v\n", err)
+			exitCode = 1
+			return
+		}
+		if createRsp.Player == nil || createRsp.Player.PlayerId < 1 {
+			fmt.Fprintf(os.Stderr, "create player returned invalid player\n")
+			exitCode = 1
+			return
+		}
+		playerID = createRsp.Player.PlayerId
+		fmt.Printf("create player OK playerId=%d name=%s\n", playerID, createRsp.Player.Name)
+	}
+
 	// 4) enter
-	enterReq := &protocol.EnterGameRequest{SceneId: 1}
+	enterReq := &protocol.EnterGameRequest{PlayerId: playerID, SceneId: 1}
 	enterRspMsg, err := c.Request("game.player.enter", enterReq)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "enter failed: %v\n", err)

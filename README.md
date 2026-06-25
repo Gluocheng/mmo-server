@@ -34,17 +34,22 @@ flowchart LR
   Master --> NATS
 ```
 
-| 节点 | 进程 | 职责 |
-|------|------|------|
-| `master` | `cmd/master` | NATS 模式集群注册发现（无业务路由） |
-| `gateway` | `cmd/gateway` | WebSocket + Pomelo 协议、鉴权路由、转发至 login/game |
-| `login` | `cmd/login` | 帐号密码签发 Token、校验、刷新、登出 |
-| `game` | `cmd/game` | 选角/创角/进场、场景移动（AOI）、聊天、背包、GM 指令处理 |
-| `gm` | `cmd/gm` | **独立管理进程**：HTTP API，通过 NATS 向 game 节点下发管理指令 |
+
+
+
+| 节点        | 进程            | 职责                                          |
+| --------- | ------------- | ------------------------------------------- |
+| `master`  | `cmd/master`  | NATS 模式集群注册发现（无业务路由）                        |
+| `gateway` | `cmd/gateway` | WebSocket + Pomelo 协议、鉴权路由、转发至 login/game   |
+| `login`   | `cmd/login`   | 帐号密码签发 Token、校验、刷新、登出                       |
+| `game`    | `cmd/game`    | 选角/创角/进场、场景移动（AOI）、聊天、背包、GM 指令处理            |
+| `gm`      | `cmd/gm`      | **独立管理进程**：HTTP API，通过 NATS 向 game 节点下发管理指令 |
+
 
 ## 依赖
 
 - Go 1.24+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)（本地 Docker CI/CD 可选）
 - [NATS Server](https://github.com/nats-io/nats-server)（默认 `nats://127.0.0.1:4222`）
 - MySQL 8+（库名 `mmo`，DSN 见 `configs/mmo-cluster.json`）
 - Redis 7+（默认 `127.0.0.1:6379`）
@@ -95,7 +100,40 @@ go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-1
 go run ./cmd/gm      -http=:9080 -nats=nats://127.0.0.1:4222 -prefix=mmo -game=10001
 ```
 
-`cluster.discovery.mode` 为 **`nats`**，`cluster.nats.master_node_id` 须与 master 的 `-node` 一致（默认 `master-1`）。
+`cluster.discovery.mode` 为 `**nats**`，`cluster.nats.master_node_id` 须与 master 的 `-node` 一致（默认 `master-1`）。
+
+### 方式三：本地 Docker CI/CD（预发布模拟）
+
+需安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)（含 `docker compose`）。
+
+```powershell
+# 一条龙：test → build image → deploy → smoke（打 tag 并记录 .release/current）
+powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage release
+
+# 如果宿主机 19080 也被占用，可临时换 GM 端口
+powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage release -GMPort 19081
+
+# 仅单测
+powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage test
+
+# 仅打包镜像（自定义 tag）
+powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage package -Tag 20260625-1200
+
+# 回滚到上一版本
+powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage rollback
+
+# 停止并移除容器
+powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage down
+```
+
+Compose 使用 [`configs/mmo-docker.json`](configs/mmo-docker.json)：NATS 由本栈启动；MySQL/Redis 使用你已有的 Docker/本机服务，容器内通过 `host.docker.internal:3306/6379` 访问，并自动执行 `import-config` 初始化配表。
+
+- 网关 WebSocket：`ws://127.0.0.1:10100`
+- GM HTTP（Docker 预发布）：默认 `http://127.0.0.1:19080/gm/config/reload`；可用 `-GMPort` 或环境变量 `GM_HTTP_PORT` 调整宿主机映射端口
+- GM 健康检查：浏览器打开 `http://127.0.0.1:19080/gm/health`
+- 发布记录：`.release/current`、`.release/previous`
+
+Docker 构建会利用层缓存与 BuildKit cache mount：Go SDK 基础镜像只在首次或镜像更新时拉取；`go.mod` / `go.sum` 不变时 module 下载层会复用；普通业务代码修改通常只重新执行最后的编译层。
 
 ### 联调客户端
 
@@ -152,16 +190,18 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 网关鉴权
 
-| 步骤 | Route | 请求 | 响应 |
-|------|-------|------|------|
-| 签发 Token | `gate.user.issueToken` | `IssueTokenRequest` | `IssueTokenResponse` |
-| Token 登录 | `gate.user.login` | `TokenLoginRequest` | `TokenLoginResponse` |
+
+| 步骤       | Route                    | 请求                    | 响应                     |
+| -------- | ------------------------ | --------------------- | ---------------------- |
+| 签发 Token | `gate.user.issueToken`   | `IssueTokenRequest`   | `IssueTokenResponse`   |
+| Token 登录 | `gate.user.login`        | `TokenLoginRequest`   | `TokenLoginResponse`   |
 | 刷新 Token | `gate.user.refreshToken` | `RefreshTokenRequest` | `RefreshTokenResponse` |
-| 登出 | `gate.user.logout` | `LogoutRequest` | `LogoutResponse` |
+| 登出       | `gate.user.logout`       | `LogoutRequest`       | `LogoutResponse`       |
+
 
 说明：
 
-- `issueToken`：`nickname`、`password`、`deviceId` 必填；`clientIp` 由网关注入；失败按「帐号+IP」限流（默认 5 次 / 5 分钟窗口，封禁 10 分钟，见 `redis.login_fail_*`）
+- `issueToken`：`nickname`、`password`、`deviceId` 必填；`clientIp` 由网关注入；失败按「帐号+IP」限流（默认 5 次 / 5 分钟窗口，封禁 10 分钟，见 `redis.login_fail_`*）
 - `login`：`accessToken`（或兼容字段 `token`）、`serverId`、`deviceId`
 - `refreshToken`：单次使用，刷新后旧 refresh 立即失效；重放返回业务码 `40013`
 - 会话策略 `auth.session_policy`：`kick_old`（默认）| `coexist` | `device_limit`（配合 `auth.max_devices_per_uid`）
@@ -170,19 +210,21 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 游戏玩法
 
-| 步骤 | Route | 请求 | 响应 / Push |
-|------|-------|------|-------------|
-| 查角 | `game.player.select` | `google.protobuf.Empty` | `PlayerSelectResponse` |
-| 创角 | `game.player.create` | `PlayerCreateRequest` | `PlayerCreateResponse` |
-| 进场 | `game.player.enter` | `EnterGameRequest` | `EnterGameResponse` |
-| 移动 | `game.player.move` | `MoveRequest` | `Empty`；同场景 AOI 内 Push `onMove`（`MoveBroadcast`） |
-| 聊天 | `game.chat.send` | `ChatSendRequest` | `Empty`；同场景 Push `onChat`（`ChatBroadcast`） |
-| 背包列表 | `game.bag.list` | `google.protobuf.Empty` | `BagListResponse`（`BagItem` 含 `slot`） |
-| 背包发放 | `game.bag.add` | `BagAddRequest` | `BagListResponse` + Push `onBagChange` |
-| 背包扣除 | `game.bag.remove` | `BagRemoveRequest` | `BagListResponse` + Push `onBagChange` |
-| 背包移动 | `game.bag.move` | `BagMoveRequest`（`fromSlot` / `toSlot`） | `BagListResponse` + Push `onBagChange` |
-| 背包拆分 | `game.bag.split` | `BagSplitRequest`（`fromSlot` / `count`） | `BagListResponse` + Push `onBagChange` |
-| 配置热更 | `game.gm.config.reload` | `RefreshTokenRequest`（`refreshToken` 承载表名） | `RefreshTokenResponse` |
+
+| 步骤   | Route                   | 请求                                         | 响应 / Push                                        |
+| ---- | ----------------------- | ------------------------------------------ | ------------------------------------------------ |
+| 查角   | `game.player.select`    | `google.protobuf.Empty`                    | `PlayerSelectResponse`                           |
+| 创角   | `game.player.create`    | `PlayerCreateRequest`                      | `PlayerCreateResponse`                           |
+| 进场   | `game.player.enter`     | `EnterGameRequest`                         | `EnterGameResponse`                              |
+| 移动   | `game.player.move`      | `MoveRequest`                              | `Empty`；同场景 AOI 内 Push `onMove`（`MoveBroadcast`） |
+| 聊天   | `game.chat.send`        | `ChatSendRequest`                          | `Empty`；同场景 Push `onChat`（`ChatBroadcast`）       |
+| 背包列表 | `game.bag.list`         | `google.protobuf.Empty`                    | `BagListResponse`（`BagItem` 含 `slot`）            |
+| 背包发放 | `game.bag.add`          | `BagAddRequest`                            | `BagListResponse` + Push `onBagChange`           |
+| 背包扣除 | `game.bag.remove`       | `BagRemoveRequest`                         | `BagListResponse` + Push `onBagChange`           |
+| 背包移动 | `game.bag.move`         | `BagMoveRequest`（`fromSlot` / `toSlot`）    | `BagListResponse` + Push `onBagChange`           |
+| 背包拆分 | `game.bag.split`        | `BagSplitRequest`（`fromSlot` / `count`）    | `BagListResponse` + Push `onBagChange`           |
+| 配置热更 | `game.gm.config.reload` | `RefreshTokenRequest`（`refreshToken` 承载表名） | `RefreshTokenResponse`                           |
+
 
 说明：
 
@@ -199,34 +241,36 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 定义与注释见 `internal/code/code.go`（`40001`–`40025`，`0` 为成功）：
 
-| 码 | 常量 | 说明 |
-|----|------|------|
-| 0 | `OK` | 成功 |
-| 40001 | `LoginFail` | 登录/鉴权通用失败 |
-| 40002 | `NotLoggedIn` | 未登录 |
-| 40003 | `EnterSceneFail` | 进场/移动无效 |
-| 40004 | `InvalidServer` | 区服 ID 无效 |
-| 40005 | `LoginRPCFail` | 网关调用登录服失败 |
-| 40006 | `PlayerDenyLogin` | 未登录踢下线 |
-| 40007 | `PlayerCreateFail` | 创角失败 |
-| 40008 | `PlayerNotFound` | 角色不存在 |
-| 40009 | `PlayerNotEntered` | 未进场 |
-| 40010 | `InvalidPassword` | 密码错误 |
-| 40011 | `AccessTokenInvalid` | 访问令牌无效 |
-| 40012 | `RefreshTokenInvalid` | 刷新令牌无效 |
-| 40013 | `RefreshTokenReplay` | 刷新令牌重放 |
-| 40014 | `LoginRateLimited` | 登录限流 |
-| 40015 | `DeviceIDRequired` | 缺少设备 ID |
-| 40016 | `DeviceLimitReached` | 设备数达上限 |
-| 40017 | `DeviceMismatch` | 设备 ID 不一致 |
-| 40018 | `BagItemInvalid` | 物品 ID/数量非法 |
-| 40019 | `BagItemNotEnough` | 物品数量不足 |
-| 40020 | `BagLoadFail` | 背包加载失败 |
-| 40021 | `BagSlotInvalid` | 槽位非法 |
-| 40022 | `BagFull` | 背包已满 |
-| 40023 | `ItemNotFound` | 道具不在配表 |
-| 40024 | `ConfigReloadDenied` | 未开启配表 reload |
-| 40025 | `ConfigReloadFail` | 配表 reload 失败 |
+
+| 码     | 常量                    | 说明           |
+| ----- | --------------------- | ------------ |
+| 0     | `OK`                  | 成功           |
+| 40001 | `LoginFail`           | 登录/鉴权通用失败    |
+| 40002 | `NotLoggedIn`         | 未登录          |
+| 40003 | `EnterSceneFail`      | 进场/移动无效      |
+| 40004 | `InvalidServer`       | 区服 ID 无效     |
+| 40005 | `LoginRPCFail`        | 网关调用登录服失败    |
+| 40006 | `PlayerDenyLogin`     | 未登录踢下线       |
+| 40007 | `PlayerCreateFail`    | 创角失败         |
+| 40008 | `PlayerNotFound`      | 角色不存在        |
+| 40009 | `PlayerNotEntered`    | 未进场          |
+| 40010 | `InvalidPassword`     | 密码错误         |
+| 40011 | `AccessTokenInvalid`  | 访问令牌无效       |
+| 40012 | `RefreshTokenInvalid` | 刷新令牌无效       |
+| 40013 | `RefreshTokenReplay`  | 刷新令牌重放       |
+| 40014 | `LoginRateLimited`    | 登录限流         |
+| 40015 | `DeviceIDRequired`    | 缺少设备 ID      |
+| 40016 | `DeviceLimitReached`  | 设备数达上限       |
+| 40017 | `DeviceMismatch`      | 设备 ID 不一致    |
+| 40018 | `BagItemInvalid`      | 物品 ID/数量非法   |
+| 40019 | `BagItemNotEnough`    | 物品数量不足       |
+| 40020 | `BagLoadFail`         | 背包加载失败       |
+| 40021 | `BagSlotInvalid`      | 槽位非法         |
+| 40022 | `BagFull`             | 背包已满         |
+| 40023 | `ItemNotFound`        | 道具不在配表       |
+| 40024 | `ConfigReloadDenied`  | 未开启配表 reload |
+| 40025 | `ConfigReloadFail`    | 配表 reload 失败 |
+
 
 ### 重新生成 Protobuf Go 代码
 
@@ -242,17 +286,19 @@ Excel/CSV 策划数据经 [Luban](https://github.com/focus-creative-games/luban)
 
 ### 目录结构
 
-| 路径 | 说明 |
-|------|------|
-| `gameconfig/datas/` | 策划 Excel/CSV 源表 |
-| `gameconfig/defines/` | Luban schema（`__root__.xml`） |
-| `gameconfig/tools/gen.ps1` | 一键导表脚本 |
-| `gameconfig/tools/luban/` | Luban.ClientServer |
-| `gameconfig/gen/cfg/` | 生成的 Go 类型（表结构体 + tables 访问器） |
-| `gameconfig/gen/data/` | 生成的 JSON（import 输入） |
-| `gameconfig/cmd/import/` | JSON → MySQL 导入工具 |
-| `gameconfig/pkg/schema/` | GORM 配置表模型（`CfgVersion`、`CfgItem`） |
-| `gameconfig/pkg/runtime/` | 运行时 Load / Reload / 查询 / 内存快照 |
+
+| 路径                         | 说明                                 |
+| -------------------------- | ---------------------------------- |
+| `gameconfig/datas/`        | 策划 Excel/CSV 源表                    |
+| `gameconfig/defines/`      | Luban schema（`__root__.xml`）       |
+| `gameconfig/tools/gen.ps1` | 一键导表脚本                             |
+| `gameconfig/tools/luban/`  | Luban.ClientServer                 |
+| `gameconfig/gen/cfg/`      | 生成的 Go 类型（表结构体 + tables 访问器）       |
+| `gameconfig/gen/data/`     | 生成的 JSON（import 输入）                |
+| `gameconfig/cmd/import/`   | JSON → MySQL 导入工具                  |
+| `gameconfig/pkg/schema/`   | GORM 配置表模型（`CfgVersion`、`CfgItem`） |
+| `gameconfig/pkg/runtime/`  | 运行时 Load / Reload / 查询 / 内存快照      |
+
 
 ### 工作流
 
@@ -269,12 +315,14 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 
 ### 演示道具
 
-| id | name | max_stack |
-|----|------|-----------|
-| 1001 | 小型生命药水 | 99 |
-| 1002 | 铜币袋 | 9999 |
-| 2001 | 新手木剑 | 1 |
-| 3001 | 任务信件 | 1 |
+
+| id   | name   | max_stack |
+| ---- | ------ | --------- |
+| 1001 | 小型生命药水 | 99        |
+| 1002 | 铜币袋    | 9999      |
+| 2001 | 新手木剑   | 1         |
+| 3001 | 任务信件   | 1         |
+
 
 ### 热更
 
@@ -287,13 +335,15 @@ profile 中 `gameconfig.allow_reload` 设为 `true` 后：
 
 ## 数据与持久化
 
-| 存储 | 内容 |
-|------|------|
-| MySQL `accounts` | 昵称、`bcrypt` 密码哈希 |
-| MySQL `players` | 每 Uid 一条角色 |
-| MySQL `inventory_items` | 每角色 `player_id + item_id` 堆叠数量 |
-| MySQL `cfg_items`、`cfg_versions` | 策划配置表（gameconfig） |
-| Redis | 帐号昵称缓存、角色/背包 protojson 缓存、access/refresh Token、登录限流、设备会话、时间偏置 |
+
+| 存储                               | 内容                                                            |
+| -------------------------------- | ------------------------------------------------------------- |
+| MySQL `accounts`                 | 昵称、`bcrypt` 密码哈希                                              |
+| MySQL `players`                  | 每 Uid 一条角色                                                    |
+| MySQL `inventory_items`          | 每角色 `player_id + item_id` 堆叠数量                                |
+| MySQL `cfg_items`、`cfg_versions` | 策划配置表（gameconfig）                                             |
+| Redis                            | 帐号昵称缓存、角色/背包 protojson 缓存、access/refresh Token、登录限流、设备会话、时间偏置 |
+
 
 要点：
 
@@ -304,7 +354,7 @@ profile 中 `gameconfig.allow_reload` 设为 `true` 后：
 
 ## 时间（gtime）
 
-业务逻辑请使用 [`internal/gtime`](internal/gtime/)，不要直接 `time.Now()`：
+业务逻辑请使用 `[internal/gtime](internal/gtime/)`，不要直接 `time.Now()`：
 
 - `gtime.Now()` / `gtime.UnixNow()` — 游戏时间（支持 Cherry 偏移 + Redis `{prefix}:meta:time_bias` 偏置秒）
 - `gtime.RealNow()` — 真实系统时间（日志/审计）
@@ -329,34 +379,41 @@ go build -o bin/gm.exe      ./cmd/gm
 go build -o bin/import-config.exe ./gameconfig/cmd/import
 ```
 
-CI：`.github/workflows/go.yml`（`go test` + 五节点 `go build`）。
+CI：`.github/workflows/go.yml`（`go test` + 五节点 `go build` + Docker 镜像构建校验）。
 
 ## 目录说明
 
-| 路径 | 说明 |
-|------|------|
-| `cmd/master` | Discovery master |
-| `cmd/gateway` | 网关节点 |
-| `cmd/login` | 登录节点 |
-| `cmd/game` | 游戏节点 |
-| `cmd/gm` | **GM 管理进程（HTTP + NATS）** |
-| `cmd/client-demo` | Protobuf 联调冒烟客户端 |
-| `configs/mmo-cluster.json` | 集群、日志、MySQL、Redis、鉴权、gameconfig 配置 |
-| `scripts/start.ps1` / `stop.ps1` | 五节点启停 |
-| `scripts/genproto.ps1` | 生成 `internal/protocolpb/gen` |
-| `internal/masterapp` | Master 节点（集群发现） |
-| `internal/gatewayapp` | 网关：连接 Agent、鉴权、集群转发 |
-| `internal/loginapp` | 登录：Token 签发与校验 Actor |
-| `internal/gameapp` | 游戏：玩家、聊天、背包、场景世界、GM Actor |
-| `internal/gmapp` | **GM 进程：HTTP 路由 + NATS 通信** |
-| `internal/persistence` | GORM + Redis + 全局事务与缓存 |
-| `internal/protocol` | 协议类型别名 |
-| `internal/protocolpb` | `.proto` 与生成的 Go 代码 |
-| `internal/code` | 业务错误码 |
-| `internal/gtime` | 统一游戏时间与日历工具 |
-| `gameconfig/` | 策划配表：Excel/CSV → Luban → JSON → MySQL → runtime |
-| `cherry-framework` | Cherry 框架源码（`go.mod replace`） |
-| `docs/plans/` | 功能计划与进度（策划文档 + 实施计划） |
+
+| 路径                               | 说明                                              |
+| -------------------------------- | ----------------------------------------------- |
+| `cmd/master`                     | Discovery master                                |
+| `cmd/gateway`                    | 网关节点                                            |
+| `cmd/login`                      | 登录节点                                            |
+| `cmd/game`                       | 游戏节点                                            |
+| `cmd/gm`                         | **GM 管理进程（HTTP + NATS）**                        |
+| `cmd/client-demo`                | Protobuf 联调冒烟客户端                                |
+| `Dockerfile`                     | 多阶段构建应用镜像（六二进制）                                 |
+| `docker-compose.yml`             | 本地预发布栈编排                                        |
+| `configs/mmo-cluster.json`       | 本机开发集群配置                                        |
+| `configs/mmo-docker.json`        | Docker Compose 容器内配置                            |
+| `scripts/start.ps1` / `stop.ps1` | 五节点启停（Windows 本机）                               |
+| `scripts/cicd.ps1`               | 本地 Docker CI/CD 流水线                             |
+| `scripts/docker-smoke.ps1`       | Compose 栈冒烟检查                                   |
+| `scripts/genproto.ps1`           | 生成 `internal/protocolpb/gen`                    |
+| `internal/masterapp`             | Master 节点（集群发现）                                 |
+| `internal/gatewayapp`            | 网关：连接 Agent、鉴权、集群转发                             |
+| `internal/loginapp`              | 登录：Token 签发与校验 Actor                            |
+| `internal/gameapp`               | 游戏：玩家、聊天、背包、场景世界、GM Actor                       |
+| `internal/gmapp`                 | **GM 进程：HTTP 路由 + NATS 通信**                     |
+| `internal/persistence`           | GORM + Redis + 全局事务与缓存                          |
+| `internal/protocol`              | 协议类型别名                                          |
+| `internal/protocolpb`            | `.proto` 与生成的 Go 代码                             |
+| `internal/code`                  | 业务错误码                                           |
+| `internal/gtime`                 | 统一游戏时间与日历工具                                     |
+| `gameconfig/`                    | 策划配表：Excel/CSV → Luban → JSON → MySQL → runtime |
+| `cherry-framework`               | Cherry 框架源码（`go.mod replace`）                   |
+| `docs/plans/`                    | 功能计划与进度（策划文档 + 实施计划）                            |
+
 
 ## 配置摘录
 
@@ -366,12 +423,12 @@ CI：`.github/workflows/go.yml`（`go test` + 五节点 `go build`）。
 - `node.gate[].address` → `:10100`
 - `mysql.dsn`
 - `auth.session_policy`（`kick_old` / `coexist` / `device_limit`）、`auth.max_devices_per_uid`
-- `redis.*`（TTL、限流、`key_prefix`）
+- `redis.`*（TTL、限流、`key_prefix`）
 - `gameconfig.allow_reload`（是否允许热更）、`gameconfig.import_data_dir`
 
 ## 功能计划与进度
 
-后续迭代在 [`docs/plans/README.md`](docs/plans/README.md) 维护：每项功能对应 plan 文件与 `done` / `in_progress` / `planned` 状态。新功能开工前先更新计划再实现。
+后续迭代在 `[docs/plans/README.md](docs/plans/README.md)` 维护：每项功能对应 plan 文件与 `done` / `in_progress` / `planned` 状态。新功能开工前先更新计划再实现。
 
 ## 后续扩展
 
