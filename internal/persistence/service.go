@@ -75,3 +75,25 @@ func CreatePlayerForUIDContext(parent context.Context, uid int64, name string) (
 func CreatePlayerForUID(uid int64, name string) (*protocol.PlayerInfo, bool, error) {
 	return CreatePlayerForUIDContext(context.Background(), uid, name)
 }
+
+// DeletePlayerContext 软删除角色，校验归属；已删除返回 ErrPlayerDeleted。
+func DeletePlayerContext(parent context.Context, uid, playerID int64) error {
+	if err := ensureDB(); err != nil {
+		return err
+	}
+	if uid < 1 || playerID < 1 {
+		return ErrPlayerNotFound
+	}
+
+	ctx, cancel := opContext(parent)
+	defer cancel()
+
+	return WithinTx(ctx, func(txCtx context.Context) error {
+		return deletePlayerInTx(txCtx, uid, playerID)
+	})
+}
+
+// DeletePlayer 是 DeletePlayerContext 的便捷入口。
+func DeletePlayer(uid, playerID int64) error {
+	return DeletePlayerContext(context.Background(), uid, playerID)
+}

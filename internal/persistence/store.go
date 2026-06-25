@@ -27,7 +27,11 @@ type config struct {
 	loginBlockTTL    time.Duration
 	deviceSessionTTL time.Duration
 	keyPrefix        string
+	maxCharacters    int
 }
+
+// defaultMaxCharacters 是单账号最大未删除角色数的默认值。
+const defaultMaxCharacters = 3
 
 var (
 	once    sync.Once
@@ -92,6 +96,11 @@ func Init() error {
 func loadConfig() config {
 	my := cprofile.GetConfig("mysql")
 	rd := cprofile.GetConfig("redis")
+	player := cprofile.GetConfig("player")
+	maxCharacters := player.GetInt("max_characters", 3)
+	if maxCharacters < 1 {
+		maxCharacters = 1
+	}
 	return config{
 		mysqlDSN:         my.GetString("dsn", ""),
 		maxOpenConn:      my.GetInt("max_open_conns", 20),
@@ -105,6 +114,7 @@ func loadConfig() config {
 		loginBlockTTL:    time.Duration(rd.GetInt("login_block_seconds", 600)) * time.Second,
 		deviceSessionTTL: time.Duration(rd.GetInt("device_session_ttl_seconds", 7200)) * time.Second,
 		keyPrefix:        rd.GetString("key_prefix", "mmo"),
+		maxCharacters:    maxCharacters,
 	}
 }
 
@@ -138,6 +148,15 @@ func LoginBlockTTL() time.Duration {
 
 func DeviceSessionTTL() time.Duration {
 	return cfg.deviceSessionTTL
+}
+
+// MaxCharacters 返回单账号可持有的最大未删除角色数，默认 3，最少 1。
+// 未通过 Init 加载配置时（如单测）返回默认值，避免零值导致上限误拦截。
+func MaxCharacters() int {
+	if cfg.maxCharacters < 1 {
+		return defaultMaxCharacters
+	}
+	return cfg.maxCharacters
 }
 
 // DB 返回全局 GORM 实例（会先 Init）。

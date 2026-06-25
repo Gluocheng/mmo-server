@@ -29,6 +29,8 @@ const (
 	ItemNotFound        int32 = 40023 // 道具 id 不在配置表
 	ConfigReloadDenied  int32 = 40024 // 未开启配置 reload
 	ConfigReloadFail    int32 = 40025 // 配置 reload 失败
+	PlayerLimitExceeded int32 = 40026 // 账号角色数已达上限（create 时触发）
+	PlayerDeleted       int32 = 40027 // 角色已删除（enter/delete 命中已删除角色）
 )
 
 func IsFail(c int32) bool {

@@ -18,6 +18,7 @@ type (
 	PlayerSelectResponse = pb.PlayerSelectResponse
 	PlayerCreateRequest  = pb.PlayerCreateRequest
 	PlayerCreateResponse = pb.PlayerCreateResponse
+	PlayerDeleteRequest  = pb.PlayerDeleteRequest
 	IssueTokenRequest    = pb.IssueTokenRequest
 	IssueTokenResponse   = pb.IssueTokenResponse
 	TokenLoginRequest    = pb.TokenLoginRequest

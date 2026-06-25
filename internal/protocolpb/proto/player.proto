@@ -20,3 +20,7 @@ message PlayerCreateRequest {
 message PlayerCreateResponse {
   PlayerInfo player = 1 [json_name = "player"];
 }
+
+message PlayerDeleteRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+}

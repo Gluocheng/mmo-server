@@ -1,6 +1,7 @@
 package player
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,7 @@ func (p *actorPlayer) OnInit() {
 	p.Local().Register("select", p.selectPlayer)
 	p.Local().Register("create", p.createPlayer)
 	p.Local().Register("enter", p.enter)
+	p.Local().Register("delete", p.deletePlayer)
 	p.Local().Register("move", p.move)
 }
 
@@ -36,20 +38,22 @@ func (p *actorPlayer) sessionClose() {
 	clog.Debugf("player actor exit uid=%d path=%s", uid, p.PathString())
 }
 
+// selectPlayer 返回当前账号下全部未删除角色列表（一账号多角）。
 func (p *actorPlayer) selectPlayer(session *cproto.Session, _ *protocol.None) {
 	rsp := &protocol.PlayerSelectResponse{}
-	info, ok, err := persistence.GetPlayerByUID(session.Uid)
+	players, err := persistence.ListPlayersByUID(session.Uid)
 	if err != nil {
 		clog.Warnf("select player fail uid=%d err=%v", session.Uid, err)
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
-	if ok && info != nil {
-		rsp.List = append(rsp.List, proto.Clone(info).(*protocol.PlayerInfo))
+	for i := range players {
+		rsp.List = append(rsp.List, proto.Clone(players[i]).(*protocol.PlayerInfo))
 	}
 	p.Response(session, rsp)
 }
 
+// createPlayer 创建新角色，受配置上限与全服未删除重名约束。
 func (p *actorPlayer) createPlayer(session *cproto.Session, req *protocol.PlayerCreateRequest) {
 	if req == nil || strings.TrimSpace(req.Name) == "" {
 		p.ResponseCode(session, code.PlayerCreateFail)
@@ -57,8 +61,15 @@ func (p *actorPlayer) createPlayer(session *cproto.Session, req *protocol.Player
 	}
 	info, created, err := persistence.CreatePlayerForUID(session.Uid, req.Name)
 	if err != nil {
-		clog.Warnf("create player fail uid=%d err=%v", session.Uid, err)
-		p.ResponseCode(session, code.PlayerCreateFail)
+		switch {
+		case errors.Is(err, persistence.ErrPlayerLimitExceeded):
+			p.ResponseCode(session, code.PlayerLimitExceeded)
+		case errors.Is(err, persistence.ErrPlayerNameTaken):
+			p.ResponseCode(session, code.PlayerCreateFail)
+		default:
+			clog.Warnf("create player fail uid=%d err=%v", session.Uid, err)
+			p.ResponseCode(session, code.PlayerCreateFail)
+		}
 		return
 	}
 	if !created || info == nil {
@@ -68,22 +79,23 @@ func (p *actorPlayer) createPlayer(session *cproto.Session, req *protocol.Player
 	p.Response(session, &protocol.PlayerCreateResponse{Player: proto.Clone(info).(*protocol.PlayerInfo)})
 }
 
+// enter 进场，player_id 必填且必须属于当前账号、未删除。
 func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequest) {
 	if session.Uid < 1 {
 		p.ResponseCode(session, code.NotLoggedIn)
 		return
 	}
-	info, ok, err := persistence.GetPlayerByUID(session.Uid)
+	if req == nil || req.PlayerId < 1 {
+		p.ResponseCode(session, code.PlayerNotFound)
+		return
+	}
+	info, ok, err := persistence.GetPlayerByPlayerID(session.Uid, req.PlayerId)
 	if err != nil {
-		clog.Warnf("load player fail uid=%d err=%v", session.Uid, err)
+		clog.Warnf("load player fail uid=%d player_id=%d err=%v", session.Uid, req.PlayerId, err)
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
 	if !ok || info == nil {
-		p.ResponseCode(session, code.PlayerNotFound)
-		return
-	}
-	if req != nil && req.PlayerId > 0 && req.PlayerId != info.PlayerId {
 		p.ResponseCode(session, code.PlayerNotFound)
 		return
 	}
@@ -95,11 +107,33 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 	})
 
 	sceneID := world.DefaultSceneID
-	if req != nil && req.SceneId > 0 {
+	if req.SceneId > 0 {
 		sceneID = req.SceneId
 	}
 	all := world.Enter(session.Uid, session.AgentPath, sceneID)
 	p.Response(session, &protocol.EnterGameResponse{SceneId: sceneID, Players: all})
+}
+
+// deletePlayer 软删除角色，校验归属；已删除返回 40027。
+func (p *actorPlayer) deletePlayer(session *cproto.Session, req *protocol.PlayerDeleteRequest) {
+	if req == nil || req.PlayerId < 1 {
+		p.ResponseCode(session, code.PlayerNotFound)
+		return
+	}
+	err := persistence.DeletePlayer(session.Uid, req.PlayerId)
+	if err != nil {
+		switch {
+		case errors.Is(err, persistence.ErrPlayerDeleted):
+			p.ResponseCode(session, code.PlayerDeleted)
+		case errors.Is(err, persistence.ErrPlayerNotFound):
+			p.ResponseCode(session, code.PlayerNotFound)
+		default:
+			clog.Warnf("delete player fail uid=%d player_id=%d err=%v", session.Uid, req.PlayerId, err)
+			p.ResponseCode(session, code.PlayerNotFound)
+		}
+		return
+	}
+	p.Response(session, &emptypb.Empty{})
 }
 
 func (p *actorPlayer) move(session *cproto.Session, req *protocol.MoveRequest) {

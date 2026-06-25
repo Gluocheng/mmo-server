@@ -225,7 +225,7 @@ func TestFindOrCreateAccountInTxInvalidPassword(t *testing.T) {
 	}
 }
 
-func TestCreatePlayerInTxDuplicateUID(t *testing.T) {
+func TestCreatePlayerInTxAllowsMultiplePerUID(t *testing.T) {
 	resetStoreForTest(t)
 	ctx := context.Background()
 
@@ -240,12 +240,12 @@ func TestCreatePlayerInTxDuplicateUID(t *testing.T) {
 	}
 
 	if err := WithinTx(ctx, func(txCtx context.Context) error {
-		_, created, err := createPlayerInTx(txCtx, 1001, "Knight2")
+		info, created, err := createPlayerInTx(txCtx, 1001, "Knight2")
 		if err != nil {
 			return err
 		}
-		if created {
-			t.Fatal("duplicate uid should not create again")
+		if !created || info == nil {
+			t.Fatal("second character for same uid should be created")
 		}
 		return nil
 	}); err != nil {
@@ -327,5 +327,122 @@ func TestNextPlayerIDInTxRollsBackSequence(t *testing.T) {
 
 	if got != playerIDInitialValue {
 		t.Fatalf("expected rollback to keep next player_id %d, got %d", playerIDInitialValue, got)
+	}
+}
+
+// setMaxCharactersForTest 覆盖角色上限，便于多角用例构造满额场景。
+func setMaxCharactersForTest(t *testing.T, n int) {
+	t.Helper()
+	old := cfg.maxCharacters
+	cfg.maxCharacters = n
+	t.Cleanup(func() { cfg.maxCharacters = old })
+}
+
+func TestListPlayersByUIDReturnsOnlyUndeleted(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	if _, _, err := CreatePlayerForUIDContext(ctx, 7001, "HeroA"); err != nil {
+		t.Fatalf("create A: %v", err)
+	}
+	infoB, _, err := CreatePlayerForUIDContext(ctx, 7001, "HeroB")
+	if err != nil {
+		t.Fatalf("create B: %v", err)
+	}
+	if err := DeletePlayerContext(ctx, 7001, infoB.PlayerId); err != nil {
+		t.Fatalf("delete B: %v", err)
+	}
+
+	players, err := ListPlayersByUIDContext(ctx, 7001)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(players) != 1 {
+		t.Fatalf("expected 1 undeleted player, got %d", len(players))
+	}
+	if players[0].Name != "HeroA" {
+		t.Fatalf("expected HeroA remains, got %s", players[0].Name)
+	}
+}
+
+func TestCreatePlayerForUIDRejectsAtLimit(t *testing.T) {
+	resetStoreForTest(t)
+	setMaxCharactersForTest(t, 2)
+	ctx := context.Background()
+
+	if _, _, err := CreatePlayerForUIDContext(ctx, 8001, "One"); err != nil {
+		t.Fatalf("create one: %v", err)
+	}
+	if _, _, err := CreatePlayerForUIDContext(ctx, 8001, "Two"); err != nil {
+		t.Fatalf("create two: %v", err)
+	}
+	if _, _, err := CreatePlayerForUIDContext(ctx, 8001, "Three"); !errors.Is(err, ErrPlayerLimitExceeded) {
+		t.Fatalf("expected ErrPlayerLimitExceeded, got %v", err)
+	}
+}
+
+func TestDeletePlayerRejectsForeignOwner(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	info, _, err := CreatePlayerForUIDContext(ctx, 9001, "Owner")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := DeletePlayerContext(ctx, 9002, info.PlayerId); !errors.Is(err, ErrPlayerNotFound) {
+		t.Fatalf("expected ErrPlayerNotFound for foreign owner, got %v", err)
+	}
+}
+
+func TestDeletePlayerAlreadyDeleted(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	info, _, err := CreatePlayerForUIDContext(ctx, 9101, "Once")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := DeletePlayerContext(ctx, 9101, info.PlayerId); err != nil {
+		t.Fatalf("first delete: %v", err)
+	}
+	if err := DeletePlayerContext(ctx, 9101, info.PlayerId); !errors.Is(err, ErrPlayerDeleted) {
+		t.Fatalf("expected ErrPlayerDeleted, got %v", err)
+	}
+}
+
+func TestGetPlayerByPlayerIDRejectsDeleted(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	info, _, err := CreatePlayerForUIDContext(ctx, 9201, "Ghost")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := DeletePlayerContext(ctx, 9201, info.PlayerId); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	_, found, err := GetPlayerByPlayerIDContext(ctx, 9201, info.PlayerId)
+	if err != nil {
+		t.Fatalf("get deleted: %v", err)
+	}
+	if found {
+		t.Fatal("expected deleted player not found")
+	}
+}
+
+func TestGetPlayerByPlayerIDRejectsForeignOwner(t *testing.T) {
+	resetStoreForTest(t)
+	ctx := context.Background()
+
+	info, _, err := CreatePlayerForUIDContext(ctx, 9301, "Mine")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	_, found, err := GetPlayerByPlayerIDContext(ctx, 9302, info.PlayerId)
+	if err != nil {
+		t.Fatalf("get foreign: %v", err)
+	}
+	if found {
+		t.Fatal("expected foreign player not found")
 	}
 }

@@ -34,7 +34,7 @@
 | superseded | 道具系统（JSON 文件方案） | [2026-05-28-item-system-design.md](2026-05-28-item-system-design.md) | 已由 gameconfig 策划替代 |
 | done | 全局 ID 生成策略 | [2026-06-25-global-id-design.md](2026-06-25-global-id-design.md) | 实施 [2026-06-25-global-id.md](2026-06-25-global-id.md) |
 | planned | 战斗骨架 | [backlog-combat.md](backlog-combat.md) | — |
-| planned | 一账号多角 | [backlog-multi-character.md](backlog-multi-character.md) | 表结构 + 协议评审 |
+| done | 一账号多角 | [2026-06-25-multi-character-design.md](2026-06-25-multi-character-design.md) | 实施 [2026-06-25-multi-character.md](2026-06-25-multi-character.md) |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 
 > 无 `*-design.md` 的 done 项为历史基线；**新迭代**须策划 + 实施双文件，并更新本表。
