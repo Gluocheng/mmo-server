@@ -311,6 +311,10 @@ func gameNodeRoute(agent *pomelo.Agent, session *cproto.Session, route *pmessage
 	if !session.IsBind() {
 		return
 	}
+	if isAdminGameRoute(route) {
+		agent.ResponseCode(session, code.ConfigReloadDenied, true)
+		return
+	}
 	if !session.Contains(sessionkey.PlayerID) {
 		if _, ok := beforeEnterRoutes[msg.Route]; !ok {
 			agent.Kick(notLoginKick, true)
@@ -325,6 +329,19 @@ func gameNodeRoute(agent *pomelo.Agent, session *cproto.Session, route *pmessage
 	targetPath := cfacade.NewChildPath(serverID, route.HandleName(), childID)
 	if err := pomelo.ClusterLocalDataRoute(agent, session, route, msg, serverID, targetPath); err != nil {
 		clog.Warnf("cluster route err: %v", err)
+	}
+}
+
+// isAdminGameRoute 拦截仅允许 GM HTTP 触发的管理路由，避免玩家经网关热更配表。
+func isAdminGameRoute(route *pmessage.Route) bool {
+	if route == nil {
+		return false
+	}
+	switch strings.ToLower(route.HandleName()) {
+	case "gm", "config":
+		return true
+	default:
+		return false
 	}
 }
 

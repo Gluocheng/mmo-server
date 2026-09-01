@@ -35,7 +35,7 @@
 | login | `cmd/login/` | `-node` | `login-1` | 账号认证：签发/校验/刷新令牌 |
 | game | `cmd/game/` | `-node` | `10001` | 游戏逻辑：角色、场景（AOI）、聊天、背包、GM 指令 |
 | gateway | `cmd/gateway/` | `-node` | `gate-1` | WebSocket + Pomelo 协议，鉴权路由转发至 login/game |
-| gm | `cmd/gm/` | `-http`, `-nats`, `-prefix`, `-game` | `gm-1` | 管理进程：HTTP API → NATS → game 节点 |
+| gm | `cmd/gm/` | `-http`, `-nats`, `-prefix`, `-game`, `-token` | `gm-1` | 管理进程：HTTP API → NATS → game 节点 |
 
 所有节点共用 `-path=configs/mmo-cluster.json` 作为 profile 配置。启动顺序必须为: **master → login → game → gateway → gm**。
 

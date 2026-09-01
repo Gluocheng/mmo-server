@@ -42,8 +42,11 @@ func (p *ActorSession) issueToken(req *protocol.IssueTokenRequest) (*protocol.Is
 	uid, err := persistence.LoginOrCreateAccount(req.Nickname, req.Password)
 	if err != nil || uid < 1 {
 		_ = persistence.RecordLoginFailure(req.ClientIp, req.Nickname)
-		if errors.Is(err, persistence.ErrInvalidPassword) {
+		if errors.Is(err, persistence.ErrInvalidPassword) || errors.Is(err, persistence.ErrPasswordInvalid) {
 			return nil, code.InvalidPassword
+		}
+		if errors.Is(err, persistence.ErrNicknameInvalid) {
+			return nil, code.LoginFail
 		}
 		return nil, code.LoginFail
 	}

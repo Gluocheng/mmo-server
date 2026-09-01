@@ -13,12 +13,33 @@ import (
 
 	"strings"
 
+	"unicode/utf8"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"gorm.io/gorm"
 )
 
 var ErrInvalidPassword = errors.New("invalid password")
+var ErrNicknameInvalid = errors.New("nickname invalid")
+var ErrPasswordInvalid = errors.New("password invalid")
+
+const (
+	maxNicknameRunes = 64
+	minPasswordBytes = 6
+	maxPasswordBytes = 72 // bcrypt 截断上限
+)
+
+func validateAccountCredentials(nickname, password string) error {
+	if nickname == "" || utf8.RuneCountInString(nickname) > maxNicknameRunes {
+		return ErrNicknameInvalid
+	}
+	n := len(password)
+	if n < minPasswordBytes || n > maxPasswordBytes {
+		return ErrPasswordInvalid
+	}
+	return nil
+}
 
 func accountNicknameKey(nickname string) string {
 

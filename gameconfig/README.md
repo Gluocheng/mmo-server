@@ -40,4 +40,4 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 
 ## 热更
 
-profile 中设置 `"gameconfig": { "allow_reload": true }` 后，可调用 RPC `game.config.reload`。
+profile 中设置 `"gameconfig": { "allow_reload": true }` 后，通过 GM HTTP `POST /gm/config/reload`（须 `X-GM-Token`）热更。玩家客户端不可调用 `game.config.reload`。

@@ -1,8 +1,12 @@
 package gmapp
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	clog "github.com/cherry-game/cherry/logger"
@@ -10,6 +14,8 @@ import (
 	"github.com/example/mmo-server/internal/protocol"
 	"google.golang.org/protobuf/proto"
 )
+
+const maxReloadBodyBytes = 4 << 10
 
 // configReloadReq HTTP 请求体：gm 配置热更。
 type configReloadReq struct {
@@ -29,8 +35,6 @@ type healthRsp struct {
 	Code          int32  `json:"code"`
 	Message       string `json:"message"`
 	NATSConnected bool   `json:"natsConnected"`
-	RemoteSubject string `json:"remoteSubject"`
-	TargetPath    string `json:"targetPath"`
 }
 
 // registerRoutes 注册 HTTP 路由。
@@ -52,8 +56,6 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Code:          0,
 		Message:       "ok",
 		NATSConnected: a.natsConn != nil && a.natsConn.IsConnected(),
-		RemoteSubject: a.remoteSubject,
-		TargetPath:    a.targetPath,
 	})
 }
 
@@ -66,12 +68,20 @@ func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if !a.authorizeGM(r) {
+		writeJSON(w, http.StatusUnauthorized, configReloadRsp{
+			Code:    -1,
+			Message: "unauthorized",
+		})
+		return
+	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxReloadBodyBytes)
 	var req configReloadReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, configReloadRsp{
 			Code:    -1,
-			Message: "invalid request body: " + err.Error(),
+			Message: "invalid request body",
 		})
 		return
 	}
@@ -107,13 +117,21 @@ func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if a.natsConn == nil {
+		writeJSON(w, http.StatusServiceUnavailable, configReloadRsp{
+			Code:    -1,
+			Message: "nats unavailable",
+		})
+		return
+	}
+
 	// 通过 NATS 发送到 game 节点，5 秒超时
 	msg, err := a.natsConn.Request(a.remoteSubject, cpBytes, 5*time.Second)
 	if err != nil {
 		clog.Warnf("gm http nats request: %v", err)
 		writeJSON(w, http.StatusGatewayTimeout, configReloadRsp{
 			Code:    -1,
-			Message: "game node timeout: " + err.Error(),
+			Message: "game node timeout",
 		})
 		return
 	}
@@ -137,7 +155,6 @@ func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 解析 ReflexTokenResponse 获取结果细节
 	var pbRsp protocol.RefreshTokenResponse
 	if len(rsp.Data) > 0 {
 		if err := proto.Unmarshal(rsp.Data, &pbRsp); err != nil {
@@ -148,14 +165,36 @@ func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, configReloadRsp{
 		Code:    0,
 		Message: "ok",
-		Version: pbRsp.AccessToken,
+		Version: strconv.FormatInt(pbRsp.AccessExpireAt, 10),
 		Tables:  pbRsp.RefreshExpireAt,
 	})
+}
+
+func (a *App) authorizeGM(r *http.Request) bool {
+	if a.token == "" {
+		return false
+	}
+	provided := strings.TrimSpace(r.Header.Get("X-GM-Token"))
+	if provided == "" {
+		auth := strings.TrimSpace(r.Header.Get("Authorization"))
+		const prefix = "Bearer "
+		if len(auth) >= len(prefix) && strings.EqualFold(auth[:len(prefix)], prefix) {
+			provided = strings.TrimSpace(auth[len(prefix):])
+		}
+	}
+	return compareGMToken(a.token, provided)
+}
+
+func compareGMToken(expected, provided string) bool {
+	sumExp := sha256.Sum256([]byte(expected))
+	sumGot := sha256.Sum256([]byte(provided))
+	return subtle.ConstantTimeCompare(sumExp[:], sumGot[:]) == 1
 }
 
 // writeJSON 写入 JSON 响应。
 func writeJSON(w http.ResponseWriter, statusCode int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(v)
 }

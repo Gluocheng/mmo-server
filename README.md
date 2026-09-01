@@ -48,7 +48,7 @@ flowchart LR
 
 ## 依赖
 
-- Go 1.24+
+- Go 1.25+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)（本地 Docker CI/CD 可选）
 - [NATS Server](https://github.com/nats-io/nats-server)（默认 `nats://127.0.0.1:4222`）
 - MySQL 8+（库名 `mmo`，DSN 见 `configs/mmo-cluster.json`）
@@ -97,7 +97,7 @@ go run ./cmd/master  -path=configs/mmo-cluster.json -node=master-1
 go run ./cmd/login   -path=configs/mmo-cluster.json -node=login-1
 go run ./cmd/game    -path=configs/mmo-cluster.json -node=10001
 go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-1
-go run ./cmd/gm      -http=:9080 -nats=nats://127.0.0.1:4222 -prefix=mmo -game=10001
+go run ./cmd/gm      -http=:9080 -nats=nats://127.0.0.1:4222 -prefix=mmo -game=10001 -token=$env:GM_TOKEN
 ```
 
 `cluster.discovery.mode` 为 `**nats**`，`cluster.nats.master_node_id` 须与 master 的 `-node` 一致（默认 `master-1`）。
@@ -129,7 +129,7 @@ powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage down
 Compose 使用 [`configs/mmo-docker.json`](configs/mmo-docker.json)：NATS 由本栈启动；MySQL/Redis 使用你已有的 Docker/本机服务，容器内通过 `host.docker.internal:3306/6379` 访问，并自动执行 `import-config` 初始化配表。
 
 - 网关 WebSocket：`ws://127.0.0.1:10100`
-- GM HTTP（Docker 预发布）：默认 `http://127.0.0.1:19080/gm/config/reload`；可用 `-GMPort` 或环境变量 `GM_HTTP_PORT` 调整宿主机映射端口
+- GM HTTP（Docker 预发布）：默认 `http://127.0.0.1:19080/gm/config/reload`；可用 `-GMPort` 或环境变量 `GM_HTTP_PORT` 调整宿主机映射端口。变更接口须带 `X-GM-Token`（或 `Authorization: Bearer`），令牌来自环境变量 `GM_TOKEN`（`scripts/cicd.ps1` 在未设置时会生成临时值）
 - GM 健康检查：浏览器打开 `http://127.0.0.1:19080/gm/health`
 - 发布记录：`.release/current`、`.release/previous`
 
@@ -150,14 +150,16 @@ GM 进程独立运行，通过 HTTP 接收管理请求，经 NATS 转发到 game
 ### 配置热更
 
 ```powershell
-# 全量重载所有配表
+# 全量重载所有配表（须设置 GM_TOKEN，或启动时传入 -token）
 curl.exe -X POST http://127.0.0.1:9080/gm/config/reload `
   -H "Content-Type: application/json" `
+  -H "X-GM-Token: $env:GM_TOKEN" `
   -d '{"tableName":""}'
 
 # 按表名重载特定表（如 item）
 curl.exe -X POST http://127.0.0.1:9080/gm/config/reload `
   -H "Content-Type: application/json" `
+  -H "X-GM-Token: $env:GM_TOKEN" `
   -d '{"tableName":"item"}'
 ```
 
@@ -201,7 +203,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 说明：
 
-- `issueToken`：`nickname`、`password`、`deviceId` 必填；`clientIp` 由网关注入；失败按「帐号+IP」限流（默认 5 次 / 5 分钟窗口，封禁 10 分钟，见 `redis.login_fail_`*）
+- `issueToken`：`nickname`（1–64 字符）、`password`（6–72 字节）、`deviceId` 必填；`clientIp` 由网关注入；失败按「帐号+IP」限流（默认 5 次 / 5 分钟窗口，封禁 10 分钟，见 `redis.login_fail_`*）
 - `login`：`accessToken`（或兼容字段 `token`）、`serverId`、`deviceId`
 - `refreshToken`：单次使用，刷新后旧 refresh 立即失效；重放返回业务码 `40013`
 - 会话策略 `auth.session_policy`：`kick_old`（默认）| `coexist` | `device_limit`（配合 `auth.max_devices_per_uid`）
@@ -223,7 +225,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 背包扣除 | `game.bag.remove`       | `BagRemoveRequest`                         | `BagListResponse` + Push `onBagChange`           |
 | 背包移动 | `game.bag.move`         | `BagMoveRequest`（`fromSlot` / `toSlot`）    | `BagListResponse` + Push `onBagChange`           |
 | 背包拆分 | `game.bag.split`        | `BagSplitRequest`（`fromSlot` / `count`）    | `BagListResponse` + Push `onBagChange`           |
-| 配置热更 | `game.gm.config.reload` | `RefreshTokenRequest`（`refreshToken` 承载表名） | `RefreshTokenResponse`                           |
+| 配置热更 | （GM HTTP）`POST /gm/config/reload` | JSON `{tableName}` + `X-GM-Token` | JSON `{code,version,tables}` |
 
 
 说明：
@@ -231,15 +233,15 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 演示为 **每帐号单角色**（`players.uid` 唯一）
 - 未完成 `enter` 时，除 `select` / `create` / `enter` 外请求会被网关拒绝
 - 移动广播带简单 **AOI 半径过滤**（默认 15，见 `internal/gameapp/world/scene.go`）
-- 聊天为同场景全员广播（无 AOI 裁剪）
+- 聊天为同场景全员广播（无 AOI 裁剪）；文本最长 256 个 Unicode 字符
 - 背包须已 `enter`；**32 固定槽位**（`slot` 0–31）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
 - `add` / `remove` / `move` / `split` 成功后 RPC 返回最新背包，并 Push `onBagChange`（同 `BagListResponse`）
-- `game.gm.config.reload` 可通过 Pomelo 客户端直接调用，也可通过 GM HTTP API 间接触发
+- 配表热更不对玩家客户端开放。网关会拒绝 `game.gm.*` / `game.config.*`；仅 GM HTTP `POST /gm/config/reload`（需 `X-GM-Token`）可触发
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40025`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40028`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -268,8 +270,11 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40021 | `BagSlotInvalid`      | 槽位非法         |
 | 40022 | `BagFull`             | 背包已满         |
 | 40023 | `ItemNotFound`        | 道具不在配表       |
-| 40024 | `ConfigReloadDenied`  | 未开启配表 reload |
+| 40024 | `ConfigReloadDenied`  | 未开启配表 reload / 玩家无权热更 |
 | 40025 | `ConfigReloadFail`    | 配表 reload 失败 |
+| 40026 | `PlayerLimitExceeded` | 账号角色数已达上限 |
+| 40027 | `PlayerDeleted`       | 角色已删除 |
+| 40028 | `ChatTextInvalid`     | 聊天内容为空或超长 |
 
 
 ### 重新生成 Protobuf Go 代码
@@ -328,8 +333,8 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 
 profile 中 `gameconfig.allow_reload` 设为 `true` 后：
 
-- 通过 GM HTTP API：`POST /gm/config/reload`
-- 通过 Pomelo RPC：`game.gm.config.reload`
+- 通过 GM HTTP API：`POST /gm/config/reload`（须 `X-GM-Token` / `GM_TOKEN`）
+- 玩家 Pomelo 路由不可触发热更（网关拒绝 `game.gm.*` / `game.config.*`）
 
 详见 [gameconfig/README.md](gameconfig/README.md)。
 

@@ -88,7 +88,17 @@ function Save-ReleaseTag([string]$releaseTag) {
     Write-Host "[cicd] release tag=$releaseTag (previous in .release/previous)"
 }
 
+function Ensure-GMToken {
+    if (-not $env:GM_TOKEN -or $env:GM_TOKEN.Trim() -eq "") {
+        $bytes = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+        $env:GM_TOKEN = [Convert]::ToBase64String($bytes)
+        Write-Host "[cicd] generated ephemeral GM_TOKEN for this session"
+    }
+}
+
 function Invoke-Deploy([string]$releaseTag) {
+    Ensure-GMToken
     $env:MMO_IMAGE_TAG = $releaseTag
     $env:GM_HTTP_PORT = "$GMPort"
     Write-Host "[cicd] docker compose up -d (MMO_IMAGE_TAG=$releaseTag, GM_HTTP_PORT=$GMPort)"
@@ -99,6 +109,9 @@ function Invoke-Deploy([string]$releaseTag) {
 }
 
 function Invoke-Smoke {
+    if (-not $env:GM_TOKEN -or $env:GM_TOKEN.Trim() -eq "") {
+        throw "GM_TOKEN is required for smoke (set it or run deploy/release first in the same session)"
+    }
     & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "docker-smoke.ps1") -GMPort $GMPort
     if ($LASTEXITCODE -ne 0) {
         throw "smoke test failed"

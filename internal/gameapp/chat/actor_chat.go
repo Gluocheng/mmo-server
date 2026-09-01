@@ -2,6 +2,7 @@ package chat
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
@@ -12,6 +13,8 @@ import (
 	"github.com/example/mmo-server/internal/sessionkey"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+const maxChatTextRunes = 256
 
 type actorChat struct {
 	pomelo.ActorBase
@@ -26,14 +29,19 @@ func (p *actorChat) send(session *cproto.Session, req *protocol.ChatSendRequest)
 		p.ResponseCode(session, code.PlayerNotEntered)
 		return
 	}
-	if req == nil || strings.TrimSpace(req.Text) == "" {
-		p.ResponseCode(session, code.LoginFail)
+	if req == nil {
+		p.ResponseCode(session, code.ChatTextInvalid)
+		return
+	}
+	text := strings.TrimSpace(req.Text)
+	if text == "" || utf8.RuneCountInString(text) > maxChatTextRunes {
+		p.ResponseCode(session, code.ChatTextInvalid)
 		return
 	}
 
 	b := &protocol.ChatBroadcast{
 		Uid:  session.Uid,
-		Text: strings.TrimSpace(req.Text),
+		Text: text,
 	}
 	sceneID := world.DefaultSceneID
 	if sid, ok := world.SceneID(session.Uid); ok {
@@ -44,4 +52,3 @@ func (p *actorChat) send(session *cproto.Session, req *protocol.ChatSendRequest)
 	clog.Debugf("chat send uid=%d len=%d", session.Uid, len(b.Text))
 	p.Response(session, &emptypb.Empty{})
 }
-

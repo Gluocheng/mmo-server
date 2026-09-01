@@ -2,21 +2,21 @@ package persistence
 
 import (
 	"context"
-	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/example/mmo-server/internal/protocol"
 )
 
 // LoginOrCreateAccount 登录或注册账号，MySQL 写操作在统一事务内完成，缓存于提交后刷新。
 func LoginOrCreateAccountContext(parent context.Context, nickname, password string) (int64, error) {
-	if err := ensureDB(); err != nil {
-		return 0, err
-	}
 	nickname = strings.TrimSpace(nickname)
 	password = strings.TrimSpace(password)
-	if nickname == "" || password == "" {
-		return 0, fmt.Errorf("nickname or password empty")
+	if err := validateAccountCredentials(nickname, password); err != nil {
+		return 0, err
+	}
+	if err := ensureDB(); err != nil {
+		return 0, err
 	}
 
 	ctx, cancel := opContext(parent)
@@ -53,7 +53,7 @@ func CreatePlayerForUIDContext(parent context.Context, uid int64, name string) (
 		return nil, false, err
 	}
 	name = strings.TrimSpace(name)
-	if uid < 1 || name == "" {
+	if uid < 1 || name == "" || utf8.RuneCountInString(name) > 32 {
 		return nil, false, nil
 	}
 

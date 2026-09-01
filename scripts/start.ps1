@@ -100,7 +100,11 @@ function Start-GMNode {
     if (-not (Test-Path $exe)) {
         throw "binary not found: $exe (run with -Build)"
     }
-    $args = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode")
+    $token = $env:GM_TOKEN
+    if (-not $token) {
+        Write-Warning "[gm] GM_TOKEN is empty; /gm/config/reload will return 401 until it is set."
+    }
+    $args = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode", "-token=$token")
     Start-Process `
         -FilePath $exe `
         -ArgumentList $args `
