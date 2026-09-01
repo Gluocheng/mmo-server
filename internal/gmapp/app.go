@@ -43,6 +43,7 @@ func (a *App) Run() error {
 		return fmt.Errorf("gm nats connect: %w", err)
 	}
 	a.natsConn = nc
+	defer nc.Close()
 	clog.Infof("gm: nats connected to %s", nc.ConnectedUrl())
 
 	// 初始化 NATS 路由信息

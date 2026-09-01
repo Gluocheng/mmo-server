@@ -62,10 +62,13 @@ func SceneID(uid int64) (int32, bool) {
 }
 
 func BroadcastMove(sender cfacade.IActor, fromUID int64, m *protocol.MoveBroadcast) {
-	mu.RLock()
+	if m == nil {
+		return
+	}
+	mu.Lock()
 	from, ok := inRoom[fromUID]
 	if !ok {
-		mu.RUnlock()
+		mu.Unlock()
 		return
 	}
 	from.x, from.y, from.z = m.X, m.Y, m.Z
@@ -84,7 +87,7 @@ func BroadcastMove(sender cfacade.IActor, fromUID int64, m *protocol.MoveBroadca
 		}
 		peers[u] = st.agentPath
 	}
-	mu.RUnlock()
+	mu.Unlock()
 
 	for uid, path := range peers {
 		pomelo.PushWithUID(sender, path, uid, "onMove", m)

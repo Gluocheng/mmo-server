@@ -79,11 +79,17 @@ func Init() error {
 			WriteTimeout: time.Duration(rcfg.GetInt("write_timeout", 2)) * time.Second,
 		})
 		if err = rdb.Ping(ctx).Err(); err != nil {
+			_ = rdb.Close()
+			rdb = nil
+			_ = sqlDB.Close()
 			initErr = err
 			return
 		}
 
 		if err = autoMigrateModels(gdb.WithContext(ctx)); err != nil {
+			_ = rdb.Close()
+			rdb = nil
+			_ = sqlDB.Close()
 			initErr = err
 			return
 		}

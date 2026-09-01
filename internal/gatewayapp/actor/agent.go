@@ -160,6 +160,9 @@ func (p *AgentActor) login(session *cproto.Session, req *protocol.TokenLoginRequ
 	oldAgent, err := pomelo.Bind(session.Sid, rsp.Uid)
 	if err != nil {
 		clog.Warnf("bind uid fail: %v", err)
+		if policy == policyDeviceLimit {
+			_ = persistence.RemoveDeviceSession(rsp.Uid, deviceID)
+		}
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 		return
 	}
