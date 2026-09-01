@@ -3,6 +3,7 @@ package gmapp
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	clog "github.com/cherry-game/cherry/logger"
@@ -107,6 +108,14 @@ func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if a.natsConn == nil {
+		writeJSON(w, http.StatusServiceUnavailable, configReloadRsp{
+			Code:    -1,
+			Message: "nats not connected",
+		})
+		return
+	}
+
 	// 通过 NATS 发送到 game 节点，5 秒超时
 	msg, err := a.natsConn.Request(a.remoteSubject, cpBytes, 5*time.Second)
 	if err != nil {
@@ -148,7 +157,7 @@ func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, configReloadRsp{
 		Code:    0,
 		Message: "ok",
-		Version: pbRsp.AccessToken,
+		Version: strconv.FormatInt(pbRsp.AccessExpireAt, 10),
 		Tables:  pbRsp.RefreshExpireAt,
 	})
 }
@@ -157,5 +166,7 @@ func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, statusCode int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		clog.Warnf("gm http write json: %v", err)
+	}
 }
