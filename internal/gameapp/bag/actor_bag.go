@@ -63,10 +63,7 @@ func (p *actorBag) add(session *cproto.Session, req *protocol.BagAddRequest) {
 		p.ResponseCode(session, code.BagItemInvalid)
 		return
 	}
-	count := req.Count
-	if count < 1 {
-		count = 1
-	}
+	count := max(req.Count, 1)
 	if err := persistence.AddOrStackItem(playerID, req.ItemId, count); err != nil {
 		p.respondBagError(session, playerID, err)
 		return
