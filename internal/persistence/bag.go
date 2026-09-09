@@ -18,25 +18,56 @@ import (
 // 背包容量与堆叠上限（与协议、错误码 40021/40022 一致）。
 const (
 	MaxBagStack int32 = 9999 // 单槽最大堆叠数量
-	MaxBagSlots int32 = 32   // 固定槽位数，slot 取值 0..31
+	// GeneralBagType 是存量数据回填与未声明 bag_type 道具的默认背包类型。
+	GeneralBagType int32 = 1
+	// defaultBagSlots 是 gameconfig 未加载或未配置该背包类型时的兜底槽位数。
+	defaultBagSlots int32 = 32
 )
 
 var (
-	ErrBagNotEnough   = errors.New("bag item not enough") // 扣除数量超过持有
-	ErrBagInvalid     = errors.New("bag item invalid")    // itemId/count 非法或 move 合并失败
-	ErrBagSlotInvalid = errors.New("bag slot invalid")    // 槽位越界或源槽为空
-	ErrBagFull        = errors.New("bag full")            // 无空槽可放入
-	ErrItemNotFound   = errors.New("item not found in config")
+	ErrBagNotEnough    = errors.New("bag item not enough") // 扣除数量超过持有
+	ErrBagInvalid      = errors.New("bag item invalid")    // itemId/count 非法或 move 合并失败
+	ErrBagSlotInvalid  = errors.New("bag slot invalid")    // 槽位越界或源槽为空
+	ErrBagFull         = errors.New("bag full")            // 无空槽可放入
+	ErrItemNotFound    = errors.New("item not found in config")
+	ErrBagTypeMismatch = errors.New("bag type mismatch") // 道具类别与目标背包不符
 )
 
 var bagCacheJSON = protojson.MarshalOptions{EmitUnpopulated: true}
 
-func bagPlayerKey(playerID int64) string {
-	return fmt.Sprintf("%s:bag:player:%d", KeyPrefix(), playerID)
+// bagPlayerKey 返回某玩家某背包的 Redis 缓存 key。
+func bagPlayerKey(playerID int64, bagType int32) string {
+	return fmt.Sprintf("%s:bag:player:%d:%d", KeyPrefix(), playerID, bagType)
 }
 
-func validateSlot(slot int32) error {
-	if slot < 0 || slot >= MaxBagSlots {
+// slotCountFor 返回背包类型槽位数；gameconfig 未加载或未配置时兜底 defaultBagSlots。
+func slotCountFor(bagType int32) int32 {
+	if n := gcruntime.SlotCount(bagType); n > 0 {
+		return n
+	}
+	return defaultBagSlots
+}
+
+// resolvedBagType 返回道具的目标背包类型；未声明时归入通用背包。
+func resolvedBagType(itemID int32) (int32, error) {
+	def, ok := gcruntime.Get(itemID)
+	if !ok {
+		return 0, ErrItemNotFound
+	}
+	if def.BagType < 1 {
+		return GeneralBagType, nil
+	}
+	return def.BagType, nil
+}
+
+// ResolveItemBagType 返回道具的目标背包类型（公开，供 Actor 在 add 成功后回传 bagType）。
+// 道具不存在时返回 0 与 ErrItemNotFound。
+func ResolveItemBagType(itemID int32) (int32, error) {
+	return resolvedBagType(itemID)
+}
+
+func validateSlot(bagType, slot int32) error {
+	if slot < 0 || slot >= slotCountFor(bagType) {
 		return ErrBagSlotInvalid
 	}
 	return nil
@@ -52,6 +83,18 @@ func validateBagItem(itemID, count int32) error {
 	max := effectiveMaxStack(itemID)
 	if max < 1 || count > max {
 		return ErrBagInvalid
+	}
+	return nil
+}
+
+// validateItemBagType 严格校验道具类别与目标背包一致。
+func validateItemBagType(itemID, bagType int32) error {
+	expect, err := resolvedBagType(itemID)
+	if err != nil {
+		return err
+	}
+	if expect != bagType {
+		return ErrBagTypeMismatch
 	}
 	return nil
 }
@@ -86,10 +129,10 @@ func bagListFromModels(models []InventoryItem) *protocol.BagListResponse {
 	return rsp
 }
 
-func loadBagFromDB(ctx context.Context, playerID int64) (*protocol.BagListResponse, error) {
+func loadBagFromDB(ctx context.Context, playerID int64, bagType int32) (*protocol.BagListResponse, error) {
 	var models []InventoryItem
 	err := DBFromContext(ctx).WithContext(ctx).
-		Where("player_id = ?", playerID).
+		Where("player_id = ? AND bag_type = ?", playerID, bagType).
 		Find(&models).Error
 	if err != nil {
 		return nil, err
@@ -97,7 +140,7 @@ func loadBagFromDB(ctx context.Context, playerID int64) (*protocol.BagListRespon
 	return bagListFromModels(models), nil
 }
 
-func writeBagCache(ctx context.Context, playerID int64, bag *protocol.BagListResponse) {
+func writeBagCache(ctx context.Context, playerID int64, bagType int32, bag *protocol.BagListResponse) {
 	if rdb == nil || bag == nil {
 		return
 	}
@@ -105,18 +148,18 @@ func writeBagCache(ctx context.Context, playerID int64, bag *protocol.BagListRes
 	if err != nil {
 		return
 	}
-	_ = rdb.Set(ctx, bagPlayerKey(playerID), b, CacheTTL()).Err()
+	_ = rdb.Set(ctx, bagPlayerKey(playerID, bagType), b, CacheTTL()).Err()
 }
 
 // scheduleBagCacheRefresh 在事务提交后从 MySQL 重载背包并写入 Redis（AfterCommit）。
-func scheduleBagCacheRefresh(ctx context.Context, playerID int64) {
+func scheduleBagCacheRefresh(ctx context.Context, playerID int64, bagType int32) {
 	if rdb == nil {
 		return
 	}
 	AfterCommit(ctx, func(commitCtx context.Context) {
-		bag, err := loadBagFromDB(commitCtx, playerID)
+		bag, err := loadBagFromDB(commitCtx, playerID, bagType)
 		if err != nil {
-			clog.Warnf("persistence: reload bag cache failed player_id=%d err=%v", playerID, err)
+			clog.Warnf("persistence: reload bag cache failed player_id=%d bag_type=%d err=%v", playerID, bagType, err)
 			return
 		}
 		b, err := bagCacheJSON.Marshal(bag)
@@ -124,14 +167,14 @@ func scheduleBagCacheRefresh(ctx context.Context, playerID int64) {
 			clog.Warnf("persistence: marshal bag cache failed player_id=%d err=%v", playerID, err)
 			return
 		}
-		if err := rdb.Set(commitCtx, bagPlayerKey(playerID), b, CacheTTL()).Err(); err != nil {
+		if err := rdb.Set(commitCtx, bagPlayerKey(playerID, bagType), b, CacheTTL()).Err(); err != nil {
 			clog.Warnf("persistence: after commit bag cache failed player_id=%d err=%v", playerID, err)
 		}
 	})
 }
 
-// GetBagByPlayerIDContext 读取背包：优先 Redis protojson，未命中则查库并回填缓存。
-func GetBagByPlayerIDContext(parent context.Context, playerID int64) (*protocol.BagListResponse, error) {
+// GetBagByPlayerIDContext 读取指定背包：优先 Redis protojson，未命中则查库并回填缓存。
+func GetBagByPlayerIDContext(parent context.Context, playerID int64, bagType int32) (*protocol.BagListResponse, error) {
 	if err := ensureDB(); err != nil {
 		return nil, err
 	}
@@ -143,7 +186,7 @@ func GetBagByPlayerIDContext(parent context.Context, playerID int64) (*protocol.
 	defer cancel()
 
 	if rdb != nil {
-		cacheKey := bagPlayerKey(playerID)
+		cacheKey := bagPlayerKey(playerID, bagType)
 		if raw, err := rdb.Get(ctx, cacheKey).Bytes(); err == nil {
 			var bag protocol.BagListResponse
 			if jsonErr := protojson.Unmarshal(raw, &bag); jsonErr == nil {
@@ -152,26 +195,26 @@ func GetBagByPlayerIDContext(parent context.Context, playerID int64) (*protocol.
 		}
 	}
 
-	bag, err := loadBagFromDB(ctx, playerID)
+	bag, err := loadBagFromDB(ctx, playerID, bagType)
 	if err != nil {
 		return nil, err
 	}
-	writeBagCache(ctx, playerID, bag)
+	writeBagCache(ctx, playerID, bagType, bag)
 	return proto.Clone(bag).(*protocol.BagListResponse), nil
 }
 
-// GetBagByPlayerID 读取背包（Background 上下文）。
-func GetBagByPlayerID(playerID int64) (*protocol.BagListResponse, error) {
-	return GetBagByPlayerIDContext(context.Background(), playerID)
+// GetBagByPlayerID 读取指定背包（Background 上下文）。
+func GetBagByPlayerID(playerID int64, bagType int32) (*protocol.BagListResponse, error) {
+	return GetBagByPlayerIDContext(context.Background(), playerID, bagType)
 }
 
-func loadItemAtSlotForUpdate(txDB *gorm.DB, ctx context.Context, playerID int64, slot int32) (*InventoryItem, error) {
-	if err := validateSlot(slot); err != nil {
+func loadItemAtSlotForUpdate(txDB *gorm.DB, ctx context.Context, playerID int64, bagType, slot int32) (*InventoryItem, error) {
+	if err := validateSlot(bagType, slot); err != nil {
 		return nil, err
 	}
 	var item InventoryItem
 	err := txDB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("player_id = ? AND slot = ?", playerID, slot).
+		Where("player_id = ? AND bag_type = ? AND slot = ?", playerID, bagType, slot).
 		First(&item).Error
 	if err == gorm.ErrRecordNotFound {
 		return nil, nil
@@ -182,11 +225,11 @@ func loadItemAtSlotForUpdate(txDB *gorm.DB, ctx context.Context, playerID int64,
 	return &item, nil
 }
 
-func findEmptySlotInTx(ctx context.Context, playerID int64) (int32, error) {
+func findEmptySlotInTx(ctx context.Context, playerID int64, bagType int32) (int32, error) {
 	txDB := DBFromContext(ctx).WithContext(ctx)
 	var used []int32
 	if err := txDB.Model(&InventoryItem{}).
-		Where("player_id = ?", playerID).
+		Where("player_id = ? AND bag_type = ?", playerID, bagType).
 		Pluck("slot", &used).Error; err != nil {
 		return -1, err
 	}
@@ -194,7 +237,8 @@ func findEmptySlotInTx(ctx context.Context, playerID int64) (int32, error) {
 	for _, s := range used {
 		occupied[s] = struct{}{}
 	}
-	for slot := int32(0); slot < MaxBagSlots; slot++ {
+	limit := slotCountFor(bagType)
+	for slot := int32(0); slot < limit; slot++ {
 		if _, ok := occupied[slot]; !ok {
 			return slot, nil
 		}
@@ -203,15 +247,18 @@ func findEmptySlotInTx(ctx context.Context, playerID int64) (int32, error) {
 }
 
 // addOrStackItemInTx 先向同 item_id 的已有槽堆叠，剩余数量占最小号空槽（可跨多槽）。
-func addOrStackItemInTx(ctx context.Context, playerID int64, itemID, count int32) error {
+func addOrStackItemInTx(ctx context.Context, playerID int64, bagType, itemID, count int32) error {
 	if err := validateBagItem(itemID, count); err != nil {
+		return err
+	}
+	if err := validateItemBagType(itemID, bagType); err != nil {
 		return err
 	}
 	txDB := DBFromContext(ctx).WithContext(ctx)
 
 	var stacks []InventoryItem
 	if err := txDB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("player_id = ? AND item_id = ?", playerID, itemID).
+		Where("player_id = ? AND bag_type = ? AND item_id = ?", playerID, bagType, itemID).
 		Find(&stacks).Error; err != nil {
 		return err
 	}
@@ -234,7 +281,7 @@ func addOrStackItemInTx(ctx context.Context, playerID int64, itemID, count int32
 		remaining -= add
 	}
 	for remaining > 0 {
-		slot, err := findEmptySlotInTx(ctx, playerID)
+		slot, err := findEmptySlotInTx(ctx, playerID, bagType)
 		if err != nil {
 			return err
 		}
@@ -245,6 +292,7 @@ func addOrStackItemInTx(ctx context.Context, playerID int64, itemID, count int32
 		}
 		if err := txDB.Create(&InventoryItem{
 			PlayerID: playerID,
+			BagType:  bagType,
 			Slot:     slot,
 			ItemID:   itemID,
 			Count:    put,
@@ -256,8 +304,8 @@ func addOrStackItemInTx(ctx context.Context, playerID int64, itemID, count int32
 	return nil
 }
 
-// AddOrStackItemContext 发放物品：WithinTx 写库，提交后刷新 Redis 背包缓存。
-func AddOrStackItemContext(parent context.Context, playerID int64, itemID, count int32) error {
+// AddOrStackItemToBagContext 发放物品到指定背包：严格校验道具类别，WithinTx 写库，提交后刷缓存。
+func AddOrStackItemToBagContext(parent context.Context, playerID int64, bagType, itemID, count int32) error {
 	if err := ensureDB(); err != nil {
 		return err
 	}
@@ -270,30 +318,39 @@ func AddOrStackItemContext(parent context.Context, playerID int64, itemID, count
 	ctx, cancel := opContext(parent)
 	defer cancel()
 	err := WithinTx(ctx, func(txCtx context.Context) error {
-		return addOrStackItemInTx(txCtx, playerID, itemID, count)
+		return addOrStackItemInTx(txCtx, playerID, bagType, itemID, count)
 	})
 	if err != nil {
 		return err
 	}
-	scheduleBagCacheRefresh(ctx, playerID)
+	scheduleBagCacheRefresh(ctx, playerID, bagType)
 	return nil
 }
 
-// AddOrStackItem 发放物品（Background 上下文）。
+// AddOrStackItemToBag 发放物品到指定背包（Background 上下文）。
+func AddOrStackItemToBag(playerID int64, bagType, itemID, count int32) error {
+	return AddOrStackItemToBagContext(context.Background(), playerID, bagType, itemID, count)
+}
+
+// AddOrStackItem 发放物品：按 item.bag_type 自动路由到目标背包。
 func AddOrStackItem(playerID int64, itemID, count int32) error {
-	return AddOrStackItemContext(context.Background(), playerID, itemID, count)
+	bagType, err := resolvedBagType(itemID)
+	if err != nil {
+		return err
+	}
+	return AddOrStackItemToBag(playerID, bagType, itemID, count)
 }
 
 // removeFromSlotInTx 从指定槽位扣除 count；扣完则删行，否则减数量。
-func removeFromSlotInTx(ctx context.Context, playerID int64, slot, count int32) error {
-	if err := validateSlot(slot); err != nil {
+func removeFromSlotInTx(ctx context.Context, playerID int64, bagType, slot, count int32) error {
+	if err := validateSlot(bagType, slot); err != nil {
 		return err
 	}
 	if count < 1 || count > MaxBagStack {
 		return ErrBagInvalid
 	}
 	txDB := DBFromContext(ctx).WithContext(ctx)
-	item, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, slot)
+	item, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, bagType, slot)
 	if err != nil {
 		return err
 	}
@@ -307,14 +364,14 @@ func removeFromSlotInTx(ctx context.Context, playerID int64, slot, count int32) 
 }
 
 // removeByItemIDInTx 按 item_id 从 slot 升序各槽合计扣除 count（可跨多槽）。
-func removeByItemIDInTx(ctx context.Context, playerID int64, itemID, count int32) error {
+func removeByItemIDInTx(ctx context.Context, playerID int64, bagType, itemID, count int32) error {
 	if err := validateBagItem(itemID, count); err != nil {
 		return err
 	}
 	txDB := DBFromContext(ctx).WithContext(ctx)
 	var stacks []InventoryItem
 	if err := txDB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("player_id = ? AND item_id = ?", playerID, itemID).
+		Where("player_id = ? AND bag_type = ? AND item_id = ?", playerID, bagType, itemID).
 		Order("slot asc").
 		Find(&stacks).Error; err != nil {
 		return err
@@ -346,7 +403,7 @@ func removeByItemIDInTx(ctx context.Context, playerID int64, itemID, count int32
 }
 
 // RemoveItemContext 扣除物品：bySlot 走单槽，否则按 itemId 跨槽扣；提交后刷缓存。
-func RemoveItemContext(parent context.Context, playerID int64, slot int32, bySlot bool, itemID, count int32) error {
+func RemoveItemContext(parent context.Context, playerID int64, bagType, slot int32, bySlot bool, itemID, count int32) error {
 	if err := ensureDB(); err != nil {
 		return err
 	}
@@ -360,47 +417,47 @@ func RemoveItemContext(parent context.Context, playerID int64, slot int32, bySlo
 	defer cancel()
 	err := WithinTx(ctx, func(txCtx context.Context) error {
 		if bySlot {
-			return removeFromSlotInTx(txCtx, playerID, slot, count)
+			return removeFromSlotInTx(txCtx, playerID, bagType, slot, count)
 		}
-		return removeByItemIDInTx(txCtx, playerID, itemID, count)
+		return removeByItemIDInTx(txCtx, playerID, bagType, itemID, count)
 	})
 	if err != nil {
 		return err
 	}
-	scheduleBagCacheRefresh(ctx, playerID)
+	scheduleBagCacheRefresh(ctx, playerID, bagType)
 	return nil
 }
 
 // RemoveItem 按 itemId 跨槽扣除（协议 bySlot=false）。
-func RemoveItem(playerID int64, itemID, count int32) error {
-	return RemoveItemContext(context.Background(), playerID, 0, false, itemID, count)
+func RemoveItem(playerID int64, bagType, itemID, count int32) error {
+	return RemoveItemContext(context.Background(), playerID, bagType, 0, false, itemID, count)
 }
 
 // RemoveItemAtSlot 从指定槽位扣除（协议 bySlot=true）。
-func RemoveItemAtSlot(playerID int64, slot, count int32) error {
-	return RemoveItemContext(context.Background(), playerID, slot, true, 0, count)
+func RemoveItemAtSlot(playerID int64, bagType, slot, count int32) error {
+	return RemoveItemContext(context.Background(), playerID, bagType, slot, true, 0, count)
 }
 
 // moveItemInTx 移动/合并/交换：目标空槽则改 slot；同 item 则合并（源槽可剩）；异 item 则交换两栈。
-func moveItemInTx(ctx context.Context, playerID int64, fromSlot, toSlot int32) error {
-	if err := validateSlot(fromSlot); err != nil {
+func moveItemInTx(ctx context.Context, playerID int64, bagType, fromSlot, toSlot int32) error {
+	if err := validateSlot(bagType, fromSlot); err != nil {
 		return err
 	}
-	if err := validateSlot(toSlot); err != nil {
+	if err := validateSlot(bagType, toSlot); err != nil {
 		return err
 	}
 	if fromSlot == toSlot {
 		return nil
 	}
 	txDB := DBFromContext(ctx).WithContext(ctx)
-	from, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, fromSlot)
+	from, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, bagType, fromSlot)
 	if err != nil {
 		return err
 	}
 	if from == nil || from.ItemID < 1 || from.Count < 1 {
 		return ErrBagSlotInvalid
 	}
-	to, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, toSlot)
+	to, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, bagType, toSlot)
 	if err != nil {
 		return err
 	}
@@ -440,7 +497,7 @@ func moveItemInTx(ctx context.Context, playerID int64, fromSlot, toSlot int32) e
 }
 
 // MoveItemContext 槽位移动：WithinTx 内 moveItemInTx，提交后刷缓存。
-func MoveItemContext(parent context.Context, playerID int64, fromSlot, toSlot int32) error {
+func MoveItemContext(parent context.Context, playerID int64, bagType, fromSlot, toSlot int32) error {
 	if err := ensureDB(); err != nil {
 		return err
 	}
@@ -450,42 +507,43 @@ func MoveItemContext(parent context.Context, playerID int64, fromSlot, toSlot in
 	ctx, cancel := opContext(parent)
 	defer cancel()
 	err := WithinTx(ctx, func(txCtx context.Context) error {
-		return moveItemInTx(txCtx, playerID, fromSlot, toSlot)
+		return moveItemInTx(txCtx, playerID, bagType, fromSlot, toSlot)
 	})
 	if err != nil {
 		return err
 	}
-	scheduleBagCacheRefresh(ctx, playerID)
+	scheduleBagCacheRefresh(ctx, playerID, bagType)
 	return nil
 }
 
 // MoveItem 槽位移动（Background 上下文）。
-func MoveItem(playerID int64, fromSlot, toSlot int32) error {
-	return MoveItemContext(context.Background(), playerID, fromSlot, toSlot)
+func MoveItem(playerID int64, bagType, fromSlot, toSlot int32) error {
+	return MoveItemContext(context.Background(), playerID, bagType, fromSlot, toSlot)
 }
 
 // splitItemInTx 从源槽拆出 count 到新空槽；要求源槽数量严格大于 count。
-func splitItemInTx(ctx context.Context, playerID int64, fromSlot, count int32) error {
-	if err := validateSlot(fromSlot); err != nil {
+func splitItemInTx(ctx context.Context, playerID int64, bagType, fromSlot, count int32) error {
+	if err := validateSlot(bagType, fromSlot); err != nil {
 		return err
 	}
 	if count < 1 || count > MaxBagStack {
 		return ErrBagInvalid
 	}
 	txDB := DBFromContext(ctx).WithContext(ctx)
-	from, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, fromSlot)
+	from, err := loadItemAtSlotForUpdate(txDB, ctx, playerID, bagType, fromSlot)
 	if err != nil {
 		return err
 	}
 	if from == nil || from.Count <= count {
 		return ErrBagNotEnough
 	}
-	emptySlot, err := findEmptySlotInTx(ctx, playerID)
+	emptySlot, err := findEmptySlotInTx(ctx, playerID, bagType)
 	if err != nil {
 		return err
 	}
 	if err := txDB.Create(&InventoryItem{
 		PlayerID: playerID,
+		BagType:  bagType,
 		Slot:     emptySlot,
 		ItemID:   from.ItemID,
 		Count:    count,
@@ -499,7 +557,7 @@ func splitItemInTx(ctx context.Context, playerID int64, fromSlot, count int32) e
 }
 
 // SplitItemContext 拆分堆叠：WithinTx 写库，提交后刷缓存。
-func SplitItemContext(parent context.Context, playerID int64, fromSlot, count int32) error {
+func SplitItemContext(parent context.Context, playerID int64, bagType, fromSlot, count int32) error {
 	if err := ensureDB(); err != nil {
 		return err
 	}
@@ -509,16 +567,16 @@ func SplitItemContext(parent context.Context, playerID int64, fromSlot, count in
 	ctx, cancel := opContext(parent)
 	defer cancel()
 	err := WithinTx(ctx, func(txCtx context.Context) error {
-		return splitItemInTx(txCtx, playerID, fromSlot, count)
+		return splitItemInTx(txCtx, playerID, bagType, fromSlot, count)
 	})
 	if err != nil {
 		return err
 	}
-	scheduleBagCacheRefresh(ctx, playerID)
+	scheduleBagCacheRefresh(ctx, playerID, bagType)
 	return nil
 }
 
 // SplitItem 拆分堆叠（Background 上下文）。
-func SplitItem(playerID int64, fromSlot, count int32) error {
-	return SplitItemContext(context.Background(), playerID, fromSlot, count)
+func SplitItem(playerID int64, bagType, fromSlot, count int32) error {
+	return SplitItemContext(context.Background(), playerID, bagType, fromSlot, count)
 }

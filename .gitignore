@@ -22,3 +22,10 @@ bin-release/
 *.apk
 .codewhale/
 .deepseek/
+
+# Luban 工具（二进制，不提交；安装见 gameconfig/tools/luban/README.md）
+gameconfig/tools/luban/*
+!gameconfig/tools/luban/README.md
+
+# Luban 缓存
+.cache.meta

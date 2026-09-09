@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "name": "通用背包",
+    "slot_count": 32
+  },
+  {
+    "id": 2,
+    "name": "消耗品",
+    "slot_count": 32
+  },
+  {
+    "id": 3,
+    "name": "材料",
+    "slot_count": 32
+  },
+  {
+    "id": 4,
+    "name": "装备",
+    "slot_count": 8
+  },
+  {
+    "id": 5,
+    "name": "任务",
+    "slot_count": 32
+  }
+]

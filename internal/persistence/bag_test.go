@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	gcfg "github.com/example/mmo-server/gameconfig/gen/cfg"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/protocol"
 )
@@ -17,6 +18,9 @@ func resetBagTestDB(t *testing.T) {
 	}
 }
 
+// SeedTestItems 的测试道具 bag_type 均为 1（通用背包），自动路由的目标就是 1。
+const testBag = int32(1)
+
 func TestAddOrStackItem(t *testing.T) {
 	resetBagTestDB(t)
 	const playerID int64 = 1001
@@ -28,7 +32,7 @@ func TestAddOrStackItem(t *testing.T) {
 		t.Fatalf("stack add: %v", err)
 	}
 
-	bag, err := GetBagByPlayerID(playerID)
+	bag, err := GetBagByPlayerID(playerID, testBag)
 	if err != nil {
 		t.Fatalf("get bag: %v", err)
 	}
@@ -44,7 +48,7 @@ func TestRemoveItemNotEnough(t *testing.T) {
 	if err := AddOrStackItem(playerID, 1, 1); err != nil {
 		t.Fatalf("add: %v", err)
 	}
-	err := RemoveItem(playerID, 1, 2)
+	err := RemoveItem(playerID, testBag, 1, 2)
 	if !errors.Is(err, ErrBagNotEnough) {
 		t.Fatalf("expected ErrBagNotEnough, got %v", err)
 	}
@@ -57,10 +61,10 @@ func TestRemoveItemDeletesRow(t *testing.T) {
 	if err := AddOrStackItem(playerID, 7, 4); err != nil {
 		t.Fatalf("add: %v", err)
 	}
-	if err := RemoveItem(playerID, 7, 4); err != nil {
+	if err := RemoveItem(playerID, testBag, 7, 4); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
-	bag, err := GetBagByPlayerID(playerID)
+	bag, err := GetBagByPlayerID(playerID, testBag)
 	if err != nil {
 		t.Fatalf("get bag: %v", err)
 	}
@@ -75,7 +79,7 @@ func TestBagTxRollback(t *testing.T) {
 	ctx := context.Background()
 
 	err := WithinTx(ctx, func(txCtx context.Context) error {
-		if err := addOrStackItemInTx(txCtx, playerID, 99, 1); err != nil {
+		if err := addOrStackItemInTx(txCtx, playerID, testBag, 99, 1); err != nil {
 			return err
 		}
 		return errors.New("force rollback")
@@ -84,7 +88,7 @@ func TestBagTxRollback(t *testing.T) {
 		t.Fatal("expected rollback error")
 	}
 
-	bag, err := GetBagByPlayerID(playerID)
+	bag, err := GetBagByPlayerID(playerID, testBag)
 	if err != nil {
 		t.Fatalf("get bag: %v", err)
 	}
@@ -104,7 +108,7 @@ func TestValidateBagItemMaxStack(t *testing.T) {
 	if err := AddOrStackItem(playerID, 1, 1); err != nil {
 		t.Fatalf("add to new slot: %v", err)
 	}
-	bag, err := GetBagByPlayerID(playerID)
+	bag, err := GetBagByPlayerID(playerID, testBag)
 	if err != nil {
 		t.Fatalf("get bag: %v", err)
 	}
@@ -123,15 +127,15 @@ func TestMoveItemToEmptySlot(t *testing.T) {
 	if err := AddOrStackItem(playerID, 5, 3); err != nil {
 		t.Fatalf("add: %v", err)
 	}
-	bag, _ := GetBagByPlayerID(playerID)
+	bag, _ := GetBagByPlayerID(playerID, testBag)
 	if len(bag.Items) != 1 {
 		t.Fatalf("expected 1 stack")
 	}
 	fromSlot := bag.Items[0].Slot
-	if err := MoveItem(playerID, fromSlot, 5); err != nil {
+	if err := MoveItem(playerID, testBag, fromSlot, 5); err != nil {
 		t.Fatalf("move: %v", err)
 	}
-	bag, err := GetBagByPlayerID(playerID)
+	bag, err := GetBagByPlayerID(playerID, testBag)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -150,15 +154,15 @@ func TestMoveItemSwap(t *testing.T) {
 	if err := AddOrStackItem(playerID, 2, 4); err != nil {
 		t.Fatalf("add2: %v", err)
 	}
-	bag, _ := GetBagByPlayerID(playerID)
+	bag, _ := GetBagByPlayerID(playerID, testBag)
 	if len(bag.Items) != 2 {
 		t.Fatalf("expected 2 stacks")
 	}
 	s0, s1 := bag.Items[0].Slot, bag.Items[1].Slot
-	if err := MoveItem(playerID, s0, s1); err != nil {
+	if err := MoveItem(playerID, testBag, s0, s1); err != nil {
 		t.Fatalf("swap move: %v", err)
 	}
-	bag, err := GetBagByPlayerID(playerID)
+	bag, err := GetBagByPlayerID(playerID, testBag)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -184,14 +188,14 @@ func TestSplitItem(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 	slot := int32(0)
-	bag, _ := GetBagByPlayerID(playerID)
+	bag, _ := GetBagByPlayerID(playerID, testBag)
 	if len(bag.Items) > 0 {
 		slot = bag.Items[0].Slot
 	}
-	if err := SplitItem(playerID, slot, 4); err != nil {
+	if err := SplitItem(playerID, testBag, slot, 4); err != nil {
 		t.Fatalf("split: %v", err)
 	}
-	bag, err := GetBagByPlayerID(playerID)
+	bag, err := GetBagByPlayerID(playerID, testBag)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -214,7 +218,9 @@ func TestBagFull(t *testing.T) {
 	resetBagTestDB(t)
 	const playerID int64 = 2004
 
-	for i := int32(0); i < MaxBagSlots; i++ {
+	// 测试道具均为通用背包(1)，slot_count=32
+	limit := slotCountFor(testBag)
+	for i := int32(0); i < limit; i++ {
 		if err := AddOrStackItem(playerID, 100+i, 1); err != nil {
 			t.Fatalf("add slot %d: %v", i, err)
 		}
@@ -222,5 +228,47 @@ func TestBagFull(t *testing.T) {
 	err := AddOrStackItem(playerID, 999, 1)
 	if !errors.Is(err, ErrBagFull) {
 		t.Fatalf("expected ErrBagFull, got %v", err)
+	}
+}
+
+func TestBagTypeMismatchRejected(t *testing.T) {
+	resetBagTestDB(t)
+	const playerID int64 = 3001
+	// 测试道具 10 的 bag_type=1；指定到背包 2 应被拒绝
+	err := AddOrStackItemToBag(playerID, 2, 10, 1)
+	if !errors.Is(err, ErrBagTypeMismatch) {
+		t.Fatalf("expected ErrBagTypeMismatch, got %v", err)
+	}
+}
+
+func TestMultiBagIsolation(t *testing.T) {
+	resetBagTestDB(t)
+	const playerID int64 = 3002
+	// 注入两个不同 bag_type 的道具，验证自动路由到各自背包且 slot 互不冲突
+	gcruntime.BuildFromItems([]*gcfg.ItemItem{
+		{Id: 10, Name: "a", Type: "material", MaxStack: 99, Stackable: true, Discardable: true, BindType: "none", BagType: 1},
+		{Id: 11, Name: "b", Type: "material", MaxStack: 99, Stackable: true, Discardable: true, BindType: "none", BagType: 2},
+	}, 1)
+
+	if err := AddOrStackItem(playerID, 10, 2); err != nil {
+		t.Fatalf("add bag1: %v", err)
+	}
+	if err := AddOrStackItem(playerID, 11, 3); err != nil {
+		t.Fatalf("add bag2: %v", err)
+	}
+
+	bag1, err := GetBagByPlayerID(playerID, 1)
+	if err != nil {
+		t.Fatalf("get bag1: %v", err)
+	}
+	bag2, err := GetBagByPlayerID(playerID, 2)
+	if err != nil {
+		t.Fatalf("get bag2: %v", err)
+	}
+	if len(bag1.Items) != 1 || bag1.Items[0].ItemId != 10 || bag1.Items[0].Slot != 0 {
+		t.Fatalf("bag1 unexpected: %+v", bag1.Items)
+	}
+	if len(bag2.Items) != 1 || bag2.Items[0].ItemId != 11 || bag2.Items[0].Slot != 0 {
+		t.Fatalf("bag2 unexpected: %+v", bag2.Items)
 	}
 }

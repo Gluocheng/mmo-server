@@ -1,0 +1,13 @@
+<module name="item">
+	<bean name="Item" comment="道具">
+		<var name="id" type="int" comment="道具id"/>
+		<var name="name" type="string" comment="名称"/>
+		<var name="type" type="string" comment="分类"/>
+		<var name="max_stack" type="int" comment="单槽最大堆叠"/>
+		<var name="stackable" type="bool" comment="可堆叠"/>
+		<var name="discardable" type="bool" comment="可丢弃"/>
+		<var name="bind_type" type="string" comment="绑定类型"/>
+		<var name="bag_type" type="int" comment="目标背包类型"/>
+	</bean>
+	<table name="TbItem" value="Item" input="item.csv" comment="道具表"/>
+</module>

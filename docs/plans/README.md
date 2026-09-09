@@ -35,6 +35,7 @@
 | done | 全局 ID 生成策略 | [2026-06-25-global-id-design.md](2026-06-25-global-id-design.md) | 实施 [2026-06-25-global-id.md](2026-06-25-global-id.md) |
 | planned | 战斗骨架 | [backlog-combat.md](backlog-combat.md) | — |
 | done | 一账号多角 | [2026-06-25-multi-character-design.md](2026-06-25-multi-character-design.md) | 实施 [2026-06-25-multi-character.md](2026-06-25-multi-character.md) |
+| done | 多背包（bag_type 维度） | [2026-09-09-multi-bag-design.md](2026-09-09-multi-bag-design.md) | 实施 [2026-09-09-multi-bag.md](2026-09-09-multi-bag.md) |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 
 > 无 `*-design.md` 的 done 项为历史基线；**新迭代**须策划 + 实施双文件，并更新本表。

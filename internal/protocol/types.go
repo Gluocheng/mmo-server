@@ -31,6 +31,7 @@ type (
 	ChatBroadcast        = pb.ChatBroadcast
 	BagItem              = pb.BagItem
 	BagListResponse      = pb.BagListResponse
+	BagListRequest       = pb.BagListRequest
 	BagAddRequest        = pb.BagAddRequest
 	BagRemoveRequest     = pb.BagRemoveRequest
 	BagMoveRequest       = pb.BagMoveRequest

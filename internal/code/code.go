@@ -31,6 +31,7 @@ const (
 	ConfigReloadFail    int32 = 40025 // 配置 reload 失败
 	PlayerLimitExceeded int32 = 40026 // 账号角色数已达上限（create 时触发）
 	PlayerDeleted       int32 = 40027 // 角色已删除（enter/delete 命中已删除角色）
+	BagTypeMismatch     int32 = 40028 // 道具类别与目标背包不符
 )
 
 func IsFail(c int32) bool {

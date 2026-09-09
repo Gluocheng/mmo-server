@@ -29,12 +29,20 @@ func main() {
 	}
 
 	itemPath := filepath.Join(*dataDir, importdata.ItemTableFile)
-	items, err := importdata.LoadItemsFromJSONFile(itemPath)
+	itemTable, _, err := importdata.LoadItemsFromJSONFile(itemPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	schemaRows := importdata.ItemsToSchema(items)
+	schemaRows := importdata.ItemsToSchema(itemTable.GetDataList())
+
+	bagTypePath := filepath.Join(*dataDir, importdata.BagTypeTableFile)
+	bagTypeTable, _, err := importdata.LoadBagTypesFromJSONFile(bagTypePath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	bagTypeRows := importdata.BagTypesToSchema(bagTypeTable.GetDataList())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -57,10 +65,17 @@ func main() {
 		if err := tx.Create(&schemaRows).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgBagType{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&bagTypeRows).Error; err != nil {
+			return err
+		}
 		var ver schema.CfgVersion
 		if err := tx.First(&ver, 1).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				ver = schema.CfgVersion{ID: 1, Version: 1}
+				newVersion = ver.Version
 				return tx.Create(&ver).Error
 			}
 			return err
@@ -75,5 +90,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("imported %d items, cfg_version=%d\n", len(schemaRows), newVersion)
+	fmt.Printf("imported %d items, %d bag_types, cfg_version=%d\n", len(schemaRows), len(bagTypeRows), newVersion)
 }

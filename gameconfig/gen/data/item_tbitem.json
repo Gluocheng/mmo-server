@@ -6,7 +6,8 @@
     "max_stack": 99,
     "stackable": true,
     "discardable": true,
-    "bind_type": "none"
+    "bind_type": "none",
+    "bag_type": 2
   },
   {
     "id": 1002,
@@ -15,7 +16,8 @@
     "max_stack": 9999,
     "stackable": true,
     "discardable": true,
-    "bind_type": "none"
+    "bind_type": "none",
+    "bag_type": 3
   },
   {
     "id": 2001,
@@ -24,7 +26,8 @@
     "max_stack": 1,
     "stackable": false,
     "discardable": true,
-    "bind_type": "none"
+    "bind_type": "none",
+    "bag_type": 4
   },
   {
     "id": 3001,
@@ -33,6 +36,7 @@
     "max_stack": 1,
     "stackable": false,
     "discardable": false,
-    "bind_type": "none"
+    "bind_type": "none",
+    "bag_type": 5
   }
 ]

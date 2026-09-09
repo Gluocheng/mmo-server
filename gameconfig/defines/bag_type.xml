@@ -1,0 +1,8 @@
+<module name="bag_type">
+	<bean name="BagType" comment="背包类型">
+		<var name="id" type="int" comment="类型id"/>
+		<var name="name" type="string" comment="名称"/>
+		<var name="slot_count" type="int" comment="槽位数"/>
+	</bean>
+	<table name="TbBagType" value="BagType" input="bag_type.csv" comment="背包类型表"/>
+</module>

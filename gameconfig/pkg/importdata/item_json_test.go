@@ -13,11 +13,11 @@ func TestLoadItemsFromJSONFile(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Skip("gen data not present")
 	}
-	items, err := importdata.LoadItemsFromJSONFile(path)
+	table, _, err := importdata.LoadItemsFromJSONFile(path)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(items) < 4 {
-		t.Fatalf("expected demo items, got %d", len(items))
+	if len(table.GetDataList()) < 4 {
+		t.Fatalf("expected demo items, got %d", len(table.GetDataList()))
 	}
 }

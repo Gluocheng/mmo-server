@@ -11,7 +11,7 @@ import (
 )
 
 // ReloadTable 按表名重新加载指定配置表；失败时保留旧快照。
-// 一期支持: "item"=道具表。
+// 支持: "item"=道具表、"bag_type"=背包类型表。
 func ReloadTable(ctx context.Context, db *gorm.DB, tableName string) error {
 	if db == nil {
 		return fmt.Errorf("gameconfig reload table: db is nil")
@@ -27,14 +27,39 @@ func ReloadTable(ctx context.Context, db *gorm.DB, tableName string) error {
 		if err := db.WithContext(ctx).Order("id asc").Find(&itemRows).Error; err != nil {
 			return fmt.Errorf("reload cfg_item: %w", err)
 		}
-		items := importdata.SchemaToItems(itemRows)
-		newItem := cfg.NewTbItem(items)
-		tables := cfg.NewTables(newItem)
+		items := make(map[int32]*cfg.ItemItem, len(itemRows))
+		for i := range itemRows {
+			it := importdata.SchemaToItems(itemRows)[i]
+			items[it.Id] = it
+		}
 		// 只替换 item 表，其他表保持不变
 		swapSnapshot(&snapshot{
 			version:    s.version,
-			tableCount: int32(len(items)),
-			tables:     tables,
+			tableCount: int32(len(itemRows)),
+			tables: &tables{
+				items:    items,
+				bagTypes: s.tables.bagTypes,
+			},
+		})
+		return nil
+	case "bag_type":
+		var bagTypeRows []schema.CfgBagType
+		if err := db.WithContext(ctx).Order("id asc").Find(&bagTypeRows).Error; err != nil {
+			return fmt.Errorf("reload cfg_bag_type: %w", err)
+		}
+		bagTypes := make(map[int32]*cfg.Bag_typeBagType, len(bagTypeRows))
+		for i := range bagTypeRows {
+			bt := importdata.SchemaToBagTypes(bagTypeRows)[i]
+			bagTypes[bt.Id] = bt
+		}
+		// 只替换 bag_type 表，其他表保持不变
+		swapSnapshot(&snapshot{
+			version:    s.version,
+			tableCount: s.tableCount,
+			tables: &tables{
+				items:    s.tables.items,
+				bagTypes: bagTypes,
+			},
 		})
 		return nil
 	default:

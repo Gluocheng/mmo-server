@@ -37,17 +37,29 @@ func Load(ctx context.Context, db *gorm.DB) error {
 		return fmt.Errorf("load cfg_item: %w", err)
 	}
 
-	items := importdata.SchemaToItems(itemRows)
-	tables := cfg.NewTables(cfg.NewTbItem(items))
-	tableCount := int32(0)
-	if tables.TbItem != nil {
-		tableCount = int32(len(tables.TbItem.DataList()))
+	var bagTypeRows []schema.CfgBagType
+	if err := db.WithContext(ctx).Order("id asc").Find(&bagTypeRows).Error; err != nil {
+		return fmt.Errorf("load cfg_bag_type: %w", err)
+	}
+
+	items := make(map[int32]*cfg.ItemItem, len(itemRows))
+	for i := range itemRows {
+		it := importdata.SchemaToItems(itemRows)[i]
+		items[it.Id] = it
+	}
+	bagTypes := make(map[int32]*cfg.Bag_typeBagType, len(bagTypeRows))
+	for i := range bagTypeRows {
+		bt := importdata.SchemaToBagTypes(bagTypeRows)[i]
+		bagTypes[bt.Id] = bt
 	}
 
 	swapSnapshot(&snapshot{
 		version:    versionRow.Version,
-		tableCount: tableCount,
-		tables:     tables,
+		tableCount: int32(len(itemRows)),
+		tables: &tables{
+			items:    items,
+			bagTypes: bagTypes,
+		},
 	})
 	return nil
 }
@@ -77,21 +89,21 @@ func TableCount() int32 {
 	return s.tableCount
 }
 
-// Tables 返回底层 Tables（只读使用，勿修改）。
-func Tables() (*cfg.Tables, error) {
-	s := getSnapshot()
-	if s == nil || s.tables == nil {
-		return nil, ErrNotLoaded
-	}
-	return s.tables, nil
-}
-
 // BuildFromItems 直接从 item 行构建快照（单测用，不写 DB）。
-func BuildFromItems(items []*cfg.Item, version int64) {
-	tables := cfg.NewTables(cfg.NewTbItem(items))
+func BuildFromItems(items []*cfg.ItemItem, version int64) {
+	m := make(map[int32]*cfg.ItemItem, len(items))
+	for _, it := range items {
+		if it == nil {
+			continue
+		}
+		m[it.Id] = it
+	}
 	swapSnapshot(&snapshot{
 		version:    version,
 		tableCount: int32(len(items)),
-		tables:     tables,
+		tables: &tables{
+			items:    m,
+			bagTypes: nil,
+		},
 	})
 }

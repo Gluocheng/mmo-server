@@ -21,12 +21,23 @@ type CfgItem struct {
 	Stackable   bool   `gorm:"not null"`
 	Discardable bool   `gorm:"not null;default:true"`
 	BindType    string `gorm:"size:16;not null;default:none"`
+	BagType     int32  `gorm:"not null;default:1"`
 }
 
 // TableName 表名 cfg_item。
 func (CfgItem) TableName() string { return "cfg_item" }
 
+// CfgBagType 背包类型静态配置行（与 Luban BagType / gen/cfg.BagType 同构）。
+type CfgBagType struct {
+	ID        int32  `gorm:"primaryKey"`
+	Name      string `gorm:"size:64;not null"`
+	SlotCount int32  `gorm:"not null"`
+}
+
+// TableName 表名 cfg_bag_type。
+func (CfgBagType) TableName() string { return "cfg_bag_type" }
+
 // Models 参与 AutoMigrate 的配置表模型列表。
 func Models() []any {
-	return []any{&CfgVersion{}, &CfgItem{}}
+	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}}
 }

@@ -43,7 +43,7 @@ func TestLoadAndReload(t *testing.T) {
 }
 
 func TestBuildFromItemsConcurrentRead(t *testing.T) {
-	items := []*cfg.Item{{ID: 7, Name: "x", Type: "material", MaxStack: 10, Stackable: true, Discardable: true, BindType: "none"}}
+	items := []*cfg.ItemItem{{Id: 7, Name: "x", Type: "material", MaxStack: 10, Stackable: true, Discardable: true, BindType: "none"}}
 	runtime.BuildFromItems(items, 1)
 	if !runtime.Exists(7) {
 		t.Fatal("expected item 7")

@@ -26,6 +26,9 @@ func autoMigrateModels(db *gorm.DB) error {
 	if err := downgradePlayerUIDUniqueIndex(db); err != nil {
 		return err
 	}
+	if err := downgradeInventorySlotUniqueIndex(db); err != nil {
+		return err
+	}
 	return migrateInventorySlots(db)
 }
 
@@ -69,8 +72,15 @@ func initializePlayerIDSequence(db *gorm.DB) error {
 	return nil
 }
 
-// migrateInventorySlots 将 v1（无 slot / 同 player 多行 slot=0）数据迁移为按 slot 递增。
+// migrateInventorySlots 将 v1（无 slot / 同 player 多行 slot=0）数据迁移为按 slot 递增，
+// 并按 cfg_item 表精确回填 bag_type。迁移早于 gameconfig 内存快照加载，故直接查 cfg_item 表
+// 而非依赖 runtime 快照；item 不在配表或配表未声明 bag_type 时回填通用背包(1)。
 func migrateInventorySlots(db *gorm.DB) error {
+	bagTypeByItem, err := loadBagTypeByItem(db)
+	if err != nil {
+		return err
+	}
+
 	var items []InventoryItem
 	if err := db.Order("player_id asc, id asc").Find(&items).Error; err != nil {
 		return err
@@ -79,14 +89,52 @@ func migrateInventorySlots(db *gorm.DB) error {
 	for i := range items {
 		item := &items[i]
 		slot := nextSlot[item.PlayerID]
-		if item.Slot == slot {
-			nextSlot[item.PlayerID] = slot + 1
-			continue
+		updates := map[string]interface{}{}
+		if item.BagType < 1 {
+			bt := GeneralBagType
+			if v, ok := bagTypeByItem[item.ItemID]; ok {
+				bt = v
+			}
+			updates["bag_type"] = bt
 		}
-		if err := db.Model(item).Update("slot", slot).Error; err != nil {
-			return err
+		if item.Slot != slot {
+			updates["slot"] = slot
+		}
+		if len(updates) > 0 {
+			if err := db.Model(item).Updates(updates).Error; err != nil {
+				return err
+			}
 		}
 		nextSlot[item.PlayerID] = slot + 1
+	}
+	return nil
+}
+
+// loadBagTypeByItem 从 cfg_item 表读取 item_id -> bag_type 映射（仅 BagType>0 的项）。
+func loadBagTypeByItem(db *gorm.DB) (map[int32]int32, error) {
+	var cfgItems []schema.CfgItem
+	if err := db.Order("id asc").Find(&cfgItems).Error; err != nil {
+		return nil, err
+	}
+	m := make(map[int32]int32, len(cfgItems))
+	for i := range cfgItems {
+		if cfgItems[i].BagType > 0 {
+			m[cfgItems[i].ID] = cfgItems[i].BagType
+		}
+	}
+	return m, nil
+}
+
+// downgradeInventorySlotUniqueIndex 将 inventory_items 的旧唯一索引 (player_id, slot)
+// 降级为 (player_id, bag_type, slot)。AutoMigrate 不会自动删除旧唯一索引，这里显式处理。
+func downgradeInventorySlotUniqueIndex(db *gorm.DB) error {
+	migrator := db.Migrator()
+	// 旧唯一索引名遵循 GORM 默认命名：idx_inventory_items_player_id_slot
+	if migrator.HasIndex(&InventoryItem{}, "idx_player_slot") {
+		_ = migrator.DropIndex(&InventoryItem{}, "idx_player_slot")
+	}
+	if migrator.HasIndex(&InventoryItem{}, "idx_inventory_items_player_id_slot") {
+		_ = migrator.DropIndex(&InventoryItem{}, "idx_inventory_items_player_id_slot")
 	}
 	return nil
 }

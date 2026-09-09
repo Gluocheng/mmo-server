@@ -218,11 +218,11 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 进场   | `game.player.enter`     | `EnterGameRequest`                         | `EnterGameResponse`                              |
 | 移动   | `game.player.move`      | `MoveRequest`                              | `Empty`；同场景 AOI 内 Push `onMove`（`MoveBroadcast`） |
 | 聊天   | `game.chat.send`        | `ChatSendRequest`                          | `Empty`；同场景 Push `onChat`（`ChatBroadcast`）       |
-| 背包列表 | `game.bag.list`         | `google.protobuf.Empty`                    | `BagListResponse`（`BagItem` 含 `slot`）            |
-| 背包发放 | `game.bag.add`          | `BagAddRequest`                            | `BagListResponse` + Push `onBagChange`           |
-| 背包扣除 | `game.bag.remove`       | `BagRemoveRequest`                         | `BagListResponse` + Push `onBagChange`           |
-| 背包移动 | `game.bag.move`         | `BagMoveRequest`（`fromSlot` / `toSlot`）    | `BagListResponse` + Push `onBagChange`           |
-| 背包拆分 | `game.bag.split`        | `BagSplitRequest`（`fromSlot` / `count`）    | `BagListResponse` + Push `onBagChange`           |
+| 背包列表 | `game.bag.list`         | `BagListRequest`（`bagType`）              | `BagListResponse`（`BagItem` 含 `slot`/`bagType`）    |
+| 背包发放 | `game.bag.add`          | `BagAddRequest`（`bagType` 可选，缺省自动路由） | `BagListResponse` + Push `onBagChange`           |
+| 背包扣除 | `game.bag.remove`       | `BagRemoveRequest`（`bagType`）            | `BagListResponse` + Push `onBagChange`           |
+| 背包移动 | `game.bag.move`         | `BagMoveRequest`（`bagType`/`fromSlot`/`toSlot`） | `BagListResponse` + Push `onBagChange`           |
+| 背包拆分 | `game.bag.split`        | `BagSplitRequest`（`bagType`/`fromSlot`/`count`） | `BagListResponse` + Push `onBagChange`           |
 | 配置热更 | `game.gm.config.reload` | `RefreshTokenRequest`（`refreshToken` 承载表名） | `RefreshTokenResponse`                           |
 
 
@@ -232,14 +232,15 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 未完成 `enter` 时，除 `select` / `create` / `enter` 外请求会被网关拒绝
 - 移动广播带简单 **AOI 半径过滤**（默认 15，见 `internal/gameapp/world/scene.go`）
 - 聊天为同场景全员广播（无 AOI 裁剪）
-- 背包须已 `enter`；**32 固定槽位**（`slot` 0–31）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
+- 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
+- `add` 缺省按 `item.bag_type` 自动路由；显式指定 `bag_type`（GM）时严格校验，不符返回 `40028`
 - `add` / `remove` / `move` / `split` 成功后 RPC 返回最新背包，并 Push `onBagChange`（同 `BagListResponse`）
 - `game.gm.config.reload` 可通过 Pomelo 客户端直接调用，也可通过 GM HTTP API 间接触发
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40025`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40028`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -270,6 +271,9 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40023 | `ItemNotFound`        | 道具不在配表       |
 | 40024 | `ConfigReloadDenied`  | 未开启配表 reload |
 | 40025 | `ConfigReloadFail`    | 配表 reload 失败 |
+| 40026 | `PlayerLimitExceeded` | 账号角色数达上限    |
+| 40027 | `PlayerDeleted`       | 角色已删除        |
+| 40028 | `BagTypeMismatch`     | 道具类别与目标背包不符 |
 
 
 ### 重新生成 Protobuf Go 代码

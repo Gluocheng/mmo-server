@@ -147,7 +147,7 @@ func main() {
 	}
 	fmt.Printf("enter OK sceneId=%d online=%d\n", enterRsp.SceneId, len(enterRsp.Players))
 
-	// 5) bag add
+	// 5) bag add（自动路由：1001 生命药水 → 消耗品背包 bag_type=2）
 	addReq := &protocol.BagAddRequest{ItemId: 1001, Count: 2}
 	addRspMsg, err := c.Request("game.bag.add", addReq)
 	if err != nil {
@@ -163,8 +163,8 @@ func main() {
 	}
 	fmt.Printf("bag add OK items=%d\n", len(bagRsp.Items))
 
-	// 6) bag list
-	listRspMsg, err := c.Request("game.bag.list", &emptypb.Empty{})
+	// 6) bag list（消耗品背包 2）
+	listRspMsg, err := c.Request("game.bag.list", &protocol.BagListRequest{BagType: 2})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "bag list failed: %v\n", err)
 		exitCode = 1
@@ -178,23 +178,33 @@ func main() {
 	}
 	fmt.Printf("bag list OK items=%d\n", len(bagRsp.Items))
 
-	// 6b) bag move + split smoke
+	// 6b) bag move + split smoke（消耗品背包 2 内）
 	if len(bagRsp.Items) > 0 {
 		fromSlot := bagRsp.Items[0].Slot
-		moveReq := &protocol.BagMoveRequest{FromSlot: fromSlot, ToSlot: fromSlot + 1}
+		moveReq := &protocol.BagMoveRequest{FromSlot: fromSlot, ToSlot: fromSlot + 1, BagType: 2}
 		if _, err := c.Request("game.bag.move", moveReq); err != nil {
 			fmt.Fprintf(os.Stderr, "bag move failed: %v\n", err)
 			exitCode = 1
 			return
 		}
 		fmt.Println("bag move OK")
-		splitReq := &protocol.BagSplitRequest{FromSlot: fromSlot + 1, Count: 1}
+		splitReq := &protocol.BagSplitRequest{FromSlot: fromSlot + 1, Count: 1, BagType: 2}
 		if _, err := c.Request("game.bag.split", splitReq); err != nil {
 			fmt.Fprintf(os.Stderr, "bag split failed: %v\n", err)
 			exitCode = 1
 			return
 		}
 		fmt.Println("bag split OK")
+	}
+
+	// 6c) GM 显式指定错误背包应被拒绝（2001 新手木剑 → 装备背包 4，指定到 2 应 40028）
+	gmReq := &protocol.BagAddRequest{ItemId: 2001, Count: 1, BagType: 2}
+	if _, err := c.Request("game.bag.add", gmReq); err != nil {
+		fmt.Fprintf(os.Stderr, "bag add (wrong bag) failed as expected: %v\n", err)
+	} else {
+		fmt.Println("bag add (wrong bag) unexpectedly succeeded")
+		exitCode = 1
+		return
 	}
 
 	// 7) move (no need to wait push)
