@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	cherrySnowflake "github.com/cherry-game/cherry/extend/snowflake"
+	"github.com/example/mmo-server/internal/persistence/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -54,12 +55,12 @@ func nextUID() (int64, error) {
 
 func nextPlayerIDInTx(ctx context.Context) (int64, error) {
 	db := DBFromContext(ctx).WithContext(ctx)
-	var seq IDSequence
+	var seq model.IDSequence
 	err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("name = ?", sequencePlayerID).
 		First(&seq).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		seq = IDSequence{Name: sequencePlayerID, NextValue: playerIDInitialValue}
+		seq = model.IDSequence{Name: sequencePlayerID, NextValue: playerIDInitialValue}
 		if err := db.Create(&seq).Error; err != nil {
 			return 0, err
 		}
@@ -71,7 +72,7 @@ func nextPlayerIDInTx(ctx context.Context) (int64, error) {
 	if playerID < playerIDInitialValue {
 		playerID = playerIDInitialValue
 	}
-	if err := db.Model(&IDSequence{}).
+	if err := db.Model(&model.IDSequence{}).
 		Where("name = ?", sequencePlayerID).
 		Update("next_value", playerID+1).Error; err != nil {
 		return 0, err

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/example/mmo-server/internal/persistence/model"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -53,7 +54,7 @@ func TestWithinTxCommits(t *testing.T) {
 	ctx := context.Background()
 
 	err := WithinTx(ctx, func(txCtx context.Context) error {
-		return DBFromContext(txCtx).WithContext(txCtx).Create(&Account{
+		return DBFromContext(txCtx).WithContext(txCtx).Create(&model.Account{
 			Nickname: "alice",
 			Password: "hash",
 		}).Error
@@ -63,7 +64,7 @@ func TestWithinTxCommits(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.Model(&Account{}).Count(&count).Error; err != nil {
+	if err := db.Model(&model.Account{}).Count(&count).Error; err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if count != 1 {
@@ -76,7 +77,7 @@ func TestWithinTxRollsBack(t *testing.T) {
 	ctx := context.Background()
 
 	err := WithinTx(ctx, func(txCtx context.Context) error {
-		if err := DBFromContext(txCtx).WithContext(txCtx).Create(&Account{
+		if err := DBFromContext(txCtx).WithContext(txCtx).Create(&model.Account{
 			Nickname: "bob",
 			Password: "hash",
 		}).Error; err != nil {
@@ -89,7 +90,7 @@ func TestWithinTxRollsBack(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.Model(&Account{}).Count(&count).Error; err != nil {
+	if err := db.Model(&model.Account{}).Count(&count).Error; err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if count != 0 {
@@ -138,7 +139,7 @@ func TestNestedWithinTxReusesTransaction(t *testing.T) {
 
 	err := WithinTx(ctx, func(outer context.Context) error {
 		return WithinTx(outer, func(inner context.Context) error {
-			return DBFromContext(inner).WithContext(inner).Create(&Account{
+			return DBFromContext(inner).WithContext(inner).Create(&model.Account{
 				Nickname: "nested",
 				Password: "hash",
 			}).Error
@@ -149,7 +150,7 @@ func TestNestedWithinTxReusesTransaction(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.Model(&Account{}).Count(&count).Error; err != nil {
+	if err := db.Model(&model.Account{}).Count(&count).Error; err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if count != 1 {
@@ -260,10 +261,10 @@ func TestAutoMigrateInitializesPlayerIDSequenceAboveHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := gdb.AutoMigrate(&Player{}); err != nil {
+	if err := gdb.AutoMigrate(&model.Player{}); err != nil {
 		t.Fatalf("pre migrate players: %v", err)
 	}
-	if err := gdb.Create(&Player{PlayerID: 120345, UID: 9001, Name: "Old"}).Error; err != nil {
+	if err := gdb.Create(&model.Player{PlayerID: 120345, UID: 9001, Name: "Old"}).Error; err != nil {
 		t.Fatalf("seed player: %v", err)
 	}
 
@@ -271,7 +272,7 @@ func TestAutoMigrateInitializesPlayerIDSequenceAboveHistory(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	var seq IDSequence
+	var seq model.IDSequence
 	if err := gdb.Where("name = ?", sequencePlayerID).First(&seq).Error; err != nil {
 		t.Fatalf("load player_id sequence: %v", err)
 	}

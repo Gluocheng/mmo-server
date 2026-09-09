@@ -1,4 +1,4 @@
-package persistence
+package model
 
 // InventoryItem 背包槽位行：每个 (player_id, bag_type, slot) 至多一条记录。
 type InventoryItem struct {

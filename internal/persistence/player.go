@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/example/mmo-server/internal/persistence/model"
 	"github.com/example/mmo-server/internal/protocol"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
@@ -23,10 +24,10 @@ var (
 	ErrPlayerDeleted = errors.New("player deleted")
 )
 
-func playerInfoFromModel(model Player) *protocol.PlayerInfo {
+func playerInfoFromModel(m model.Player) *protocol.PlayerInfo {
 	return &protocol.PlayerInfo{
-		PlayerId: model.PlayerID,
-		Name:     model.Name,
+		PlayerId: m.PlayerID,
+		Name:     m.Name,
 	}
 }
 
@@ -34,7 +35,7 @@ func playerInfoFromModel(model Player) *protocol.PlayerInfo {
 func countPlayersByUIDInTx(ctx context.Context, uid int64) (int64, error) {
 	var n int64
 	err := DBFromContext(ctx).WithContext(ctx).
-		Model(&Player{}).
+		Model(&model.Player{}).
 		Where("uid = ? AND deleted_at IS NULL", uid).
 		Count(&n).Error
 	return n, err
@@ -52,16 +53,16 @@ func ListPlayersByUIDContext(parent context.Context, uid int64) ([]*protocol.Pla
 	ctx, cancel := opContext(parent)
 	defer cancel()
 
-	var models []Player
+	var players []model.Player
 	if err := DBFromContext(ctx).WithContext(ctx).
 		Where("uid = ? AND deleted_at IS NULL", uid).
 		Order("created_at asc, player_id asc").
-		Find(&models).Error; err != nil {
+		Find(&players).Error; err != nil {
 		return nil, err
 	}
-	out := make([]*protocol.PlayerInfo, 0, len(models))
-	for i := range models {
-		out = append(out, playerInfoFromModel(models[i]))
+	out := make([]*protocol.PlayerInfo, 0, len(players))
+	for i := range players {
+		out = append(out, playerInfoFromModel(players[i]))
 	}
 	return out, nil
 }
@@ -84,20 +85,20 @@ func GetPlayerByPlayerIDContext(parent context.Context, uid, playerID int64) (*p
 	ctx, cancel := opContext(parent)
 	defer cancel()
 
-	var model Player
+	var p model.Player
 	err := DBFromContext(ctx).WithContext(ctx).
 		Where("player_id = ? AND uid = ?", playerID, uid).
-		First(&model).Error
+		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, false, nil
 	}
 	if err != nil {
 		return nil, false, err
 	}
-	if model.DeletedAt != nil {
+	if p.DeletedAt != nil {
 		return nil, false, nil
 	}
-	return proto.Clone(playerInfoFromModel(model)).(*protocol.PlayerInfo), true, nil
+	return proto.Clone(playerInfoFromModel(p)).(*protocol.PlayerInfo), true, nil
 }
 
 // GetPlayerByPlayerID 是 GetPlayerByPlayerIDContext 的便捷入口。
@@ -123,7 +124,7 @@ func createPlayerInTx(ctx context.Context, uid int64, name string) (*protocol.Pl
 	}
 
 	// 全服未删除角色名唯一。
-	var dup Player
+	var dup model.Player
 	dupErr := DBFromContext(ctx).WithContext(ctx).
 		Where("name = ? AND deleted_at IS NULL", name).
 		First(&dup).Error
@@ -138,15 +139,15 @@ func createPlayerInTx(ctx context.Context, uid int64, name string) (*protocol.Pl
 		return nil, false, err
 	}
 
-	model := Player{
+	p := model.Player{
 		PlayerID: playerID,
 		UID:      uid,
 		Name:     name,
 	}
-	if err := DBFromContext(ctx).WithContext(ctx).Create(&model).Error; err != nil {
+	if err := DBFromContext(ctx).WithContext(ctx).Create(&p).Error; err != nil {
 		return nil, false, err
 	}
-	return playerInfoFromModel(model), true, nil
+	return playerInfoFromModel(p), true, nil
 }
 
 // deletePlayerInTx 软删除角色，校验归属；已删除返回 ErrPlayerDeleted。
@@ -155,22 +156,22 @@ func deletePlayerInTx(ctx context.Context, uid, playerID int64) error {
 		return ErrPlayerNotFound
 	}
 
-	var model Player
+	var p model.Player
 	err := DBFromContext(ctx).WithContext(ctx).
 		Where("player_id = ? AND uid = ?", playerID, uid).
-		First(&model).Error
+		First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrPlayerNotFound
 	}
 	if err != nil {
 		return err
 	}
-	if model.DeletedAt != nil {
+	if p.DeletedAt != nil {
 		return ErrPlayerDeleted
 	}
 
 	now := time.Now()
 	return DBFromContext(ctx).WithContext(ctx).
-		Model(&model).
+		Model(&p).
 		Update("deleted_at", now).Error
 }

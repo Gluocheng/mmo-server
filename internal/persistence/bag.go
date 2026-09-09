@@ -8,6 +8,7 @@ import (
 
 	clog "github.com/cherry-game/cherry/logger"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
+	"github.com/example/mmo-server/internal/persistence/model"
 	"github.com/example/mmo-server/internal/protocol"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -111,7 +112,7 @@ func effectiveMaxStack(itemID int32) int32 {
 	return ms
 }
 
-func bagListFromModels(models []InventoryItem) *protocol.BagListResponse {
+func bagListFromModels(models []model.InventoryItem) *protocol.BagListResponse {
 	sort.Slice(models, func(i, j int) bool {
 		return models[i].Slot < models[j].Slot
 	})
@@ -130,7 +131,7 @@ func bagListFromModels(models []InventoryItem) *protocol.BagListResponse {
 }
 
 func loadBagFromDB(ctx context.Context, playerID int64, bagType int32) (*protocol.BagListResponse, error) {
-	var models []InventoryItem
+	var models []model.InventoryItem
 	err := DBFromContext(ctx).WithContext(ctx).
 		Where("player_id = ? AND bag_type = ?", playerID, bagType).
 		Find(&models).Error
@@ -208,11 +209,11 @@ func GetBagByPlayerID(playerID int64, bagType int32) (*protocol.BagListResponse,
 	return GetBagByPlayerIDContext(context.Background(), playerID, bagType)
 }
 
-func loadItemAtSlotForUpdate(txDB *gorm.DB, ctx context.Context, playerID int64, bagType, slot int32) (*InventoryItem, error) {
+func loadItemAtSlotForUpdate(txDB *gorm.DB, ctx context.Context, playerID int64, bagType, slot int32) (*model.InventoryItem, error) {
 	if err := validateSlot(bagType, slot); err != nil {
 		return nil, err
 	}
-	var item InventoryItem
+	var item model.InventoryItem
 	err := txDB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("player_id = ? AND bag_type = ? AND slot = ?", playerID, bagType, slot).
 		First(&item).Error
@@ -228,7 +229,7 @@ func loadItemAtSlotForUpdate(txDB *gorm.DB, ctx context.Context, playerID int64,
 func findEmptySlotInTx(ctx context.Context, playerID int64, bagType int32) (int32, error) {
 	txDB := DBFromContext(ctx).WithContext(ctx)
 	var used []int32
-	if err := txDB.Model(&InventoryItem{}).
+	if err := txDB.Model(&model.InventoryItem{}).
 		Where("player_id = ? AND bag_type = ?", playerID, bagType).
 		Pluck("slot", &used).Error; err != nil {
 		return -1, err
@@ -256,7 +257,7 @@ func addOrStackItemInTx(ctx context.Context, playerID int64, bagType, itemID, co
 	}
 	txDB := DBFromContext(ctx).WithContext(ctx)
 
-	var stacks []InventoryItem
+	var stacks []model.InventoryItem
 	if err := txDB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("player_id = ? AND bag_type = ? AND item_id = ?", playerID, bagType, itemID).
 		Find(&stacks).Error; err != nil {
@@ -290,7 +291,7 @@ func addOrStackItemInTx(ctx context.Context, playerID int64, bagType, itemID, co
 		if put > maxStack {
 			put = maxStack
 		}
-		if err := txDB.Create(&InventoryItem{
+		if err := txDB.Create(&model.InventoryItem{
 			PlayerID: playerID,
 			BagType:  bagType,
 			Slot:     slot,
@@ -369,7 +370,7 @@ func removeByItemIDInTx(ctx context.Context, playerID int64, bagType, itemID, co
 		return err
 	}
 	txDB := DBFromContext(ctx).WithContext(ctx)
-	var stacks []InventoryItem
+	var stacks []model.InventoryItem
 	if err := txDB.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("player_id = ? AND bag_type = ? AND item_id = ?", playerID, bagType, itemID).
 		Order("slot asc").
@@ -541,7 +542,7 @@ func splitItemInTx(ctx context.Context, playerID int64, bagType, fromSlot, count
 	if err != nil {
 		return err
 	}
-	if err := txDB.Create(&InventoryItem{
+	if err := txDB.Create(&model.InventoryItem{
 		PlayerID: playerID,
 		BagType:  bagType,
 		Slot:     emptySlot,

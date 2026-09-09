@@ -11,6 +11,8 @@ import (
 
 	clog "github.com/cherry-game/cherry/logger"
 
+	"github.com/example/mmo-server/internal/persistence/model"
+
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -97,7 +99,7 @@ func scheduleAccountCacheRefresh(ctx context.Context, nickname string, uid int64
 
 func findOrCreateAccountInTx(ctx context.Context, nickname, password string) (int64, error) {
 
-	var acc Account
+	var acc model.Account
 
 	err := DBFromContext(ctx).WithContext(ctx).Where("nickname = ?", nickname).First(&acc).Error
 
@@ -134,7 +136,7 @@ func findOrCreateAccountInTx(ctx context.Context, nickname, password string) (in
 		return 0, err
 	}
 
-	acc = Account{
+	acc = model.Account{
 
 		UID: uid,
 
@@ -145,7 +147,7 @@ func findOrCreateAccountInTx(ctx context.Context, nickname, password string) (in
 
 	if err = DBFromContext(ctx).WithContext(ctx).Create(&acc).Error; err != nil {
 
-		var existed Account
+		var existed model.Account
 
 		qErr := DBFromContext(ctx).WithContext(ctx).Where("nickname = ?", nickname).First(&existed).Error
 

@@ -3,17 +3,17 @@ package persistence
 import (
 	"errors"
 
-	"gorm.io/gorm"
-
 	"github.com/example/mmo-server/gameconfig/pkg/schema"
+	"github.com/example/mmo-server/internal/persistence/model"
+	"gorm.io/gorm"
 )
 
 func autoMigrateModels(db *gorm.DB) error {
 	if err := db.AutoMigrate(
-		&Account{},
-		&Player{},
-		&IDSequence{},
-		&InventoryItem{},
+		&model.Account{},
+		&model.Player{},
+		&model.IDSequence{},
+		&model.InventoryItem{},
 	); err != nil {
 		return err
 	}
@@ -37,20 +37,20 @@ func autoMigrateModels(db *gorm.DB) error {
 func downgradePlayerUIDUniqueIndex(db *gorm.DB) error {
 	migrator := db.Migrator()
 	// 旧唯一索引名遵循 GORM 默认命名：idx_players_uid
-	if migrator.HasIndex(&Player{}, "idx_players_uid") {
-		_ = migrator.DropIndex(&Player{}, "idx_players_uid")
+	if migrator.HasIndex(&model.Player{}, "idx_players_uid") {
+		_ = migrator.DropIndex(&model.Player{}, "idx_players_uid")
 	}
 	// 部分历史库可能为 uni_players_uid，一并尝试清理
-	if migrator.HasIndex(&Player{}, "uni_players_uid") {
-		_ = migrator.DropIndex(&Player{}, "uni_players_uid")
+	if migrator.HasIndex(&model.Player{}, "uni_players_uid") {
+		_ = migrator.DropIndex(&model.Player{}, "uni_players_uid")
 	}
-	return migrator.CreateIndex(&Player{}, "idx_players_uid")
+	return migrator.CreateIndex(&model.Player{}, "idx_players_uid")
 }
 
 // initializePlayerIDSequence 按历史最大角色 ID 初始化短数字序列，避免迁移后新角色撞号。
 func initializePlayerIDSequence(db *gorm.DB) error {
 	var maxPlayerID int64
-	if err := db.Model(&Player{}).Select("COALESCE(MAX(player_id), 0)").Scan(&maxPlayerID).Error; err != nil {
+	if err := db.Model(&model.Player{}).Select("COALESCE(MAX(player_id), 0)").Scan(&maxPlayerID).Error; err != nil {
 		return err
 	}
 	nextValue := maxPlayerID + 1
@@ -58,10 +58,10 @@ func initializePlayerIDSequence(db *gorm.DB) error {
 		nextValue = playerIDInitialValue
 	}
 
-	var seq IDSequence
+	var seq model.IDSequence
 	err := db.Where("name = ?", sequencePlayerID).First(&seq).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&IDSequence{Name: sequencePlayerID, NextValue: nextValue}).Error
+		return db.Create(&model.IDSequence{Name: sequencePlayerID, NextValue: nextValue}).Error
 	}
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func migrateInventorySlots(db *gorm.DB) error {
 		return err
 	}
 
-	var items []InventoryItem
+	var items []model.InventoryItem
 	if err := db.Order("player_id asc, id asc").Find(&items).Error; err != nil {
 		return err
 	}
@@ -130,11 +130,11 @@ func loadBagTypeByItem(db *gorm.DB) (map[int32]int32, error) {
 func downgradeInventorySlotUniqueIndex(db *gorm.DB) error {
 	migrator := db.Migrator()
 	// 旧唯一索引名遵循 GORM 默认命名：idx_inventory_items_player_id_slot
-	if migrator.HasIndex(&InventoryItem{}, "idx_player_slot") {
-		_ = migrator.DropIndex(&InventoryItem{}, "idx_player_slot")
+	if migrator.HasIndex(&model.InventoryItem{}, "idx_player_slot") {
+		_ = migrator.DropIndex(&model.InventoryItem{}, "idx_player_slot")
 	}
-	if migrator.HasIndex(&InventoryItem{}, "idx_inventory_items_player_id_slot") {
-		_ = migrator.DropIndex(&InventoryItem{}, "idx_inventory_items_player_id_slot")
+	if migrator.HasIndex(&model.InventoryItem{}, "idx_inventory_items_player_id_slot") {
+		_ = migrator.DropIndex(&model.InventoryItem{}, "idx_inventory_items_player_id_slot")
 	}
 	return nil
 }
