@@ -57,6 +57,16 @@
           "ref_logger": "game_log"
         }
       }
+    ],
+    "gm": [
+      {
+        "node_id": "gm-1",
+        "address": ":9080",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "gm_log"
+        }
+      }
     ]
   },
   "logger": {
@@ -87,6 +97,13 @@
       "enable_write_file": false,
       "file_link_path": "",
       "file_path_format": "logs/master.log"
+    },
+    "gm_log": {
+      "level": "info",
+      "enable_console": true,
+      "enable_write_file": false,
+      "file_link_path": "",
+      "file_path_format": "logs/gm.log"
     }
   },
   "mysql": {

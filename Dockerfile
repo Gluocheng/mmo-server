@@ -1,4 +1,13 @@
 # syntax=docker/dockerfile:1
+# 多阶段：Node 构建 GM 控制台 → Go 编译六二进制 → debian 运行时
+
+FROM node:22-bookworm AS ui
+
+WORKDIR /src/web/gm-console
+COPY web/gm-console/package.json web/gm-console/package-lock.json ./
+RUN npm ci
+COPY web/gm-console/ ./
+RUN npm run build
 
 FROM golang:1.24-bookworm AS builder
 
@@ -9,6 +18,7 @@ COPY cherry-framework ./cherry-framework
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
+COPY --from=ui /src/internal/gmapp/ui ./internal/gmapp/ui
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

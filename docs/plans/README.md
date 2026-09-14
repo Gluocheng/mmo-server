@@ -36,6 +36,10 @@
 | planned | 战斗骨架 | [backlog-combat.md](backlog-combat.md) | — |
 | done | 一账号多角 | [2026-06-25-multi-character-design.md](2026-06-25-multi-character-design.md) | 实施 [2026-06-25-multi-character.md](2026-06-25-multi-character.md) |
 | done | 多背包（bag_type 维度） | [2026-09-09-multi-bag-design.md](2026-09-09-multi-bag-design.md) | 实施 [2026-09-09-multi-bag.md](2026-09-09-multi-bag.md) |
+| done | GM 运营后台 P0 | [2026-09-14-gm-ops-p0-design.md](2026-09-14-gm-ops-p0-design.md) | 实施 [2026-09-14-gm-ops-p0.md](2026-09-14-gm-ops-p0.md) |
+| done | GM Web 控制台 | [2026-09-14-gm-web-ui-design.md](2026-09-14-gm-web-ui-design.md) | 实施 [2026-09-14-gm-web-ui.md](2026-09-14-gm-web-ui.md) |
+| done | GM 上线鉴权与 Naive UI | [2026-09-14-gm-prod-console-design.md](2026-09-14-gm-prod-console-design.md) | 实施 [2026-09-14-gm-prod-console.md](2026-09-14-gm-prod-console.md) |
+| planned | GM 运营后台 P1+ | [backlog-gm-ops.md](backlog-gm-ops.md) | 封号、公告、调时间等（Web UI 已拆出） |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 
 > 无 `*-design.md` 的 done 项为历史基线；**新迭代**须策划 + 实施双文件，并更新本表。

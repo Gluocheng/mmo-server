@@ -48,7 +48,8 @@
 | `internal/loginapp/` | 登录服：账号/密码认证、令牌签发、校验、刷新、登出 |
 | `internal/gatewayapp/` | 网关：WebSocket 接收器、Pomelo 协议解析、会话管理、鉴权路由转发 |
 | `internal/masterapp/` | 发现主节点：NATS 模式集群注册，无业务路由 |
-| `internal/gmapp/` | GM 管理：HTTP 监听、NATS 请求中转到 game 节点 |
+| `internal/gmapp/` | GM 管理：HTTP 监听、NATS 中转到 game、嵌入 Web 控制台 |
+| `web/gm-console/` | GM 控制台前端（Vue 3 + Naive UI；`npm run build` 写入 `internal/gmapp/ui`） |
 | `internal/persistence/` | 数据层：GORM 模型（账号、玩家、背包、物品栏）、仓储、事务、Redis 频率限制、迁移 |
 | `internal/protocolpb/` + `internal/protocol/` | 通信协议：`.proto` 定义 → `gen/` 下生成的 Go 类型；`types.go` 别名导出 |
 | `internal/gtime/` | 游戏时间：时钟抽象、Redis 时间偏差、日历工具 |

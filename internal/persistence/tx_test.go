@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/example/mmo-server/internal/persistence/model"
@@ -13,36 +12,7 @@ import (
 )
 
 func resetDBForTest(t *testing.T) *gorm.DB {
-	t.Helper()
-	gdb, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := autoMigrateModels(gdb); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-
-	oldDB := db
-	oldRDB := rdb
-	oldInitErr := initErr
-	hadInit := oldDB != nil
-	db = gdb
-	rdb = nil
-	once = sync.Once{}
-	initErr = nil
-
-	t.Cleanup(func() {
-		db = oldDB
-		rdb = oldRDB
-		initErr = oldInitErr
-		once = sync.Once{}
-		if hadInit {
-			once.Do(func() {})
-		}
-	})
-	return gdb
+	return UseMemoryDBForTest(t)
 }
 
 func resetStoreForTest(t *testing.T) *gorm.DB {

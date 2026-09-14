@@ -22,6 +22,7 @@ bin-release/
 *.apk
 .codewhale/
 .deepseek/
+web/gm-console/node_modules/
 
 # Luban 工具（二进制，不提交；安装见 gameconfig/tools/luban/README.md）
 gameconfig/tools/luban/*

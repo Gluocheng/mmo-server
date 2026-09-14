@@ -32,6 +32,10 @@ const (
 	PlayerLimitExceeded int32 = 40026 // 账号角色数已达上限（create 时触发）
 	PlayerDeleted       int32 = 40027 // 角色已删除（enter/delete 命中已删除角色）
 	BagTypeMismatch     int32 = 40028 // 道具类别与目标背包不符
+	GmUnauthorized      int32 = 40029 // GM HTTP 未登录或 token/密码错误
+	GmBadRequest        int32 = 40030 // GM 查询/踢人条件缺失或互斥
+	GmTargetNotFound    int32 = 40031 // GM 目标账号或角色不存在
+	GmForbidden         int32 = 40032 // GM 非管理员访问管理接口
 )
 
 func IsFail(c int32) bool {

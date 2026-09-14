@@ -42,8 +42,32 @@ function Invoke-GoTest {
     }
 }
 
+function Invoke-GmConsoleBuild {
+    $dir = Join-Path $root "web/gm-console"
+    if (-not (Test-Path (Join-Path $dir "package.json"))) {
+        return
+    }
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Warning "[cicd] npm not found; skip gm-console. Docker package stage still builds UI."
+        return
+    }
+    Write-Host "[cicd] npm run build (web/gm-console)..."
+    Push-Location $dir
+    try {
+        if (-not (Test-Path "node_modules")) {
+            & npm install
+            if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+        }
+        & npm run build
+        if ($LASTEXITCODE -ne 0) { throw "npm run build failed" }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Invoke-GoBuild {
     Write-Host "[cicd] go build local binaries..."
+    Invoke-GmConsoleBuild
     Ensure-Dir (Join-Path $root "bin")
     $targets = @(
         @{ Name = "master"; Path = "cmd/master" },
@@ -64,7 +88,7 @@ function Invoke-GoBuild {
 
 function Invoke-Package([string]$releaseTag) {
     $fullTag = "{0}:{1}" -f $imageName, $releaseTag
-    Write-Host "[cicd] docker build -t $fullTag ."
+    Write-Host "[cicd] docker build -t $fullTag . (includes Node UI stage)"
     & docker build -t $fullTag .
     if ($LASTEXITCODE -ne 0) {
         throw "docker build failed"

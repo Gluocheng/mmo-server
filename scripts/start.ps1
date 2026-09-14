@@ -26,6 +26,29 @@ function Ensure-Dir([string]$Path) {
     }
 }
 
+function Ensure-GmConsole {
+    $dir = Join-Path $root "web/gm-console"
+    if (-not (Test-Path (Join-Path $dir "package.json"))) {
+        return
+    }
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Warning "[build] npm not found; skip gm-console. GM will serve existing internal/gmapp/ui."
+        return
+    }
+    Write-Host "[build] gm-console (vite)..."
+    Push-Location $dir
+    try {
+        if (-not (Test-Path "node_modules")) {
+            & npm install
+            if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+        }
+        & npm run build
+        if ($LASTEXITCODE -ne 0) { throw "npm run build failed" }
+    } finally {
+        Pop-Location
+    }
+}
+
 function Ensure-Binaries {
     $targets = @(
         @{ Name = "master";  Path = "cmd/master" },
@@ -45,6 +68,7 @@ function Ensure-Binaries {
     if (-not $needBuild) {
         return
     }
+    Ensure-GmConsole
     Write-Host "[build] compiling four nodes..."
     Ensure-Dir (Join-Path $root "bin")
     foreach ($t in $targets) {
@@ -100,7 +124,9 @@ function Start-GMNode {
     if (-not (Test-Path $exe)) {
         throw "binary not found: $exe (run with -Build)"
     }
-    $args = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode")
+    if (-not $env:GM_BOOTSTRAP_USER) { $env:GM_BOOTSTRAP_USER = "admin" }
+    if (-not $env:GM_BOOTSTRAP_PASSWORD) { $env:GM_BOOTSTRAP_PASSWORD = "admin123" }
+    $args = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode", "-path=$Profile", "-token=dev-gm-token")
     Start-Process `
         -FilePath $exe `
         -ArgumentList $args `
@@ -171,7 +197,8 @@ if (-not (Test-PortOpen 10100)) {
 if (-not (Test-PortOpen $GMPort)) {
     Write-Warning "[gm] $GMPort not open yet — check logs/gm.log"
 } else {
-    Write-Host "[gm] http://127.0.0.1:$GMPort/gm/config/reload"
+    Write-Host "[gm] console http://127.0.0.1:$GMPort/  (admin / admin123，生产请改 bootstrap 密码)"
+    Write-Host "[gm] api     http://127.0.0.1:$GMPort/gm/health"
 }
 
 Write-Host "=== all nodes started ==="

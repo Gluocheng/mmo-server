@@ -54,6 +54,11 @@ foreach ($name in $required) {
 Wait-Port -Port 10100 -Name "gateway"
 Wait-Port -Port $GMPort -Name "gm"
 
+$gmToken = $env:GM_HTTP_TOKEN
+if (-not $gmToken) {
+    $gmToken = "dev-gm-token"
+}
+
 $health = Invoke-RestMethod -Uri "http://127.0.0.1:$GMPort/gm/health" -Method Get
 if ($null -eq $health -or $health.code -ne 0 -or $health.natsConnected -ne $true) {
     throw "[smoke] gm health failed: $($health | ConvertTo-Json -Compress)"
@@ -61,10 +66,14 @@ if ($null -eq $health -or $health.code -ne 0 -or $health.natsConnected -ne $true
 Write-Host "[smoke] gm health ok: target=$($health.targetPath)"
 
 $body = '{"tableName":""}'
+$headers = @{
+    "Content-Type" = "application/json"
+    "X-GM-Token"   = $gmToken
+}
 $resp = Invoke-RestMethod `
     -Uri "http://127.0.0.1:$GMPort/gm/config/reload" `
     -Method Post `
-    -ContentType "application/json" `
+    -Headers $headers `
     -Body $body
 
 if ($null -eq $resp -or $resp.code -ne 0) {

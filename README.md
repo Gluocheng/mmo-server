@@ -86,7 +86,8 @@ powershell -ExecutionPolicy Bypass -File scripts/stop.ps1 -StopNats
 日志目录：`logs/`（`master.log`、`gate.log`、`login.log`、`game.log`、`gm.log`，与 profile 中 `ref_logger` 对应）。
 
 - 网关 WebSocket：`ws://127.0.0.1:10100`
-- GM HTTP API：`http://127.0.0.1:9080`
+- GM 控制台：浏览器打开 `http://127.0.0.1:9080/`（默认账号 `admin` / `admin123`）
+- GM HTTP API：`http://127.0.0.1:9080/gm/*`
 
 ### 方式二：手动 `go run`
 
@@ -97,7 +98,7 @@ go run ./cmd/master  -path=configs/mmo-cluster.json -node=master-1
 go run ./cmd/login   -path=configs/mmo-cluster.json -node=login-1
 go run ./cmd/game    -path=configs/mmo-cluster.json -node=10001
 go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-1
-go run ./cmd/gm      -http=:9080 -nats=nats://127.0.0.1:4222 -prefix=mmo -game=10001
+go run ./cmd/gm      -http=:9080 -nats=nats://127.0.0.1:4222 -prefix=mmo -game=10001 -path=configs/mmo-cluster.json -token=dev-gm-token
 ```
 
 `cluster.discovery.mode` 为 `**nats**`，`cluster.nats.master_node_id` 须与 master 的 `-node` 一致（默认 `master-1`）。
@@ -129,8 +130,8 @@ powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage down
 Compose 使用 [`configs/mmo-docker.json`](configs/mmo-docker.json)：NATS 由本栈启动；MySQL/Redis 使用你已有的 Docker/本机服务，容器内通过 `host.docker.internal:3306/6379` 访问，并自动执行 `import-config` 初始化配表。
 
 - 网关 WebSocket：`ws://127.0.0.1:10100`
-- GM HTTP（Docker 预发布）：默认 `http://127.0.0.1:19080/gm/config/reload`；可用 `-GMPort` 或环境变量 `GM_HTTP_PORT` 调整宿主机映射端口
-- GM 健康检查：浏览器打开 `http://127.0.0.1:19080/gm/health`
+- GM 控制台（Docker）：浏览器打开 `http://127.0.0.1:19080/`（默认 `admin` / `admin123`）；可用 `-GMPort` 或环境变量 `GM_HTTP_PORT` 调整宿主机映射端口
+- GM HTTP API：`http://127.0.0.1:19080/gm/*`（健康检查 `/gm/health`）
 - 发布记录：`.release/current`、`.release/previous`
 
 Docker 构建会利用层缓存与 BuildKit cache mount：Go SDK 基础镜像只在首次或镜像更新时拉取；`go.mod` / `go.sum` 不变时 module 下载层会复用；普通业务代码修改通常只重新执行最后的编译层。
@@ -147,17 +148,32 @@ go run ./cmd/client-demo -ws 127.0.0.1:10100
 
 GM 进程独立运行，通过 HTTP 接收管理请求，经 NATS 转发到 game 节点执行。
 
+### Web 控制台
+
+Vue 3 + Naive UI 单页应用由 GM 进程同源托管（构建产物嵌入 `internal/gmapp/ui`）。
+
+| 环境 | 地址 | 默认账号 |
+|------|------|----------|
+| 本地 `scripts/start.ps1` | [http://127.0.0.1:9080/](http://127.0.0.1:9080/) | `admin` / `admin123` |
+| Docker 预发布 | [http://127.0.0.1:19080/](http://127.0.0.1:19080/) | `admin` / `admin123` |
+
+空表时用环境变量 `GM_BOOTSTRAP_USER` / `GM_BOOTSTRAP_PASSWORD` 种子管理员（脚本与 Docker 默认即上表）。**生产必须改掉默认密码。** 登录后可查账号/角色/背包、发道具、踢下线、配表热更、查操作记录；管理员可开运营号。源码在 `web/gm-console/`。`scripts/start.ps1 -Build` 会先 `npm run build`；Docker 镜像构建含 Node 阶段。本地热更新：`cd web/gm-console && npm install && npm run dev`（把 `/gm` 代理到本机 `:9080`）。
+
+浏览器走账号密码 + HttpOnly Cookie。脚本/CI 仍可用共享密钥：请求头 `X-GM-Token` 或 `Authorization: Bearer`（默认 `dev-gm-token`，记审计操作者为 `system`）。`GET /gm/health` 与登录接口免鉴权。写操作的 `operator` 来自会话用户名，不再信任 `X-GM-Operator`。
+
 ### 配置热更
 
 ```powershell
 # 全量重载所有配表
 curl.exe -X POST http://127.0.0.1:9080/gm/config/reload `
   -H "Content-Type: application/json" `
+  -H "X-GM-Token: dev-gm-token" `
   -d '{"tableName":""}'
 
 # 按表名重载特定表（如 item）
 curl.exe -X POST http://127.0.0.1:9080/gm/config/reload `
   -H "Content-Type: application/json" `
+  -H "X-GM-Token: dev-gm-token" `
   -d '{"tableName":"item"}'
 ```
 
@@ -169,15 +185,33 @@ curl.exe -X POST http://127.0.0.1:9080/gm/config/reload `
 
 前提：`configs/mmo-cluster.json` 中 `gameconfig.allow_reload` 设为 `true`。
 
+### 查询 / 发奖 / 踢人
+
+```powershell
+curl.exe -G http://127.0.0.1:9080/gm/account -H "X-GM-Token: dev-gm-token" --data-urlencode "nickname=alice"
+curl.exe -G http://127.0.0.1:9080/gm/player -H "X-GM-Token: dev-gm-token" --data-urlencode "playerId=1"
+curl.exe -G http://127.0.0.1:9080/gm/bag -H "X-GM-Token: dev-gm-token" -d "playerId=1" -d "bagType=2"
+
+curl.exe -X POST http://127.0.0.1:9080/gm/bag/grant `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"playerId":1,"itemId":1001,"count":2}'
+
+curl.exe -X POST http://127.0.0.1:9080/gm/player/kick `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"uid":100}'
+```
+
+Docker 预发布 GM 端口为 `19080`。发奖不要求玩家在线；已进场则会 Push `onBagChange`。踢人只断连接，不封号、不吊销 token。
+
 ### 通信链路
 
 ```
-POST /gm/config/reload  →  gm 进程  →  NATS Request (ClusterPacket)
-  →  game 节点 ActorGM  →  actorGMConfig.reloadCluster  →  NATS Response
+HTTP /gm/*  →  gm 进程（鉴权）  →  NATS Request (ClusterPacket)
+  →  game 节点 ActorGM.{config|account|player|bag}  →  NATS Response
   →  gm 进程  →  JSON 返回
 ```
 
-GM 通过 `cherry-{prefix}.remote.game.{gameNodeID}` subject 向 game 节点发送 Cherry `ClusterPacket`，由 game 节点 `ActorGM` 按 `domain`（如 `config`）路由到对应子 Actor 处理。
+GM 通过 `cherry-{prefix}.remote.game.{gameNodeID}` subject 向 game 节点发送 Cherry `ClusterPacket`，由 game 节点 `ActorGM` 按 `domain` 路由到对应子 Actor 处理。运营发奖走 persistence，不经过玩家 `game.bag.add`。
 
 ## 客户端协议（Pomelo + Protobuf）
 
@@ -185,7 +219,7 @@ GM 通过 `cherry-{prefix}.remote.game.{gameNodeID}` subject 向 game 节点发�
 - 路由：`nodeType.handlerName.method`
 - 与旧 JSON 客户端 **不兼容**
 
-`.proto`：`internal/protocolpb/proto/`（`common`、`auth`、`player`、`scene`、`chat`、`bag`）  
+`.proto`：`internal/protocolpb/proto/`（`common`、`auth`、`player`、`scene`、`chat`、`bag`、`gm`）  
 Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/gen`）
 
 ### 网关鉴权
@@ -223,7 +257,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 背包扣除 | `game.bag.remove`       | `BagRemoveRequest`（`bagType`）            | `BagListResponse` + Push `onBagChange`           |
 | 背包移动 | `game.bag.move`         | `BagMoveRequest`（`bagType`/`fromSlot`/`toSlot`） | `BagListResponse` + Push `onBagChange`           |
 | 背包拆分 | `game.bag.split`        | `BagSplitRequest`（`bagType`/`fromSlot`/`count`） | `BagListResponse` + Push `onBagChange`           |
-| 配置热更 | `game.gm.config.reload` | `RefreshTokenRequest`（`refreshToken` 承载表名） | `RefreshTokenResponse`                           |
+| 配置热更 | `POST /gm/config/reload` | JSON `{tableName}` | `{code,version,tables}` | 需 GM token；内部 `GmReloadRequest` |
 
 
 说明：
@@ -236,11 +270,11 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
 - `add` 缺省按 `item.bag_type` 自动路由；显式指定 `bag_type`（GM）时严格校验，不符返回 `40028`
 - `add` / `remove` / `move` / `split` 成功后 RPC 返回最新背包，并 Push `onBagChange`（同 `BagListResponse`）
-- `game.gm.config.reload` 可通过 Pomelo 客户端直接调用，也可通过 GM HTTP API 间接触发
+- 运营发奖请用 GM HTTP `POST /gm/bag/grant`，不要依赖玩家 Session 上的 `game.bag.add`
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40028`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40032`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -274,6 +308,10 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40026 | `PlayerLimitExceeded` | 账号角色数达上限    |
 | 40027 | `PlayerDeleted`       | 角色已删除        |
 | 40028 | `BagTypeMismatch`     | 道具类别与目标背包不符 |
+| 40029 | `GmUnauthorized`      | GM 未登录或 token/密码错误 |
+| 40030 | `GmBadRequest`        | GM 查询/踢人条件缺失或互斥 |
+| 40031 | `GmTargetNotFound`    | GM 目标账号或角色不存在 |
+| 40032 | `GmForbidden`         | GM 非管理员访问管号等接口 |
 
 
 ### 重新生成 Protobuf Go 代码
@@ -332,8 +370,7 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 
 profile 中 `gameconfig.allow_reload` 设为 `true` 后：
 
-- 通过 GM HTTP API：`POST /gm/config/reload`
-- 通过 Pomelo RPC：`game.gm.config.reload`
+- 通过 GM HTTP API：`POST /gm/config/reload`（需 `X-GM-Token`）
 
 详见 [gameconfig/README.md](gameconfig/README.md)。
 
@@ -408,7 +445,8 @@ CI：`.github/workflows/go.yml`（`go test` + 五节点 `go build` + Docker 镜�
 | `internal/gatewayapp`            | 网关：连接 Agent、鉴权、集群转发                             |
 | `internal/loginapp`              | 登录：Token 签发与校验 Actor                            |
 | `internal/gameapp`               | 游戏：玩家、聊天、背包、场景世界、GM Actor                       |
-| `internal/gmapp`                 | **GM 进程：HTTP 路由 + NATS 通信**                     |
+| `internal/gmapp`                 | **GM 进程：HTTP 路由 + NATS 通信 + 嵌入 Web 控制台**     |
+| `web/gm-console`                 | GM 控制台前端（Vue 3 + Naive UI → `internal/gmapp/ui`） |
 | `internal/persistence`           | GORM + Redis + 全局事务与缓存                          |
 | `internal/protocol`              | 协议类型别名                                          |
 | `internal/protocolpb`            | `.proto` 与生成的 Go 代码                             |

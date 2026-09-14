@@ -70,7 +70,7 @@ go run ./gameconfig/cmd/import -profile configs/mmo-cluster.json
 
 - 后端节点（master/login/game）用 `cherry.Configure(..., isFrontend=false, cherry.Cluster)`，然后 `SetSerializer(NewProtobuf())`、`AddActors(...)`、`Startup()`。
 - gateway 用 `isFrontend=true`，通过 `pomelo.NewActor("user")` + `AddConnector(NewWS(...))` + `SetNetParser(...)` 装配前端，`SetOnDataRoute` 指向 `internal/gatewayapp/actor.OnPomeloDataRoute`。
-- gm 是**非 Cherry 进程**，直接用 `nats.Connect` + 标准库 `net/http`（见 `internal/gmapp/app.go`、`http.go`）。
+- gm 是**非 Cherry 进程**，直接用 `nats.Connect` + 标准库 `net/http`（见 `internal/gmapp/app.go`、`http.go`），加载同一 profile 连 MySQL/Redis，并 `go:embed` 托管 `web/gm-console` 构建产物。
 
 ### 消息流
 

@@ -69,6 +69,7 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Web 控制台：http://127.0.0.1:${GM_HTTP_PORT:-19080}/  默认 admin / admin123
   gm:
     image: mmo-server:${MMO_IMAGE_TAG:-local}
     command:
@@ -77,6 +78,12 @@ services:
       - -nats=nats://nats:4222
       - -prefix=mmo
       - -game=10001
+      - -path=/app/configs/mmo-docker.json
+      - -token=dev-gm-token
+    environment:
+      GM_BOOTSTRAP_USER: admin
+      GM_BOOTSTRAP_PASSWORD: admin123
+      GM_HTTP_TOKEN: dev-gm-token
     ports:
       - "${GM_HTTP_PORT:-19080}:9080"
     depends_on:

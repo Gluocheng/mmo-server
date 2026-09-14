@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+import "bag.proto";
+
+message GmReloadRequest {
+  string table_name = 1 [json_name = "tableName"];
+  string operator = 2 [json_name = "operator"];
+}
+
+message GmReloadResponse {
+  int64 version = 1 [json_name = "version"];
+  int64 tables = 2 [json_name = "tables"];
+}
+
+message GmAccountQueryRequest {
+  int64 uid = 1 [json_name = "uid"];
+  string nickname = 2 [json_name = "nickname"];
+}
+
+message GmAccountView {
+  int64 uid = 1 [json_name = "uid"];
+  string nickname = 2 [json_name = "nickname"];
+  int64 created_at_unix = 3 [json_name = "createdAtUnix"];
+}
+
+message GmPlayerQueryRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+  string name = 2 [json_name = "name"];
+  int64 uid = 3 [json_name = "uid"];
+}
+
+message GmPlayerRecord {
+  int64 player_id = 1 [json_name = "playerId"];
+  int64 uid = 2 [json_name = "uid"];
+  string name = 3 [json_name = "name"];
+  bool deleted = 4 [json_name = "deleted"];
+  int64 created_at_unix = 5 [json_name = "createdAtUnix"];
+}
+
+message GmPlayerQueryResponse {
+  repeated GmPlayerRecord list = 1 [json_name = "list"];
+}
+
+message GmBagQueryRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+  int32 bag_type = 2 [json_name = "bagType"];
+}
+
+message GmGrantRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+  int32 item_id = 2 [json_name = "itemId"];
+  int32 count = 3 [json_name = "count"];
+  int32 bag_type = 4 [json_name = "bagType"];
+  string operator = 5 [json_name = "operator"];
+}
+
+message GmGrantResponse {
+  int32 bag_type = 1 [json_name = "bagType"];
+  BagListResponse bag = 2 [json_name = "bag"];
+  bool pushed = 3 [json_name = "pushed"];
+}
+
+message GmKickRequest {
+  int64 uid = 1 [json_name = "uid"];
+  int64 player_id = 2 [json_name = "playerId"];
+  string operator = 3 [json_name = "operator"];
+}
+
+message GmKickResponse {
+  int64 uid = 1 [json_name = "uid"];
+  bool kicked = 2 [json_name = "kicked"];
+}

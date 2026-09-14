@@ -7,6 +7,19 @@ import (
 	"github.com/example/mmo-server/internal/protocol"
 )
 
+func TestAgentPath(t *testing.T) {
+	Leave(9)
+	if _, ok := AgentPath(9); ok {
+		t.Fatal("expected missing")
+	}
+	Enter(9, "gate-1.user", DefaultSceneID)
+	defer Leave(9)
+	path, ok := AgentPath(9)
+	if !ok || path != "gate-1.user" {
+		t.Fatalf("path=%s ok=%v", path, ok)
+	}
+}
+
 func TestEnterLeave(t *testing.T) {
 	Leave(1)
 	Leave(2)

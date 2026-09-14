@@ -2,30 +2,31 @@ package gmapp
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	clog "github.com/cherry-game/cherry/logger"
 	cproto "github.com/cherry-game/cherry/net/proto"
+	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/protocol"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
-// configReloadReq HTTP 请求体：gm 配置热更。
-type configReloadReq struct {
-	TableName string `json:"tableName"` // 为空时重载全部
+var errNATSDisconnected = errors.New("nats not connected")
+
+var protoJSON = protojson.MarshalOptions{
+	UseProtoNames:   false,
+	EmitUnpopulated: true,
 }
 
-// configReloadRsp HTTP 响应体。
-type configReloadRsp struct {
+type errorRsp struct {
 	Code    int32  `json:"code"`
 	Message string `json:"message,omitempty"`
-	Version string `json:"version,omitempty"`
-	Tables  int64  `json:"tables,omitempty"`
 }
 
-// healthRsp HTTP 健康检查响应体。
 type healthRsp struct {
 	Code          int32  `json:"code"`
 	Message       string `json:"message"`
@@ -34,19 +35,56 @@ type healthRsp struct {
 	TargetPath    string `json:"targetPath"`
 }
 
-// registerRoutes 注册 HTTP 路由。
-func (a *App) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/gm/health", a.handleHealth)
-	mux.HandleFunc("/gm/config/reload", a.handleConfigReload)
+type configReloadReq struct {
+	TableName string `json:"tableName"`
 }
 
-// handleHealth 提供浏览器可直接访问的后台健康检查。
+type configReloadRsp struct {
+	Code    int32  `json:"code"`
+	Message string `json:"message,omitempty"`
+	Version string `json:"version,omitempty"`
+	Tables  int64  `json:"tables,omitempty"`
+}
+
+type grantReq struct {
+	PlayerId int64 `json:"playerId"`
+	ItemId   int32 `json:"itemId"`
+	Count    int32 `json:"count"`
+	BagType  int32 `json:"bagType"`
+}
+
+type kickReq struct {
+	Uid      int64 `json:"uid"`
+	PlayerId int64 `json:"playerId"`
+}
+
+func (a *App) registerRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/gm/health", a.handleHealth)
+	mux.HandleFunc("/gm/auth/login", a.handleLogin)
+	mux.HandleFunc("/gm/auth/logout", a.handleLogout)
+	mux.HandleFunc("/gm/auth/me", a.requireAuth(a.handleMe))
+	mux.HandleFunc("/gm/users", a.requireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			a.handleUsersList(w, r)
+			return
+		}
+		a.handleUsersCreate(w, r)
+	}))
+	mux.HandleFunc("/gm/users/disable", a.requireAdmin(a.handleUsersDisable))
+	mux.HandleFunc("/gm/users/password", a.requireAdmin(a.handleUsersPassword))
+	mux.HandleFunc("/gm/ops/logs", a.requireAuth(a.handleOpsLogs))
+	mux.HandleFunc("/gm/config/reload", a.requireAuth(a.handleConfigReload))
+	mux.HandleFunc("/gm/account", a.requireAuth(a.handleAccount))
+	mux.HandleFunc("/gm/player", a.requireAuth(a.handlePlayer))
+	mux.HandleFunc("/gm/bag", a.requireAuth(a.handleBagQuery))
+	mux.HandleFunc("/gm/bag/grant", a.requireAuth(a.handleBagGrant))
+	mux.HandleFunc("/gm/player/kick", a.requireAuth(a.handleKick))
+	mux.Handle("/", spaHandler())
+}
+
 func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, healthRsp{
-			Code:    -1,
-			Message: "method not allowed, use GET",
-		})
+		writeJSON(w, http.StatusMethodNotAllowed, healthRsp{Code: -1, Message: "method not allowed, use GET"})
 		return
 	}
 	writeJSON(w, http.StatusOK, healthRsp{
@@ -58,111 +96,239 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleConfigReload 接收配置热更请求，通过 NATS 转发到 game 节点 actor。
 func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, configReloadRsp{
-			Code:    -1,
-			Message: "method not allowed, use POST",
-		})
+		writeJSON(w, http.StatusMethodNotAllowed, configReloadRsp{Code: -1, Message: "method not allowed, use POST"})
 		return
 	}
-
 	var req configReloadReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, configReloadRsp{
-			Code:    -1,
-			Message: "invalid request body: " + err.Error(),
-		})
+		writeJSON(w, http.StatusBadRequest, configReloadRsp{Code: -1, Message: "invalid request body: " + err.Error()})
 		return
 	}
-
-	// 构造 protobuf 请求：复用 RefreshTokenRequest.RefreshToken 承载表名
-	pbReq := &protocol.RefreshTokenRequest{
-		RefreshToken: req.TableName,
-	}
-	argBytes, err := proto.Marshal(pbReq)
-	if err != nil {
-		clog.Warnf("gm http marshal reload req: %v", err)
-		writeJSON(w, http.StatusInternalServerError, configReloadRsp{
-			Code:    -1,
-			Message: "marshal error",
-		})
+	pbReq := &protocol.GmReloadRequest{TableName: req.TableName, Operator: operatorFrom(r)}
+	rsp, err := a.callRemote("config", "reload", pbReq)
+	if !a.writeRemoteErr(w, "reload", err) {
 		return
 	}
-
-	// 构造跨节点 ClusterPacket 发送到 game 节点 gm config actor
-	clusterPacket := &cproto.ClusterPacket{
-		SourcePath: a.sourcePath,
-		TargetPath: a.targetPath,
-		FuncName:   "reload",
-		ArgBytes:   argBytes,
-	}
-	cpBytes, err := proto.Marshal(clusterPacket)
-	if err != nil {
-		clog.Warnf("gm http marshal cluster packet: %v", err)
-		writeJSON(w, http.StatusInternalServerError, configReloadRsp{
-			Code:    -1,
-			Message: "marshal cluster packet error",
-		})
-		return
-	}
-
-	if a.natsConn == nil {
-		writeJSON(w, http.StatusServiceUnavailable, configReloadRsp{
-			Code:    -1,
-			Message: "nats not connected",
-		})
-		return
-	}
-
-	// 通过 NATS 发送到 game 节点，5 秒超时
-	msg, err := a.natsConn.Request(a.remoteSubject, cpBytes, 5*time.Second)
-	if err != nil {
-		clog.Warnf("gm http nats request: %v", err)
-		writeJSON(w, http.StatusGatewayTimeout, configReloadRsp{
-			Code:    -1,
-			Message: "game node timeout: " + err.Error(),
-		})
-		return
-	}
-
-	// 解析 game 节点返回的 Response{code,data}
-	var rsp cproto.Response
-	if err := proto.Unmarshal(msg.Data, &rsp); err != nil {
-		clog.Warnf("gm http unmarshal response: %v", err)
-		writeJSON(w, http.StatusInternalServerError, configReloadRsp{
-			Code:    -1,
-			Message: "unmarshal response error",
-		})
-		return
-	}
-
 	if rsp.Code != 0 {
-		writeJSON(w, http.StatusOK, configReloadRsp{
-			Code:    rsp.Code,
-			Message: "reload failed",
-		})
+		writeJSON(w, http.StatusOK, configReloadRsp{Code: rsp.Code, Message: "reload failed"})
 		return
 	}
-
-	// 解析 ReflexTokenResponse 获取结果细节
-	var pbRsp protocol.RefreshTokenResponse
-	if len(rsp.Data) > 0 {
-		if err := proto.Unmarshal(rsp.Data, &pbRsp); err != nil {
-			clog.Warnf("gm http unmarshal reload rsp: %v", err)
-		}
-	}
-
+	var pbRsp protocol.GmReloadResponse
+	unmarshalPayload(rsp, &pbRsp)
 	writeJSON(w, http.StatusOK, configReloadRsp{
 		Code:    0,
 		Message: "ok",
-		Version: strconv.FormatInt(pbRsp.AccessExpireAt, 10),
-		Tables:  pbRsp.RefreshExpireAt,
+		Version: strconv.FormatInt(pbRsp.Version, 10),
+		Tables:  pbRsp.Tables,
 	})
 }
 
-// writeJSON 写入 JSON 响应。
+func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use GET"})
+		return
+	}
+	uid, _ := parseInt64Query(r, "uid")
+	nickname := r.URL.Query().Get("nickname")
+	uidSet := uid > 0
+	nickSet := nickname != ""
+	if uidSet == nickSet {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "provide exactly one of uid or nickname"})
+		return
+	}
+	rsp, err := a.callRemote("account", "query", &protocol.GmAccountQueryRequest{Uid: uid, Nickname: nickname})
+	a.writeProtoResult(w, "account.query", err, rsp, &protocol.GmAccountView{})
+}
+
+func (a *App) handlePlayer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use GET"})
+		return
+	}
+	playerID, _ := parseInt64Query(r, "playerId")
+	uid, _ := parseInt64Query(r, "uid")
+	name := r.URL.Query().Get("name")
+	n := 0
+	if playerID > 0 {
+		n++
+	}
+	if name != "" {
+		n++
+	}
+	if uid > 0 {
+		n++
+	}
+	if n != 1 {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "provide exactly one of playerId, name or uid"})
+		return
+	}
+	rsp, err := a.callRemote("player", "query", &protocol.GmPlayerQueryRequest{
+		PlayerId: playerID,
+		Name:     name,
+		Uid:      uid,
+	})
+	a.writeProtoResult(w, "player.query", err, rsp, &protocol.GmPlayerQueryResponse{})
+}
+
+func (a *App) handleBagQuery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use GET"})
+		return
+	}
+	playerID, _ := parseInt64Query(r, "playerId")
+	bagType, _ := parseInt32Query(r, "bagType")
+	if playerID < 1 || bagType < 1 {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "playerId and bagType required"})
+		return
+	}
+	rsp, err := a.callRemote("bag", "query", &protocol.GmBagQueryRequest{PlayerId: playerID, BagType: bagType})
+	a.writeProtoResult(w, "bag.query", err, rsp, &protocol.BagListResponse{})
+}
+
+func (a *App) handleBagGrant(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use POST"})
+		return
+	}
+	var req grantReq
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: err.Error()})
+		return
+	}
+	if req.PlayerId < 1 || req.ItemId < 1 {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "playerId and itemId required"})
+		return
+	}
+	rsp, err := a.callRemote("bag", "grant", &protocol.GmGrantRequest{
+		PlayerId: req.PlayerId,
+		ItemId:   req.ItemId,
+		Count:    req.Count,
+		BagType:  req.BagType,
+		Operator: operatorFrom(r),
+	})
+	a.writeProtoResult(w, "bag.grant", err, rsp, &protocol.GmGrantResponse{})
+}
+
+func (a *App) handleKick(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use POST"})
+		return
+	}
+	var req kickReq
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: err.Error()})
+		return
+	}
+	uidSet := req.Uid > 0
+	pidSet := req.PlayerId > 0
+	if uidSet == pidSet {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "provide exactly one of uid or playerId"})
+		return
+	}
+	rsp, err := a.callRemote("player", "kick", &protocol.GmKickRequest{
+		Uid:      req.Uid,
+		PlayerId: req.PlayerId,
+		Operator: operatorFrom(r),
+	})
+	a.writeProtoResult(w, "player.kick", err, rsp, &protocol.GmKickResponse{})
+}
+
+func (a *App) writeRemoteErr(w http.ResponseWriter, op string, err error) bool {
+	if err == nil {
+		return true
+	}
+	logRemoteErr(op, err)
+	if errors.Is(err, errNATSDisconnected) {
+		writeJSON(w, http.StatusServiceUnavailable, errorRsp{Code: -1, Message: "nats not connected"})
+		return false
+	}
+	writeJSON(w, http.StatusGatewayTimeout, errorRsp{Code: -1, Message: "game node timeout: " + err.Error()})
+	return false
+}
+
+func (a *App) writeProtoResult(w http.ResponseWriter, op string, err error, rsp *cproto.Response, msg proto.Message) {
+	if !a.writeRemoteErr(w, op, err) {
+		return
+	}
+	httpStatus := http.StatusOK
+	switch rsp.Code {
+	case code.GmUnauthorized:
+		httpStatus = http.StatusUnauthorized
+	case code.GmBadRequest:
+		httpStatus = http.StatusBadRequest
+	case code.GmForbidden:
+		httpStatus = http.StatusForbidden
+	}
+	if rsp.Code != 0 {
+		writeJSON(w, httpStatus, errorRsp{Code: rsp.Code, Message: "failed"})
+		return
+	}
+	unmarshalPayload(rsp, msg)
+	writeMergedProtoJSON(w, httpStatus, rsp.Code, msg)
+}
+
+func unmarshalPayload(rsp *cproto.Response, msg proto.Message) {
+	if rsp == nil || len(rsp.Data) == 0 {
+		return
+	}
+	if err := proto.Unmarshal(rsp.Data, msg); err != nil {
+		clog.Warnf("gm http unmarshal payload: %v", err)
+	}
+}
+
+func writeMergedProtoJSON(w http.ResponseWriter, httpStatus int, bizCode int32, msg proto.Message) {
+	out := map[string]any{"code": bizCode, "message": "ok"}
+	if msg != nil {
+		raw, err := protoJSON.Marshal(msg)
+		if err == nil {
+			var fields map[string]any
+			if json.Unmarshal(raw, &fields) == nil {
+				for k, v := range fields {
+					if k == "code" {
+						continue
+					}
+					out[k] = v
+				}
+			}
+		}
+	}
+	writeJSON(w, httpStatus, out)
+}
+
+func decodeJSONBody(r *http.Request, v any) error {
+	defer r.Body.Close()
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(v); err != nil {
+		if errors.Is(err, io.EOF) {
+			return errors.New("empty body")
+		}
+		return err
+	}
+	return nil
+}
+
+func parseInt64Query(r *http.Request, key string) (int64, bool) {
+	s := r.URL.Query().Get(key)
+	if s == "" {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+func parseInt32Query(r *http.Request, key string) (int32, bool) {
+	n, ok := parseInt64Query(r, key)
+	if !ok {
+		return 0, false
+	}
+	return int32(n), true
+}
+
 func writeJSON(w http.ResponseWriter, statusCode int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)

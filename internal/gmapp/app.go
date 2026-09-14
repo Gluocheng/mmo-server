@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	clog "github.com/cherry-game/cherry/logger"
+	cprofile "github.com/cherry-game/cherry/profile"
+	"github.com/example/mmo-server/internal/persistence"
 	"github.com/nats-io/nats.go"
 )
 
@@ -21,23 +23,48 @@ type App struct {
 	natsAddr      string
 	natsPrefix    string
 	gameNodeID    string
+	token         string
+	profilePath   string
+	bootstrapUser string
+	bootstrapPass string
 	remoteSubject string // NATS subject: cherry-{prefix}.remote.game.{gameNodeID}
-	sourcePath    string // ClusterPacket: {gmNodeID}.gm.config
-	targetPath    string // ClusterPacket: {gameNodeID}.gm.config
+	sourcePath    string // ClusterPacket: {gmNodeID}.gm.config（health 展示）
+	targetPath    string // ClusterPacket: {gameNodeID}.gm.config（health 展示）
 }
 
-// New 创建 GM 应用实例。
-func New(httpAddr, natsAddr, natsPrefix, gameNodeID string) *App {
+// New 创建 GM 应用实例。token 为空时除公开接口外须登录会话。
+func New(httpAddr, natsAddr, natsPrefix, gameNodeID, token string) *App {
 	return &App{
 		httpAddr:   httpAddr,
 		natsAddr:   natsAddr,
 		natsPrefix: natsPrefix,
 		gameNodeID: gameNodeID,
+		token:      token,
 	}
 }
 
-// Run 启动 GM 进程：连接 NATS 并启动 HTTP 服务。
+// SetProfile 设置 cluster profile 路径与空表种子管理员。
+func (a *App) SetProfile(path, bootstrapUser, bootstrapPass string) {
+	a.profilePath = path
+	a.bootstrapUser = bootstrapUser
+	a.bootstrapPass = bootstrapPass
+}
+
+// Run 启动 GM 进程：加载 profile、连接 MySQL/Redis 与 NATS，再启动 HTTP。
 func (a *App) Run() error {
+	if a.profilePath == "" {
+		a.profilePath = "configs/mmo-cluster.json"
+	}
+	if _, err := cprofile.Init(a.profilePath, gmNodeID); err != nil {
+		return fmt.Errorf("gm profile: %w", err)
+	}
+	if err := persistence.Init(); err != nil {
+		return fmt.Errorf("gm persistence: %w", err)
+	}
+	if err := persistence.EnsureGMBootstrap(a.bootstrapUser, a.bootstrapPass); err != nil {
+		return fmt.Errorf("gm bootstrap: %w", err)
+	}
+
 	nc, err := nats.Connect(a.natsAddr)
 	if err != nil {
 		return fmt.Errorf("gm nats connect: %w", err)
@@ -46,7 +73,6 @@ func (a *App) Run() error {
 	defer nc.Close()
 	clog.Infof("gm: nats connected to %s", nc.ConnectedUrl())
 
-	// 初始化 NATS 路由信息
 	a.remoteSubject = fmt.Sprintf("cherry-%s.remote.game.%s", a.natsPrefix, a.gameNodeID)
 	a.sourcePath = fmt.Sprintf("%s.gm.config", gmNodeID)
 	a.targetPath = fmt.Sprintf("%s.gm.config", a.gameNodeID)

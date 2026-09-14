@@ -61,6 +61,17 @@ func SceneID(uid int64) (int32, bool) {
 	return st.sceneID, true
 }
 
+// AgentPath 返回已进场玩家的网关 agent 路径；未进场 ok=false。
+func AgentPath(uid int64) (string, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
+	st, ok := inRoom[uid]
+	if !ok || st.agentPath == "" {
+		return "", false
+	}
+	return st.agentPath, true
+}
+
 func BroadcastMove(sender cfacade.IActor, fromUID int64, m *protocol.MoveBroadcast) {
 	if m == nil {
 		return

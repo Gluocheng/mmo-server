@@ -80,4 +80,4 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 
 ## 热更
 
-profile 中设置 `"gameconfig": { "allow_reload": true }` 后，可调用 RPC `game.config.reload`（或 GM HTTP `/gm/config/reload`）。支持按表名重载：`item`、`bag_type`。
+profile 中设置 `"gameconfig": { "allow_reload": true }` 后，可调用 GM HTTP `POST /gm/config/reload`（需 token）或 Pomelo `game.config.reload`。支持按表名重载：`item`、`bag_type`。
