@@ -40,7 +40,8 @@
 | done | GM Web 控制台 | [2026-09-14-gm-web-ui-design.md](2026-09-14-gm-web-ui-design.md) | 实施 [2026-09-14-gm-web-ui.md](2026-09-14-gm-web-ui.md) |
 | done | GM 上线鉴权与 Naive UI | [2026-09-14-gm-prod-console-design.md](2026-09-14-gm-prod-console-design.md) | 实施 [2026-09-14-gm-prod-console.md](2026-09-14-gm-prod-console.md) |
 | done | GM 运营后台 P1 | [2026-09-21-gm-ops-p1-design.md](2026-09-21-gm-ops-p1-design.md) | 实施 [2026-09-21-gm-ops-p1.md](2026-09-21-gm-ops-p1.md)；扣道具/封号/在线/公告/调时间 |
-| planned | GM 运营后台 P2 | [backlog-gm-ops.md](backlog-gm-ops.md) | 禁言、邮件、SSO、礼包码等 |
+| done | GM 运营后台 P2 管控核 | [2026-09-21-gm-ops-p2-design.md](2026-09-21-gm-ops-p2-design.md) | 实施 [2026-09-21-gm-ops-p2.md](2026-09-21-gm-ops-p2.md)；禁言/限时封号/吊销 token/强制维护 |
+| planned | GM 运营后台其余 P2 | [backlog-gm-ops.md](backlog-gm-ops.md) | 清背包、改名、邮件/礼包码、细权限等 |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 
 > 无 `*-design.md` 的 done 项为历史基线；**新迭代**须策划 + 实施双文件，并更新本表。

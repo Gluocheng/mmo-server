@@ -37,6 +37,8 @@ const (
 	GmTargetNotFound    int32 = 40031 // GM 目标账号或角色不存在
 	GmForbidden         int32 = 40032 // GM 非管理员访问管理接口
 	AccountBanned       int32 = 40033 // 账号已封禁（登录/刷新/鉴权）
+	ChatMuted           int32 = 40034 // 账号禁言中（发聊天）
+	ServerMaintenance   int32 = 40035 // 服务器维护中（登录/刷新/鉴权）
 )
 
 func IsFail(c int32) bool {

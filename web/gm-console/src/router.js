@@ -15,6 +15,7 @@ import Deduct from './views/Deduct.vue'
 import Online from './views/Online.vue'
 import Notice from './views/Notice.vue'
 import Time from './views/Time.vue'
+import Maintenance from './views/Maintenance.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -34,6 +35,7 @@ const router = createRouter({
         { path: 'online', component: Online },
         { path: 'notice', component: Notice },
         { path: 'time', component: Time },
+        { path: 'maintenance', component: Maintenance },
         { path: 'reload', component: Reload },
         { path: 'logs', component: Logs },
         { path: 'users', component: Users, meta: { admin: true } },

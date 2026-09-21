@@ -51,6 +51,11 @@ type (
 	GmDeductRequest       = pb.GmDeductRequest
 	GmBanRequest          = pb.GmBanRequest
 	GmBanResponse         = pb.GmBanResponse
+	GmMuteResponse        = pb.GmMuteResponse
+	GmMaintenanceRequest  = pb.GmMaintenanceRequest
+	GmMaintenanceResponse = pb.GmMaintenanceResponse
+	GmKickAllRequest      = pb.GmKickAllRequest
+	GmKickAllResponse     = pb.GmKickAllResponse
 	GmOnlineRequest       = pb.GmOnlineRequest
 	GmOnlinePlayer        = pb.GmOnlinePlayer
 	GmOnlineResponse      = pb.GmOnlineResponse

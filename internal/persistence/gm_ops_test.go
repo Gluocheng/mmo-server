@@ -126,3 +126,70 @@ func TestAccountBanAndQuery(t *testing.T) {
 		t.Fatalf("view after unban: %+v found=%v err=%v", view, found, err)
 	}
 }
+
+func TestAccountTimedBanExpires(t *testing.T) {
+	resetDBForTest(t)
+	seedGMAccountPlayer(t, 22, "tempban", 402, "hero", false)
+
+	found, err := SetAccountBannedFor(22, true, "temp", 1)
+	if err != nil || !found {
+		t.Fatalf("ban: found=%v err=%v", found, err)
+	}
+	ok, err := IsAccountBanned(22)
+	if err != nil || !ok {
+		t.Fatalf("expected banned, ok=%v err=%v", ok, err)
+	}
+	view, found, err := GetAccountByUID(22)
+	if err != nil || !found || !view.Banned || view.BannedUntil < 1 {
+		t.Fatalf("view timed: %+v found=%v err=%v", view, found, err)
+	}
+	if err := db.Model(&model.Account{}).Where("uid = ?", 22).Update("banned_until", 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	ok, err = IsAccountBanned(22)
+	if err != nil || ok {
+		t.Fatalf("expected expired, ok=%v err=%v", ok, err)
+	}
+	view, found, err = GetAccountByUID(22)
+	if err != nil || !found || view.Banned {
+		t.Fatalf("view after expiry: %+v found=%v err=%v", view, found, err)
+	}
+}
+
+func TestAccountMuteAndExpiry(t *testing.T) {
+	resetDBForTest(t)
+	seedGMAccountPlayer(t, 23, "muted", 403, "hero", false)
+
+	found, err := SetAccountMuted(23, true, "spam", 0)
+	if err != nil || !found {
+		t.Fatalf("mute: found=%v err=%v", found, err)
+	}
+	ok, err := IsAccountMuted(23)
+	if err != nil || !ok {
+		t.Fatalf("expected muted, ok=%v err=%v", ok, err)
+	}
+	view, found, err := GetAccountByUID(23)
+	if err != nil || !found || !view.Muted || view.MuteReason != "spam" {
+		t.Fatalf("view mute: %+v found=%v err=%v", view, found, err)
+	}
+	found, err = SetAccountMuted(23, false, "", 0)
+	if err != nil || !found {
+		t.Fatalf("unmute: found=%v err=%v", found, err)
+	}
+	ok, err = IsAccountMuted(23)
+	if err != nil || ok {
+		t.Fatalf("expected unmuted, ok=%v err=%v", ok, err)
+	}
+
+	found, err = SetAccountMuted(23, true, "temp", 60)
+	if err != nil || !found {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.Account{}).Where("uid = ?", 23).Update("muted_until", 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	ok, err = IsAccountMuted(23)
+	if err != nil || ok {
+		t.Fatalf("expected mute expired, ok=%v err=%v", ok, err)
+	}
+}

@@ -12,6 +12,7 @@ import (
 func Run(profileFilePath, nodeID string) {
 	app := cherry.Configure(profileFilePath, nodeID, true, cherry.Cluster)
 	app.SetSerializer(cserializer.NewProtobuf())
+	app.AddActors(&actor.ActorOps{})
 
 	agentActor := pomelo.NewActor("user")
 	agentActor.AddConnector(cconnector.NewWS(app.Address()))

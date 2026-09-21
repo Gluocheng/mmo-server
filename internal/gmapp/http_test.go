@@ -116,15 +116,49 @@ func TestDeductXORParams(t *testing.T) {
 	}
 }
 
-func TestBanXORParams(t *testing.T) {
+func TestBanNegativeDuration(t *testing.T) {
 	mux := testMux("secret")
-	req := httptest.NewRequest(http.MethodPost, "/gm/account/ban", strings.NewReader(`{"uid":1,"nickname":"a"}`))
+	req := httptest.NewRequest(http.MethodPost, "/gm/account/ban", strings.NewReader(`{"uid":1,"durationSeconds":-1}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-GM-Token", "secret")
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestMuteXORParams(t *testing.T) {
+	mux := testMux("secret")
+	req := httptest.NewRequest(http.MethodPost, "/gm/account/mute", strings.NewReader(`{"uid":1,"nickname":"a"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GM-Token", "secret")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestMaintenanceGetAuthorized(t *testing.T) {
+	persistence.UseMemoryDBForTest(t)
+	mux := testMux("secret")
+	req := httptest.NewRequest(http.MethodGet, "/gm/maintenance", nil)
+	req.Header.Set("X-GM-Token", "secret")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var rsp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &rsp); err != nil {
+		t.Fatal(err)
+	}
+	if rsp["code"] != float64(0) {
+		t.Fatalf("code=%v body=%s", rsp["code"], rec.Body.String())
+	}
+	if _, ok := rsp["enabled"]; !ok {
+		t.Fatalf("missing enabled: %s", rec.Body.String())
 	}
 }
 
@@ -170,9 +204,11 @@ func TestP1RoutesRequireAuth(t *testing.T) {
 	}{
 		{http.MethodPost, "/gm/bag/deduct", `{"playerId":1,"itemId":1}`},
 		{http.MethodPost, "/gm/account/ban", `{"uid":1}`},
+		{http.MethodPost, "/gm/account/mute", `{"uid":1}`},
 		{http.MethodGet, "/gm/world/online", ""},
 		{http.MethodPost, "/gm/notice", `{"text":"hi"}`},
 		{http.MethodGet, "/gm/time", ""},
+		{http.MethodGet, "/gm/maintenance", ""},
 	}
 	for _, tc := range paths {
 		var req *http.Request

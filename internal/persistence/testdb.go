@@ -3,8 +3,11 @@ package persistence
 import (
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -48,4 +51,28 @@ func UseMemoryDBForTest(t *testing.T) *gorm.DB {
 		gmSessMu.Unlock()
 	})
 	return gdb
+}
+
+// UseRedisForTest 挂接 miniredis 作为全局 rdb；须在 UseMemoryDBForTest 之后调用。
+func UseRedisForTest(t *testing.T) {
+	t.Helper()
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	oldRDB := rdb
+	oldCfg := cfg
+	rdb = client
+	if cfg.keyPrefix == "" {
+		cfg.keyPrefix = "t"
+	}
+	if cfg.accessTTL == 0 {
+		cfg.accessTTL = time.Minute
+	}
+	if cfg.refreshTTL == 0 {
+		cfg.refreshTTL = time.Hour
+	}
+	t.Cleanup(func() {
+		_ = client.Close()
+		rdb = oldRDB
+		cfg = oldCfg
+	})
 }

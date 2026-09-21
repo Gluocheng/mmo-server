@@ -151,6 +151,7 @@ func RotateTokenPairByRefreshTokenContext(parent context.Context, refreshToken s
 	if err != nil || uid < 1 {
 		return "", 0, "", 0, "", fmt.Errorf("refresh token uid invalid")
 	}
+	indexRemoveMembers(ctx, uid, refreshIndexMember(refreshToken))
 
 	accessToken, accessExpireAt, newRefreshToken, refreshExpireAt, err = issueTokenPairWithUID(ctx, uid, deviceID)
 	if err != nil {
@@ -180,6 +181,10 @@ func issueTokenPairWithUID(ctx context.Context, uid int64, deviceID string) (acc
 	}
 	if err := rdb.Set(ctx, refreshTokenKey(refreshToken), tokenValue, RefreshTTL()).Err(); err != nil {
 		_ = rdb.Del(ctx, accessTokenKey(accessToken)).Err()
+		return "", 0, "", 0, err
+	}
+	if err := indexAddTokenPair(ctx, uid, accessToken, refreshToken); err != nil {
+		_ = rdb.Del(ctx, accessTokenKey(accessToken), refreshTokenKey(refreshToken)).Err()
 		return "", 0, "", 0, err
 	}
 	return accessToken, accessExpireAt, refreshToken, refreshExpireAt, nil
@@ -216,6 +221,7 @@ func RevokeTokensContext(parent context.Context, accessToken, refreshToken strin
 	}
 	ctx, cancel := opContext(parent)
 	defer cancel()
+	uid := tokenUIDFromKeys(ctx, accessToken, refreshToken)
 	keys := make([]string, 0, 2)
 	if accessToken != "" {
 		keys = append(keys, accessTokenKey(accessToken))
@@ -223,7 +229,133 @@ func RevokeTokensContext(parent context.Context, accessToken, refreshToken strin
 	if refreshToken != "" {
 		keys = append(keys, refreshTokenKey(refreshToken))
 	}
-	return rdb.Del(ctx, keys...).Err()
+	if err := rdb.Del(ctx, keys...).Err(); err != nil {
+		return err
+	}
+	indexRemoveMembers(ctx, uid, accessIndexMember(accessToken), refreshIndexMember(refreshToken))
+	return nil
+}
+
+func tokenUIDFromKeys(ctx context.Context, accessToken, refreshToken string) int64 {
+	if accessToken != "" {
+		if uid := peekUIDAt(ctx, accessTokenKey(accessToken)); uid > 0 {
+			return uid
+		}
+	}
+	if refreshToken != "" {
+		return peekUIDAt(ctx, refreshTokenKey(refreshToken))
+	}
+	return 0
+}
+
+func peekUIDAt(ctx context.Context, key string) int64 {
+	raw, err := rdb.Get(ctx, key).Result()
+	if err != nil {
+		return 0
+	}
+	uid, _, err := parseTokenValue(raw)
+	if err != nil {
+		return 0
+	}
+	return uid
+}
+
+func uidTokensKey(uid int64) string {
+	return fmt.Sprintf("%s:tokens:uid:%d", KeyPrefix(), uid)
+}
+
+func accessIndexMember(token string) string {
+	if token == "" {
+		return ""
+	}
+	return "a:" + token
+}
+
+func refreshIndexMember(token string) string {
+	if token == "" {
+		return ""
+	}
+	return "r:" + token
+}
+
+func indexAddTokenPair(ctx context.Context, uid int64, accessToken, refreshToken string) error {
+	if rdb == nil || uid < 1 {
+		return nil
+	}
+	members := make([]any, 0, 2)
+	if accessToken != "" {
+		members = append(members, accessIndexMember(accessToken))
+	}
+	if refreshToken != "" {
+		members = append(members, refreshIndexMember(refreshToken))
+	}
+	if len(members) == 0 {
+		return nil
+	}
+	key := uidTokensKey(uid)
+	if err := rdb.SAdd(ctx, key, members...).Err(); err != nil {
+		return err
+	}
+	ttl := RefreshTTL()
+	if ttl <= 0 {
+		return nil
+	}
+	return rdb.Expire(ctx, key, ttl).Err()
+}
+
+func indexRemoveMembers(ctx context.Context, uid int64, members ...string) {
+	if rdb == nil || uid < 1 {
+		return
+	}
+	args := make([]any, 0, len(members))
+	for _, m := range members {
+		if m != "" {
+			args = append(args, m)
+		}
+	}
+	if len(args) == 0 {
+		return
+	}
+	_ = rdb.SRem(ctx, uidTokensKey(uid), args...).Err()
+}
+
+// RevokeAllTokensForUID 删除该 uid 索引内全部 access/refresh（封号用）。
+func RevokeAllTokensForUID(uid int64) error {
+	return RevokeAllTokensForUIDContext(context.Background(), uid)
+}
+
+// RevokeAllTokensForUIDContext 按 uid 反向索引批量吊销令牌。
+func RevokeAllTokensForUIDContext(parent context.Context, uid int64) error {
+	if uid < 1 {
+		return nil
+	}
+	if rdb == nil {
+		if err := Init(); err != nil {
+			return err
+		}
+	}
+	if rdb == nil {
+		return nil
+	}
+	ctx, cancel := opContext(parent)
+	defer cancel()
+	key := uidTokensKey(uid)
+	members, err := rdb.SMembers(ctx, key).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return err
+	}
+	delKeys := make([]string, 0, len(members)+1)
+	for _, m := range members {
+		switch {
+		case strings.HasPrefix(m, "a:"):
+			delKeys = append(delKeys, accessTokenKey(strings.TrimPrefix(m, "a:")))
+		case strings.HasPrefix(m, "r:"):
+			tok := strings.TrimPrefix(m, "r:")
+			delKeys = append(delKeys, refreshTokenKey(tok), refreshUsedKey(tok))
+		}
+	}
+	delKeys = append(delKeys, key)
+	return rdb.Del(ctx, delKeys...).Err()
 }
 
 func RevokeTokens(accessToken, refreshToken string) error {

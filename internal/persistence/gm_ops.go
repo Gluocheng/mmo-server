@@ -6,20 +6,24 @@ import (
 	"strings"
 
 	clog "github.com/cherry-game/cherry/logger"
+	"github.com/example/mmo-server/internal/gtime"
 	"github.com/example/mmo-server/internal/persistence/model"
 	"github.com/example/mmo-server/internal/protocol"
 	"gorm.io/gorm"
 )
 
 const (
-	GMActionReload  = "config.reload"
-	GMActionGrant   = "bag.grant"
-	GMActionKick    = "player.kick"
-	GMActionDeduct  = "bag.deduct"
-	GMActionBan     = "account.ban"
-	GMActionUnban   = "account.unban"
-	GMActionNotice  = "world.notice"
-	GMActionTimeSet = "time.set"
+	GMActionReload      = "config.reload"
+	GMActionGrant       = "bag.grant"
+	GMActionKick        = "player.kick"
+	GMActionDeduct      = "bag.deduct"
+	GMActionBan         = "account.ban"
+	GMActionUnban       = "account.unban"
+	GMActionNotice      = "world.notice"
+	GMActionTimeSet     = "time.set"
+	GMActionMute        = "account.mute"
+	GMActionUnmute      = "account.unmute"
+	GMActionMaintenance = "world.maintenance"
 )
 
 func gmPlayerRecord(p model.Player) *protocol.GmPlayerRecord {
@@ -40,6 +44,42 @@ func gmAccountView(a model.Account) *protocol.GmAccountView {
 		CreatedAtUnix: a.CreatedAt.Unix(),
 		Banned:        a.Banned,
 		BanReason:     a.BanReason,
+		BannedUntil:   a.BannedUntil,
+		Muted:         a.Muted,
+		MuteReason:    a.MuteReason,
+		MutedUntil:    a.MutedUntil,
+	}
+}
+
+// applyAccountExpiry 惰性清除已到期的封禁/禁言，失败只打日志。
+func applyAccountExpiry(ctx context.Context, acc *model.Account) {
+	if acc == nil || acc.UID < 1 {
+		return
+	}
+	now := gtime.UnixNow()
+	updates := map[string]any{}
+	if acc.Banned && acc.BannedUntil > 0 && now >= acc.BannedUntil {
+		acc.Banned = false
+		acc.BanReason = ""
+		acc.BannedUntil = 0
+		updates["banned"] = false
+		updates["ban_reason"] = ""
+		updates["banned_until"] = 0
+	}
+	if acc.Muted && acc.MutedUntil > 0 && now >= acc.MutedUntil {
+		acc.Muted = false
+		acc.MuteReason = ""
+		acc.MutedUntil = 0
+		updates["muted"] = false
+		updates["mute_reason"] = ""
+		updates["muted_until"] = 0
+	}
+	if len(updates) == 0 {
+		return
+	}
+	if err := DBFromContext(ctx).WithContext(ctx).Model(&model.Account{}).
+		Where("uid = ?", acc.UID).Updates(updates).Error; err != nil {
+		clog.Warnf("account expiry clear uid=%d err=%v", acc.UID, err)
 	}
 }
 
@@ -66,6 +106,7 @@ func GetAccountByUIDContext(parent context.Context, uid int64) (*protocol.GmAcco
 	if err != nil {
 		return nil, false, err
 	}
+	applyAccountExpiry(ctx, &acc)
 	return gmAccountView(acc), true, nil
 }
 
@@ -93,6 +134,7 @@ func GetAccountByNicknameContext(parent context.Context, nickname string) (*prot
 	if err != nil {
 		return nil, false, err
 	}
+	applyAccountExpiry(ctx, &acc)
 	return gmAccountView(acc), true, nil
 }
 
@@ -208,34 +250,64 @@ func IsAccountBanned(uid int64) (bool, error) {
 	return IsAccountBannedContext(context.Background(), uid)
 }
 
-// IsAccountBannedContext 查询账号是否封禁。
+// IsAccountBannedContext 查询账号是否封禁（含限时到期）。
 func IsAccountBannedContext(parent context.Context, uid int64) (bool, error) {
-	if err := ensureDB(); err != nil {
-		return false, err
-	}
-	if uid < 1 {
-		return false, nil
-	}
-	ctx, cancel := opContext(parent)
-	defer cancel()
-	var acc model.Account
-	err := DBFromContext(ctx).WithContext(ctx).Select("banned").Where("uid = ?", uid).First(&acc).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
-	if err != nil {
+	acc, err := loadAccountFlags(parent, uid)
+	if err != nil || acc == nil {
 		return false, err
 	}
 	return acc.Banned, nil
 }
 
-// SetAccountBanned 设置账号封禁状态；解封时清空原因。found=false 表示账号不存在。
-func SetAccountBanned(uid int64, banned bool, reason string) (bool, error) {
-	return SetAccountBannedContext(context.Background(), uid, banned, reason)
+// IsAccountMuted 查询账号是否禁言；不存在视为未禁言。
+func IsAccountMuted(uid int64) (bool, error) {
+	return IsAccountMutedContext(context.Background(), uid)
 }
 
-// SetAccountBannedContext 设置账号封禁状态。
-func SetAccountBannedContext(parent context.Context, uid int64, banned bool, reason string) (bool, error) {
+// IsAccountMutedContext 查询账号是否禁言（含限时到期）。
+func IsAccountMutedContext(parent context.Context, uid int64) (bool, error) {
+	acc, err := loadAccountFlags(parent, uid)
+	if err != nil || acc == nil {
+		return false, err
+	}
+	return acc.Muted, nil
+}
+
+func loadAccountFlags(parent context.Context, uid int64) (*model.Account, error) {
+	if err := ensureDB(); err != nil {
+		return nil, err
+	}
+	if uid < 1 {
+		return nil, nil
+	}
+	ctx, cancel := opContext(parent)
+	defer cancel()
+	var acc model.Account
+	err := DBFromContext(ctx).WithContext(ctx).
+		Select("uid", "banned", "ban_reason", "banned_until", "muted", "mute_reason", "muted_until").
+		Where("uid = ?", uid).First(&acc).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	applyAccountExpiry(ctx, &acc)
+	return &acc, nil
+}
+
+// SetAccountBanned 设置账号封禁状态（永久）；解封时清空原因与到期。
+func SetAccountBanned(uid int64, banned bool, reason string) (bool, error) {
+	return SetAccountBannedFor(uid, banned, reason, 0)
+}
+
+// SetAccountBannedFor 设置封禁；durationSeconds>0 为限时，0 为永久（banned=true）或清到期（解封）。
+func SetAccountBannedFor(uid int64, banned bool, reason string, durationSeconds int64) (bool, error) {
+	return SetAccountBannedForContext(context.Background(), uid, banned, reason, durationSeconds)
+}
+
+// SetAccountBannedForContext 设置账号封禁状态。
+func SetAccountBannedForContext(parent context.Context, uid int64, banned bool, reason string, durationSeconds int64) (bool, error) {
 	if err := ensureDB(); err != nil {
 		return false, err
 	}
@@ -245,12 +317,48 @@ func SetAccountBannedContext(parent context.Context, uid int64, banned bool, rea
 	ctx, cancel := opContext(parent)
 	defer cancel()
 	reason = strings.TrimSpace(reason)
+	var until int64
 	if !banned {
 		reason = ""
+		until = 0
+	} else if durationSeconds > 0 {
+		until = gtime.UnixNow() + durationSeconds
 	}
 	res := DBFromContext(ctx).WithContext(ctx).Model(&model.Account{}).
 		Where("uid = ?", uid).
-		Updates(map[string]any{"banned": banned, "ban_reason": reason})
+		Updates(map[string]any{"banned": banned, "ban_reason": reason, "banned_until": until})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
+// SetAccountMuted 设置禁言；durationSeconds>0 为限时，0 为永久或解禁。
+func SetAccountMuted(uid int64, muted bool, reason string, durationSeconds int64) (bool, error) {
+	return SetAccountMutedContext(context.Background(), uid, muted, reason, durationSeconds)
+}
+
+// SetAccountMutedContext 设置账号禁言状态。
+func SetAccountMutedContext(parent context.Context, uid int64, muted bool, reason string, durationSeconds int64) (bool, error) {
+	if err := ensureDB(); err != nil {
+		return false, err
+	}
+	if uid < 1 {
+		return false, nil
+	}
+	ctx, cancel := opContext(parent)
+	defer cancel()
+	reason = strings.TrimSpace(reason)
+	var until int64
+	if !muted {
+		reason = ""
+		until = 0
+	} else if durationSeconds > 0 {
+		until = gtime.UnixNow() + durationSeconds
+	}
+	res := DBFromContext(ctx).WithContext(ctx).Model(&model.Account{}).
+		Where("uid = ?", uid).
+		Updates(map[string]any{"muted": muted, "mute_reason": reason, "muted_until": until})
 	if res.Error != nil {
 		return false, res.Error
 	}

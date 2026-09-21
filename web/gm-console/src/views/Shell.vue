@@ -32,6 +32,7 @@ import {
   GlobeOutline,
   GridOutline,
   HourglassOutline,
+  ConstructOutline,
   LogOutOutline,
   MegaphoneOutline,
   PeopleOutline,
@@ -64,6 +65,7 @@ const menuOptions = computed(() => {
     { label: '在线列表', key: '/online', icon: renderIcon(GlobeOutline) },
     { label: '公告', key: '/notice', icon: renderIcon(MegaphoneOutline) },
     { label: '游戏时间', key: '/time', icon: renderIcon(HourglassOutline) },
+    { label: '强制维护', key: '/maintenance', icon: renderIcon(ConstructOutline) },
     { label: '配表热更', key: '/reload', icon: renderIcon(FlashOutline) },
     { label: '操作记录', key: '/logs', icon: renderIcon(TimeOutline) },
   ]

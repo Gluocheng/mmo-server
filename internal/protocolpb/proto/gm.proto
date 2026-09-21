@@ -27,6 +27,10 @@ message GmAccountView {
     int64 created_at_unix = 3 [json_name = "createdAtUnix"];
     bool banned = 4 [json_name = "banned"];
     string ban_reason = 5 [json_name = "banReason"];
+    int64 banned_until = 6 [json_name = "bannedUntil"];
+    bool muted = 7 [json_name = "muted"];
+    string mute_reason = 8 [json_name = "muteReason"];
+    int64 muted_until = 9 [json_name = "mutedUntil"];
 }
 
 message GmPlayerQueryRequest {
@@ -91,12 +95,39 @@ message GmBanRequest {
     string nickname = 2 [json_name = "nickname"];
     string reason = 3 [json_name = "reason"];
     string operator = 4 [json_name = "operator"];
+    int64 duration_seconds = 5 [json_name = "durationSeconds"];
 }
 
 message GmBanResponse {
     int64 uid = 1 [json_name = "uid"];
     bool banned = 2 [json_name = "banned"];
     bool kicked = 3 [json_name = "kicked"];
+    int64 banned_until = 4 [json_name = "bannedUntil"];
+    bool tokens_revoked = 5 [json_name = "tokensRevoked"];
+}
+
+message GmMuteResponse {
+    int64 uid = 1 [json_name = "uid"];
+    bool muted = 2 [json_name = "muted"];
+    int64 muted_until = 3 [json_name = "mutedUntil"];
+}
+
+message GmMaintenanceRequest {
+    bool enabled = 1 [json_name = "enabled"];
+    string reason = 2 [json_name = "reason"];
+    string operator = 3 [json_name = "operator"];
+}
+
+message GmMaintenanceResponse {
+    bool enabled = 1 [json_name = "enabled"];
+    string reason = 2 [json_name = "reason"];
+    int32 kicked = 3 [json_name = "kicked"];
+}
+
+message GmKickAllRequest {}
+
+message GmKickAllResponse {
+    int32 kicked = 1 [json_name = "kicked"];
 }
 
 message GmOnlineRequest {

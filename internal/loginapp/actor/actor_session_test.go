@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"context"
 	"testing"
 
 	"github.com/example/mmo-server/internal/code"
@@ -24,6 +25,37 @@ func TestRejectIfBanned(t *testing.T) {
 	}
 	if c := rejectIfBanned(77); c != code.AccountBanned {
 		t.Fatalf("expected %d, got %d", code.AccountBanned, c)
+	}
+}
+
+func TestRejectIfBannedExpired(t *testing.T) {
+	gdb := persistence.UseMemoryDBForTest(t)
+	acc := model.Account{UID: 78, Nickname: "temp", Password: "hash"}
+	if err := gdb.Create(&acc).Error; err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := persistence.SetAccountBannedFor(78, true, "temp", 60); err != nil {
+		t.Fatal(err)
+	}
+	if err := gdb.Model(&model.Account{}).Where("uid = ?", 78).Update("banned_until", 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if c := rejectIfBanned(78); c != code.OK {
+		t.Fatalf("expected ok after expiry, got %d", c)
+	}
+}
+
+func TestRejectIfMaintenance(t *testing.T) {
+	persistence.UseMemoryDBForTest(t)
+	persistence.UseRedisForTest(t)
+	if c := rejectIfMaintenance(); c != code.OK {
+		t.Fatalf("off got %d", c)
+	}
+	if err := persistence.SaveMaintenance(context.Background(), true, "patch"); err != nil {
+		t.Fatal(err)
+	}
+	if c := rejectIfMaintenance(); c != code.ServerMaintenance {
+		t.Fatalf("on got %d", c)
 	}
 }
 

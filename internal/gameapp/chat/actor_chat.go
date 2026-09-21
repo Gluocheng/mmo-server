@@ -8,6 +8,7 @@ import (
 	cproto "github.com/cherry-game/cherry/net/proto"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/gameapp/world"
+	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -30,6 +31,16 @@ func (p *actorChat) send(session *cproto.Session, req *protocol.ChatSendRequest)
 		p.ResponseCode(session, code.LoginFail)
 		return
 	}
+	muted, err := persistence.IsAccountMuted(session.Uid)
+	if err != nil {
+		clog.Warnf("chat mute check uid=%d err=%v", session.Uid, err)
+		p.ResponseCode(session, code.LoginFail)
+		return
+	}
+	if muted {
+		p.ResponseCode(session, code.ChatMuted)
+		return
+	}
 
 	b := &protocol.ChatBroadcast{
 		Uid:  session.Uid,
@@ -44,4 +55,3 @@ func (p *actorChat) send(session *cproto.Session, req *protocol.ChatSendRequest)
 	clog.Debugf("chat send uid=%d len=%d", session.Uid, len(b.Text))
 	p.Response(session, &emptypb.Empty{})
 }
-

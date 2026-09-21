@@ -19,6 +19,7 @@ type actorGMWorld struct {
 func (p *actorGMWorld) OnInit() {
 	p.Remote().Register("online", p.onlineCluster)
 	p.Remote().Register("notice", p.noticeCluster)
+	p.Remote().Register("maintenance", p.maintenanceCluster)
 }
 
 // onlineCluster 导出当前进场玩家；sceneId=0 为全部场景。
@@ -56,4 +57,28 @@ func (p *actorGMWorld) noticeCluster(req *protocol.GmNoticeRequest) (*protocol.G
 	}
 	persistence.WriteGMOpLog(operator, persistence.GMActionNotice, 0, 0, detail, code.OK)
 	return &protocol.GmNoticeResponse{Pushed: n}, code.OK
+}
+
+// maintenanceCluster 开维护时踢全网关连接；关维护不踢。审计在此写入。
+func (p *actorGMWorld) maintenanceCluster(req *protocol.GmMaintenanceRequest) (*protocol.GmMaintenanceResponse, int32) {
+	operator := ""
+	enabled := false
+	reason := ""
+	if req != nil {
+		operator = req.Operator
+		enabled = req.Enabled
+		reason = strings.TrimSpace(req.Reason)
+	}
+	var kicked int32
+	if enabled {
+		kicked = kickAllOnGates(p)
+	}
+	detail := reason
+	if enabled {
+		detail = "on " + reason
+	} else {
+		detail = "off"
+	}
+	persistence.WriteGMOpLog(operator, persistence.GMActionMaintenance, 0, 0, detail, code.OK)
+	return &protocol.GmMaintenanceResponse{Enabled: enabled, Reason: reason, Kicked: kicked}, code.OK
 }

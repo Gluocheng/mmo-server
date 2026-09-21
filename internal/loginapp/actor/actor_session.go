@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -31,6 +32,9 @@ func (p *ActorSession) OnInit() {
 func (p *ActorSession) issueToken(req *protocol.IssueTokenRequest) (*protocol.IssueTokenResponse, int32) {
 	if req == nil || strings.TrimSpace(req.Nickname) == "" || strings.TrimSpace(req.Password) == "" {
 		return nil, code.LoginFail
+	}
+	if c := rejectIfMaintenance(); c != code.OK {
+		return nil, c
 	}
 	if blocked, err := persistence.IsLoginBlocked(req.ClientIp, req.Nickname); err == nil && blocked {
 		return nil, code.LoginRateLimited
@@ -70,6 +74,9 @@ func (p *ActorSession) authToken(req *protocol.TokenLoginRequest) (*protocol.Tok
 	if req == nil {
 		return nil, code.LoginFail
 	}
+	if c := rejectIfMaintenance(); c != code.OK {
+		return nil, c
+	}
 	accessToken := strings.TrimSpace(req.AccessToken)
 	if accessToken == "" {
 		accessToken = strings.TrimSpace(req.Token)
@@ -103,6 +110,9 @@ func (p *ActorSession) authToken(req *protocol.TokenLoginRequest) (*protocol.Tok
 func (p *ActorSession) refreshToken(req *protocol.RefreshTokenRequest) (*protocol.RefreshTokenResponse, int32) {
 	if req == nil || strings.TrimSpace(req.RefreshToken) == "" {
 		return nil, code.LoginFail
+	}
+	if c := rejectIfMaintenance(); c != code.OK {
+		return nil, c
 	}
 	if uid, err := persistence.PeekRefreshTokenUID(req.RefreshToken); err == nil {
 		if c := rejectIfBanned(uid); c != code.OK {
@@ -149,6 +159,17 @@ func rejectIfBanned(uid int64) int32 {
 	}
 	if banned {
 		return code.AccountBanned
+	}
+	return code.OK
+}
+
+func rejectIfMaintenance() int32 {
+	on, err := persistence.IsMaintenance(context.Background())
+	if err != nil {
+		return code.OK
+	}
+	if on {
+		return code.ServerMaintenance
 	}
 	return code.OK
 }

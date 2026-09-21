@@ -157,7 +157,7 @@ Vue 3 + Naive UI 单页应用由 GM 进程同源托管（构建产物嵌入 `int
 | 本地 `scripts/start.ps1` | [http://127.0.0.1:9080/](http://127.0.0.1:9080/) | `admin` / `admin123` |
 | Docker 预发布 | [http://127.0.0.1:19080/](http://127.0.0.1:19080/) | `admin` / `admin123` |
 
-空表时用环境变量 `GM_BOOTSTRAP_USER` / `GM_BOOTSTRAP_PASSWORD` 种子管理员（脚本与 Docker 默认即上表）。**生产必须改掉默认密码。** 登录后可查账号/角色/背包、发道具、扣道具、封号、踢下线、看在线、发公告、调游戏时间、配表热更、查操作记录；管理员可开运营号。源码在 `web/gm-console/`。`scripts/start.ps1 -Build` 会先 `npm run build`；Docker 镜像构建含 Node 阶段。本地热更新：`cd web/gm-console && npm install && npm run dev`（把 `/gm` 代理到本机 `:9080`）。
+空表时用环境变量 `GM_BOOTSTRAP_USER` / `GM_BOOTSTRAP_PASSWORD` 种子管理员（脚本与 Docker 默认即上表）。**生产必须改掉默认密码。** 登录后可查账号/角色/背包、发道具、扣道具、封号、禁言、踢下线、看在线、发公告、调游戏时间、强制维护、配表热更、查操作记录；管理员可开运营号。源码在 `web/gm-console/`。`scripts/start.ps1 -Build` 会先 `npm run build`；Docker 镜像构建含 Node 阶段。本地热更新：`cd web/gm-console && npm install && npm run dev`（把 `/gm` 代理到本机 `:9080`）。
 
 浏览器走账号密码 + HttpOnly Cookie。脚本/CI 仍可用共享密钥：请求头 `X-GM-Token` 或 `Authorization: Bearer`（默认 `dev-gm-token`，记审计操作者为 `system`）。`GET /gm/health` 与登录接口免鉴权。写操作的 `operator` 来自会话用户名，不再信任 `X-GM-Operator`。
 
@@ -206,9 +206,17 @@ curl.exe -X POST http://127.0.0.1:9080/gm/player/kick `
 
 curl.exe -X POST http://127.0.0.1:9080/gm/account/ban `
   -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
-  -d '{"uid":100,"reason":"cheat"}'
+  -d '{"uid":100,"reason":"cheat","durationSeconds":3600}'
 
 curl.exe -X POST http://127.0.0.1:9080/gm/account/unban `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"uid":100}'
+
+curl.exe -X POST http://127.0.0.1:9080/gm/account/mute `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"uid":100,"reason":"spam","durationSeconds":600}'
+
+curl.exe -X POST http://127.0.0.1:9080/gm/account/unmute `
   -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
   -d '{"uid":100}'
 
@@ -221,9 +229,14 @@ curl.exe -G http://127.0.0.1:9080/gm/time -H "X-GM-Token: dev-gm-token"
 curl.exe -X POST http://127.0.0.1:9080/gm/time `
   -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
   -d '{"biasSeconds":3600}'
+
+curl.exe -G http://127.0.0.1:9080/gm/maintenance -H "X-GM-Token: dev-gm-token"
+curl.exe -X POST http://127.0.0.1:9080/gm/maintenance `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"enabled":true,"reason":"patch"}'
 ```
 
-Docker 预发布 GM 端口为 `19080`。发奖/扣道具不要求玩家在线；已进场则会 Push `onBagChange`。踢人只断连接；封号后无法签发或刷新 token（`40033`）。公告 Push `onNotice`。调时间写入 Redis 并热更新 game 与 login（`-login` 默认 `login-1`）。
+Docker 预发布 GM 端口为 `19080`。发奖/扣道具不要求玩家在线；已进场则会 Push `onBagChange`。踢人只断连接；封号后无法签发或刷新 token（`40033`）并吊销该 uid 已签发 token。禁言后发聊天返回 `40034`。维护中登录/鉴权/刷新返回 `40035` 并踢全连接。公告 Push `onNotice`。调时间写入 Redis 并热更新 game 与 login（`-login` 默认 `login-1`）。
 
 ### 通信链路
 
@@ -297,7 +310,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40033`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40035`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -336,6 +349,8 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40031 | `GmTargetNotFound`    | GM 目标账号或角色不存在 |
 | 40032 | `GmForbidden`         | GM 非管理员访问管号等接口 |
 | 40033 | `AccountBanned`       | 账号已封禁（登录/刷新/鉴权） |
+| 40034 | `ChatMuted`           | 账号禁言中（发聊天） |
+| 40035 | `ServerMaintenance`   | 服务器维护中（登录/刷新/鉴权） |
 
 
 ### 重新生成 Protobuf Go 代码
