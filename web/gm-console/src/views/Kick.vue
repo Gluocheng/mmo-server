@@ -9,7 +9,7 @@
       <n-input v-model:value="value" :placeholder="mode" />
       <n-button type="error" :loading="busy" @click="submit">踢下线</n-button>
       <n-alert v-if="error" type="error">{{ error }}</n-alert>
-      <pre v-if="text" class="result-pre">{{ text }}</pre>
+      <n-alert v-if="ok" type="success">{{ ok }}</n-alert>
     </n-space>
   </n-card>
 </template>
@@ -17,17 +17,18 @@
 <script setup>
 import { ref } from 'vue'
 import { useDialog } from 'naive-ui'
-import { apiPost, formatResult } from '../api.js'
+import { apiPost } from '../api.js'
 
 const dialog = useDialog()
 const mode = ref('uid')
 const value = ref('')
 const busy = ref(false)
-const text = ref('')
 const error = ref('')
+const ok = ref('')
 
 async function submit() {
   error.value = ''
+  ok.value = ''
   const n = Number(value.value)
   if (!n) {
     error.value = '请填写有效 ID'
@@ -48,10 +49,11 @@ async function doKick(n) {
   try {
     const body = mode.value === 'uid' ? { uid: n } : { playerId: n }
     const data = await apiPost('/gm/player/kick', body)
-    text.value = formatResult(data)
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
+      return
     }
+    ok.value = data.kicked ? `已踢下线，uid=${data.uid || n}` : '目标当前不在线'
   } catch (e) {
     error.value = e.message || '请求失败'
   } finally {

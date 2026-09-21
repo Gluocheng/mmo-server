@@ -191,6 +191,7 @@ curl.exe -X POST http://127.0.0.1:9080/gm/config/reload `
 curl.exe -G http://127.0.0.1:9080/gm/account -H "X-GM-Token: dev-gm-token" --data-urlencode "nickname=alice"
 curl.exe -G http://127.0.0.1:9080/gm/player -H "X-GM-Token: dev-gm-token" --data-urlencode "playerId=1"
 curl.exe -G http://127.0.0.1:9080/gm/bag -H "X-GM-Token: dev-gm-token" -d "playerId=1" -d "bagType=2"
+curl.exe -G http://127.0.0.1:9080/gm/config/catalog -H "X-GM-Token: dev-gm-token"
 
 curl.exe -X POST http://127.0.0.1:9080/gm/bag/grant `
   -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `

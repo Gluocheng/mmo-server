@@ -4,14 +4,3 @@ body,
   margin: 0;
   height: 100%;
 }
-
-.result-pre {
-  margin: 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: #111827;
-  color: #e5e7eb;
-  overflow: auto;
-  font-size: 13px;
-  line-height: 1.45;
-}

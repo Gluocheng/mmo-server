@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/example/mmo-server/gameconfig/pkg/schema"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/persistence"
 )
@@ -202,6 +203,7 @@ func TestP1RoutesRequireAuth(t *testing.T) {
 		path   string
 		body   string
 	}{
+		{http.MethodGet, "/gm/config/catalog", ""},
 		{http.MethodPost, "/gm/bag/deduct", `{"playerId":1,"itemId":1}`},
 		{http.MethodPost, "/gm/account/ban", `{"uid":1}`},
 		{http.MethodPost, "/gm/account/mute", `{"uid":1}`},
@@ -353,5 +355,35 @@ func TestLoginSessionAndAdminGate(t *testing.T) {
 	mux.ServeHTTP(logsRec, logs)
 	if logsRec.Code != http.StatusOK {
 		t.Fatalf("logs status=%d body=%s", logsRec.Code, logsRec.Body.String())
+	}
+}
+
+func TestConfigCatalogListsNames(t *testing.T) {
+	gdb := persistence.UseMemoryDBForTest(t)
+	if err := gdb.Create(&schema.CfgBagType{ID: 2, Name: "消耗品", SlotCount: 32}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := gdb.Create(&schema.CfgItem{
+		ID: 1001, Name: "小型生命药水", Type: "consumable", MaxStack: 99, Stackable: true, Discardable: true, BindType: "none", BagType: 2,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	mux := testMux("secret")
+	req := httptest.NewRequest(http.MethodGet, "/gm/config/catalog", nil)
+	req.Header.Set("X-GM-Token", "secret")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var rsp catalogRsp
+	if err := json.Unmarshal(rec.Body.Bytes(), &rsp); err != nil {
+		t.Fatal(err)
+	}
+	if rsp.Code != 0 || len(rsp.BagTypes) != 1 || rsp.BagTypes[0].Name != "消耗品" {
+		t.Fatalf("bagTypes=%+v", rsp.BagTypes)
+	}
+	if len(rsp.Items) != 1 || rsp.Items[0].Name != "小型生命药水" {
+		t.Fatalf("items=%+v", rsp.Items)
 	}
 }

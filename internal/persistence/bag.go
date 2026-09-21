@@ -122,9 +122,10 @@ func bagListFromModels(models []model.InventoryItem) *protocol.BagListResponse {
 			continue
 		}
 		rsp.Items = append(rsp.Items, &protocol.BagItem{
-			Slot:   m.Slot,
-			ItemId: m.ItemID,
-			Count:  m.Count,
+			Slot:    m.Slot,
+			ItemId:  m.ItemID,
+			Count:   m.Count,
+			BagType: m.BagType,
 		})
 	}
 	return rsp

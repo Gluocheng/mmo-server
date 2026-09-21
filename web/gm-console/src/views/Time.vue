@@ -14,7 +14,7 @@
         <n-button :loading="busy" @click="resetBias">偏置归零</n-button>
       </n-space>
       <n-alert v-if="error" type="error">{{ error }}</n-alert>
-      <pre v-if="text" class="result-pre">{{ text }}</pre>
+      <n-alert v-if="ok" type="success">{{ ok }}</n-alert>
     </n-space>
   </n-card>
 </template>
@@ -22,21 +22,21 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useDialog } from 'naive-ui'
-import { apiGet, apiPost, formatResult, formatUnix } from '../api.js'
+import { apiGet, apiPost, formatUnix } from '../api.js'
 
 const dialog = useDialog()
 const busy = ref(false)
 const error = ref('')
-const text = ref('')
+const ok = ref('')
 const info = ref(null)
 const addSeconds = ref('3600')
 
 async function load() {
   error.value = ''
+  ok.value = ''
   busy.value = true
   try {
     const data = await apiGet('/gm/time')
-    text.value = formatResult(data)
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
       return
@@ -81,12 +81,12 @@ async function setBias(sec) {
   busy.value = true
   try {
     const data = await apiPost('/gm/time', { biasSeconds: sec })
-    text.value = formatResult(data)
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
       return
     }
     info.value = data
+    ok.value = '时间偏置已更新'
   } catch (e) {
     error.value = e.message || '请求失败'
   } finally {

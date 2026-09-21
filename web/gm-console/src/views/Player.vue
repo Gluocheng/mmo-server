@@ -8,34 +8,35 @@
       </n-radio-group>
       <n-input v-model:value="value" :placeholder="mode" @keyup.enter="query" />
       <n-button type="primary" :loading="busy" @click="query">查询</n-button>
-      <n-data-table v-if="rows.length" :columns="columns" :data="rows" :bordered="true" />
       <n-alert v-if="error" type="error">{{ error }}</n-alert>
-      <pre v-if="text" class="result-pre">{{ text }}</pre>
+      <n-data-table v-if="rows.length" :columns="columns" :data="rows" :bordered="true" />
+      <n-empty v-else-if="queried && !error" description="没有角色" />
     </n-space>
   </n-card>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { apiGet, formatResult, formatUnix } from '../api.js'
+import { apiGet, formatUnix } from '../api.js'
 
 const mode = ref('playerId')
 const value = ref('')
 const busy = ref(false)
-const text = ref('')
 const error = ref('')
+const queried = ref(false)
 const rows = ref([])
 const columns = [
-  { title: 'playerId', key: 'playerId' },
-  { title: 'uid', key: 'uid' },
-  { title: '名称', key: 'name' },
+  { title: '角色 ID', key: 'playerId' },
+  { title: '账号 UID', key: 'uid' },
+  { title: '角色名', key: 'name' },
   { title: '已删除', key: 'deleted', render(row) { return row.deleted ? '是' : '否' } },
-  { title: '创建时间', key: 'createdAtUnix', render: (row) => formatUnix(row.createdAtUnix) },
+  { title: '创建时间', key: 'createdAtUnix', render: (row) => formatUnix(row.createdAtUnix) || '—' },
 ]
 
 async function query() {
   error.value = ''
   rows.value = []
+  queried.value = false
   if (!value.value.trim()) {
     error.value = '请填写查询条件'
     return
@@ -43,7 +44,7 @@ async function query() {
   busy.value = true
   try {
     const data = await apiGet(`/gm/player?${mode.value}=${encodeURIComponent(value.value.trim())}`)
-    text.value = formatResult(data)
+    queried.value = true
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
     } else if (Array.isArray(data.list)) {

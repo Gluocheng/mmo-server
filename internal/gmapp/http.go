@@ -107,6 +107,7 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/gm/users/password", a.requireAdmin(a.handleUsersPassword))
 	mux.HandleFunc("/gm/ops/logs", a.requireAuth(a.handleOpsLogs))
 	mux.HandleFunc("/gm/config/reload", a.requireAuth(a.handleConfigReload))
+	mux.HandleFunc("/gm/config/catalog", a.requireAuth(a.handleConfigCatalog))
 	mux.HandleFunc("/gm/account", a.requireAuth(a.handleAccount))
 	mux.HandleFunc("/gm/player", a.requireAuth(a.handlePlayer))
 	mux.HandleFunc("/gm/bag", a.requireAuth(a.handleBagQuery))
@@ -136,6 +137,51 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 		RemoteSubject: a.remoteSubject,
 		TargetPath:    a.targetPath,
 	})
+}
+
+type catalogBagType struct {
+	ID        int32  `json:"id"`
+	Name      string `json:"name"`
+	SlotCount int32  `json:"slotCount"`
+}
+
+type catalogItem struct {
+	ID      int32  `json:"id"`
+	Name    string `json:"name"`
+	BagType int32  `json:"bagType"`
+}
+
+type catalogRsp struct {
+	Code     int32            `json:"code"`
+	Message  string           `json:"message"`
+	BagTypes []catalogBagType `json:"bagTypes"`
+	Items    []catalogItem    `json:"items"`
+}
+
+// handleConfigCatalog 返回配表中的背包类型与道具名，供控制台下拉与表格展示。
+func (a *App) handleConfigCatalog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use GET"})
+		return
+	}
+	bags, err := persistence.ListCfgBagTypes()
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, errorRsp{Code: -1, Message: "list bag types: " + err.Error()})
+		return
+	}
+	items, err := persistence.ListCfgItems()
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, errorRsp{Code: -1, Message: "list items: " + err.Error()})
+		return
+	}
+	out := catalogRsp{Code: 0, Message: "ok", BagTypes: make([]catalogBagType, 0, len(bags)), Items: make([]catalogItem, 0, len(items))}
+	for _, b := range bags {
+		out.BagTypes = append(out.BagTypes, catalogBagType{ID: b.ID, Name: b.Name, SlotCount: b.SlotCount})
+	}
+	for _, it := range items {
+		out.Items = append(out.Items, catalogItem{ID: it.ID, Name: it.Name, BagType: it.BagType})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *App) handleConfigReload(w http.ResponseWriter, r *http.Request) {

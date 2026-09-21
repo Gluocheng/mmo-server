@@ -11,7 +11,7 @@
       />
       <n-button type="primary" :loading="busy" @click="submit">发送</n-button>
       <n-alert v-if="error" type="error">{{ error }}</n-alert>
-      <pre v-if="result" class="result-pre">{{ result }}</pre>
+      <n-alert v-if="ok" type="success">{{ ok }}</n-alert>
     </n-space>
   </n-card>
 </template>
@@ -19,17 +19,18 @@
 <script setup>
 import { ref } from 'vue'
 import { useDialog } from 'naive-ui'
-import { apiPost, formatResult } from '../api.js'
+import { apiPost } from '../api.js'
 
 const dialog = useDialog()
 const sceneId = ref('')
 const text = ref('')
 const busy = ref(false)
 const error = ref('')
-const result = ref('')
+const ok = ref('')
 
 function submit() {
   error.value = ''
+  ok.value = ''
   const bodyText = text.value.trim()
   if (!bodyText) {
     error.value = '公告内容不能为空'
@@ -50,10 +51,11 @@ async function doSend(sid, bodyText) {
   busy.value = true
   try {
     const data = await apiPost('/gm/notice', { sceneId: sid, text: bodyText })
-    result.value = formatResult(data)
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
+      return
     }
+    ok.value = `已发送，推送给 ${data.pushed ?? 0} 名在线玩家`
   } catch (e) {
     error.value = e.message || '请求失败'
   } finally {

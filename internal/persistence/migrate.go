@@ -87,6 +87,8 @@ func migrateInventorySlots(db *gorm.DB) error {
 	if err := db.Order("player_id asc, id asc").Find(&items).Error; err != nil {
 		return err
 	}
+	// 唯一索引已在则槽位已合法；再按 player 压槽会与 (player,bag,slot) 冲突。
+	hasSlotUnique := db.Migrator().HasIndex(&model.InventoryItem{}, "idx_player_bag_slot")
 	nextSlot := make(map[int64]int32)
 	for i := range items {
 		item := &items[i]
@@ -99,13 +101,16 @@ func migrateInventorySlots(db *gorm.DB) error {
 			}
 			updates["bag_type"] = bt
 		}
-		if item.Slot != slot {
+		if !hasSlotUnique && item.Slot != slot {
 			updates["slot"] = slot
 		}
 		if len(updates) > 0 {
 			if err := db.Model(item).Updates(updates).Error; err != nil {
 				return err
 			}
+		}
+		if hasSlotUnique {
+			continue
 		}
 		nextSlot[item.PlayerID] = slot + 1
 	}

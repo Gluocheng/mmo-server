@@ -22,7 +22,25 @@
         <n-button :disabled="!accountUid" :loading="busy" @click="onUnmute">解禁</n-button>
       </n-space>
       <n-alert v-if="error" type="error">{{ error }}</n-alert>
-      <pre v-if="text" class="result-pre">{{ text }}</pre>
+      <n-descriptions v-if="last" bordered :column="2" size="small" label-placement="left">
+        <n-descriptions-item label="UID">{{ last.uid }}</n-descriptions-item>
+        <n-descriptions-item label="昵称">{{ last.nickname || '—' }}</n-descriptions-item>
+        <n-descriptions-item label="创建时间">{{ formatUnix(last.createdAtUnix) || '—' }}</n-descriptions-item>
+        <n-descriptions-item label="封号状态">
+          <n-tag :type="last.banned ? 'error' : 'success'" size="small">
+            {{ last.banned ? '已封禁' : '正常' }}
+          </n-tag>
+        </n-descriptions-item>
+        <n-descriptions-item label="封号截止">{{ formatLimit(last.banned, last.bannedUntil) }}</n-descriptions-item>
+        <n-descriptions-item label="封号原因">{{ last.banReason || '—' }}</n-descriptions-item>
+        <n-descriptions-item label="禁言状态">
+          <n-tag :type="last.muted ? 'warning' : 'success'" size="small">
+            {{ last.muted ? '已禁言' : '正常' }}
+          </n-tag>
+        </n-descriptions-item>
+        <n-descriptions-item label="禁言截止">{{ formatLimit(last.muted, last.mutedUntil) }}</n-descriptions-item>
+        <n-descriptions-item label="禁言原因">{{ last.muteReason || '—' }}</n-descriptions-item>
+      </n-descriptions>
     </n-space>
   </n-card>
 </template>
@@ -30,7 +48,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useDialog } from 'naive-ui'
-import { apiGet, apiPost, formatResult } from '../api.js'
+import { apiGet, apiPost, formatUnix } from '../api.js'
 
 const dialog = useDialog()
 const mode = ref('nickname')
@@ -39,11 +57,21 @@ const uid = ref('')
 const reason = ref('')
 const duration = ref('')
 const busy = ref(false)
-const text = ref('')
 const error = ref('')
 const last = ref(null)
 
 const accountUid = computed(() => (last.value && last.value.uid ? last.value.uid : 0))
+
+function formatLimit(active, until) {
+  if (!active) {
+    return '—'
+  }
+  const n = Number(until) || 0
+  if (n <= 0) {
+    return '永久'
+  }
+  return formatUnix(n) || '—'
+}
 
 function parseDuration() {
   const raw = duration.value.trim()
@@ -71,7 +99,6 @@ async function query() {
   busy.value = true
   try {
     const data = await apiGet(`/gm/account?${qs}`)
-    text.value = formatResult(data)
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
       return
@@ -153,7 +180,6 @@ async function doBan(ban, id, sec) {
       }
     }
     const data = await apiPost(path, body)
-    text.value = formatResult(data)
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
     } else {
@@ -179,7 +205,6 @@ async function doMute(mute, id, sec) {
       }
     }
     const data = await apiPost(path, body)
-    text.value = formatResult(data)
     if (data.code && data.code !== 0) {
       error.value = data.message || `业务码 ${data.code}`
     } else {

@@ -28,15 +28,6 @@ export function apiPost(path, body) {
   return apiFetch(path, { method: 'POST', body: JSON.stringify(body) })
 }
 
-export function formatResult(data) {
-  if (!data) {
-    return ''
-  }
-  const copy = { ...data }
-  delete copy._http
-  return JSON.stringify(copy, null, 2)
-}
-
 export function formatUnix(sec) {
   if (!sec) {
     return ''
