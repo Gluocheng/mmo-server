@@ -91,6 +91,39 @@ func VerifyAccessToken(token, requestDeviceID string) (int64, string, error) {
 	return VerifyAccessTokenContext(context.Background(), token, requestDeviceID)
 }
 
+// PeekRefreshTokenUID 读取 refresh token 对应 uid，不消费该 token。
+func PeekRefreshTokenUID(refreshToken string) (int64, error) {
+	return PeekRefreshTokenUIDContext(context.Background(), refreshToken)
+}
+
+// PeekRefreshTokenUIDContext 读取 refresh token 对应 uid。
+func PeekRefreshTokenUIDContext(parent context.Context, refreshToken string) (int64, error) {
+	if err := Init(); err != nil {
+		return 0, err
+	}
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return 0, ErrRefreshTokenInvalid
+	}
+	if rdb == nil {
+		return 0, fmt.Errorf("redis unavailable")
+	}
+	ctx, cancel := opContext(parent)
+	defer cancel()
+	raw, err := rdb.Get(ctx, refreshTokenKey(refreshToken)).Result()
+	if err == redis.Nil {
+		return 0, ErrRefreshTokenInvalid
+	}
+	if err != nil {
+		return 0, err
+	}
+	uid, _, err := parseTokenValue(raw)
+	if err != nil || uid < 1 {
+		return 0, ErrRefreshTokenInvalid
+	}
+	return uid, nil
+}
+
 func RotateTokenPairByRefreshTokenContext(parent context.Context, refreshToken string) (accessToken string, accessExpireAt int64, newRefreshToken string, refreshExpireAt int64, deviceID string, err error) {
 	if err = Init(); err != nil {
 		return "", 0, "", 0, "", err

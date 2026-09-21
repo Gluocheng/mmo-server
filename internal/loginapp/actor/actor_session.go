@@ -6,6 +6,7 @@ import (
 
 	cactor "github.com/cherry-game/cherry/net/actor"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gtime"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 )
@@ -24,6 +25,7 @@ func (p *ActorSession) OnInit() {
 	p.Remote().Register("authToken", p.authToken)
 	p.Remote().Register("refreshToken", p.refreshToken)
 	p.Remote().Register("logout", p.logout)
+	p.Remote().Register("setGameTime", p.setGameTime)
 }
 
 func (p *ActorSession) issueToken(req *protocol.IssueTokenRequest) (*protocol.IssueTokenResponse, int32) {
@@ -46,6 +48,9 @@ func (p *ActorSession) issueToken(req *protocol.IssueTokenRequest) (*protocol.Is
 			return nil, code.InvalidPassword
 		}
 		return nil, code.LoginFail
+	}
+	if c := rejectIfBanned(uid); c != code.OK {
+		return nil, c
 	}
 	_ = persistence.ClearLoginFailure(req.ClientIp, req.Nickname)
 	accessToken, accessExpireAt, refreshToken, refreshExpireAt, err := persistence.IssueTokenPair(uid, deviceID)
@@ -89,12 +94,20 @@ func (p *ActorSession) authToken(req *protocol.TokenLoginRequest) (*protocol.Tok
 		}
 		return nil, code.LoginFail
 	}
+	if c := rejectIfBanned(uid); c != code.OK {
+		return nil, c
+	}
 	return &protocol.TokenLoginResponse{Uid: uid}, code.OK
 }
 
 func (p *ActorSession) refreshToken(req *protocol.RefreshTokenRequest) (*protocol.RefreshTokenResponse, int32) {
 	if req == nil || strings.TrimSpace(req.RefreshToken) == "" {
 		return nil, code.LoginFail
+	}
+	if uid, err := persistence.PeekRefreshTokenUID(req.RefreshToken); err == nil {
+		if c := rejectIfBanned(uid); c != code.OK {
+			return nil, c
+		}
 	}
 	accessToken, accessExpireAt, refreshToken, refreshExpireAt, _, err := persistence.RotateTokenPairByRefreshToken(req.RefreshToken)
 	if err != nil {
@@ -127,4 +140,28 @@ func (p *ActorSession) logout(req *protocol.LogoutRequest) (*protocol.LogoutResp
 		return nil, code.LoginFail
 	}
 	return &protocol.LogoutResponse{Ok: true}, code.OK
+}
+
+func rejectIfBanned(uid int64) int32 {
+	banned, err := persistence.IsAccountBanned(uid)
+	if err != nil {
+		return code.LoginFail
+	}
+	if banned {
+		return code.AccountBanned
+	}
+	return code.OK
+}
+
+// setGameTime 热更新本进程游戏时间偏置（Redis 已由 GM 写入）。
+func (p *ActorSession) setGameTime(req *protocol.GmTimeSetRequest) (*protocol.GmTimeGetResponse, int32) {
+	if req == nil || req.BiasSeconds < 0 {
+		return nil, code.GmBadRequest
+	}
+	gtime.SetBiasSeconds(req.BiasSeconds)
+	return &protocol.GmTimeGetResponse{
+		BiasSeconds: gtime.BiasSeconds(),
+		UnixNow:     gtime.UnixNow(),
+		RealUnixNow: gtime.RealNow().Unix(),
+	}, code.OK
 }

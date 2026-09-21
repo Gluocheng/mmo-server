@@ -69,7 +69,7 @@ function Ensure-Binaries {
         return
     }
     Ensure-GmConsole
-    Write-Host "[build] compiling four nodes..."
+    Write-Host "[build] compiling five nodes..."
     Ensure-Dir (Join-Path $root "bin")
     foreach ($t in $targets) {
         $out = Join-Path $root ("bin/{0}.exe" -f $t.Name)
@@ -126,15 +126,23 @@ function Start-GMNode {
     }
     if (-not $env:GM_BOOTSTRAP_USER) { $env:GM_BOOTSTRAP_USER = "admin" }
     if (-not $env:GM_BOOTSTRAP_PASSWORD) { $env:GM_BOOTSTRAP_PASSWORD = "admin123" }
-    $args = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode", "-path=$Profile", "-token=dev-gm-token")
+    $procArgs = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode", "-login=login-1", "-path=$Profile", "-token=dev-gm-token")
+    $errLog = Join-Path $root "logs/gm.stderr.log"
+    if (Test-Path $errLog) { Remove-Item $errLog -Force }
     Start-Process `
         -FilePath $exe `
-        -ArgumentList $args `
+        -ArgumentList $procArgs `
         -WorkingDirectory $root `
-        -WindowStyle Hidden | Out-Null
+        -WindowStyle Hidden `
+        -RedirectStandardError $errLog | Out-Null
     Start-Sleep -Seconds $WaitSec
     if (-not (Get-Process -Name $procName -ErrorAction SilentlyContinue)) {
-        throw "[gm] failed to start, see logs/gm.log"
+        $detail = ""
+        if (Test-Path $errLog) { $detail = (Get-Content $errLog -Raw).Trim() }
+        if ($detail) {
+            throw "[gm] failed to start: $detail"
+        }
+        throw "[gm] failed to start, see logs/gm.log (recompile with -Build if binary is stale)"
     }
     Write-Host "[gm] started (http=$HTTPAddr, game=$GameNode)."
 }
@@ -153,10 +161,10 @@ function Start-MMONode {
     if (-not (Test-Path $exe)) {
         throw "binary not found: $exe (run with -Build)"
     }
-    $args = @("-path=$Profile", "-node=$NodeID")
+    $procArgs = @("-path=$Profile", "-node=$NodeID")
     Start-Process `
         -FilePath $exe `
-        -ArgumentList $args `
+        -ArgumentList $procArgs `
         -WorkingDirectory $root `
         -WindowStyle Hidden | Out-Null
     Start-Sleep -Seconds $WaitSec

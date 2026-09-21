@@ -6,10 +6,13 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	clog "github.com/cherry-game/cherry/logger"
 	cproto "github.com/cherry-game/cherry/net/proto"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gtime"
+	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -58,6 +61,29 @@ type kickReq struct {
 	PlayerId int64 `json:"playerId"`
 }
 
+type deductReq struct {
+	PlayerId int64  `json:"playerId"`
+	ItemId   *int32 `json:"itemId"`
+	Slot     *int32 `json:"slot"`
+	Count    int32  `json:"count"`
+	BagType  int32  `json:"bagType"`
+}
+
+type banReq struct {
+	Uid      int64  `json:"uid"`
+	Nickname string `json:"nickname"`
+	Reason   string `json:"reason"`
+}
+
+type noticeReq struct {
+	SceneId int32  `json:"sceneId"`
+	Text    string `json:"text"`
+}
+
+type timeSetReq struct {
+	BiasSeconds int64 `json:"biasSeconds"`
+}
+
 func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/gm/health", a.handleHealth)
 	mux.HandleFunc("/gm/auth/login", a.handleLogin)
@@ -78,7 +104,13 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/gm/player", a.requireAuth(a.handlePlayer))
 	mux.HandleFunc("/gm/bag", a.requireAuth(a.handleBagQuery))
 	mux.HandleFunc("/gm/bag/grant", a.requireAuth(a.handleBagGrant))
+	mux.HandleFunc("/gm/bag/deduct", a.requireAuth(a.handleBagDeduct))
 	mux.HandleFunc("/gm/player/kick", a.requireAuth(a.handleKick))
+	mux.HandleFunc("/gm/account/ban", a.requireAuth(a.handleAccountBan))
+	mux.HandleFunc("/gm/account/unban", a.requireAuth(a.handleAccountUnban))
+	mux.HandleFunc("/gm/world/online", a.requireAuth(a.handleWorldOnline))
+	mux.HandleFunc("/gm/notice", a.requireAuth(a.handleNotice))
+	mux.HandleFunc("/gm/time", a.requireAuth(a.handleTime))
 	mux.Handle("/", spaHandler())
 }
 
@@ -233,6 +265,162 @@ func (a *App) handleKick(w http.ResponseWriter, r *http.Request) {
 		Operator: operatorFrom(r),
 	})
 	a.writeProtoResult(w, "player.kick", err, rsp, &protocol.GmKickResponse{})
+}
+
+func (a *App) handleBagDeduct(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use POST"})
+		return
+	}
+	var req deductReq
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: err.Error()})
+		return
+	}
+	itemSet := req.ItemId != nil && *req.ItemId > 0
+	slotSet := req.Slot != nil
+	if req.PlayerId < 1 || itemSet == slotSet {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "playerId required; provide exactly one of itemId or slot"})
+		return
+	}
+	pbReq := &protocol.GmDeductRequest{
+		PlayerId: req.PlayerId,
+		Count:    req.Count,
+		BagType:  req.BagType,
+		Operator: operatorFrom(r),
+	}
+	if itemSet {
+		pbReq.ItemId = *req.ItemId
+	} else {
+		pbReq.Slot = *req.Slot
+	}
+	rsp, err := a.callRemote("bag", "deduct", pbReq)
+	a.writeProtoResult(w, "bag.deduct", err, rsp, &protocol.GmGrantResponse{})
+}
+
+func (a *App) handleAccountBan(w http.ResponseWriter, r *http.Request) {
+	a.handleAccountBanState(w, r, true)
+}
+
+func (a *App) handleAccountUnban(w http.ResponseWriter, r *http.Request) {
+	a.handleAccountBanState(w, r, false)
+}
+
+func (a *App) handleAccountBanState(w http.ResponseWriter, r *http.Request, ban bool) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use POST"})
+		return
+	}
+	var req banReq
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: err.Error()})
+		return
+	}
+	uidSet := req.Uid > 0
+	nickSet := strings.TrimSpace(req.Nickname) != ""
+	if uidSet == nickSet {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "provide exactly one of uid or nickname"})
+		return
+	}
+	fn := "unban"
+	if ban {
+		fn = "ban"
+	}
+	rsp, err := a.callRemote("account", fn, &protocol.GmBanRequest{
+		Uid:      req.Uid,
+		Nickname: req.Nickname,
+		Reason:   req.Reason,
+		Operator: operatorFrom(r),
+	})
+	a.writeProtoResult(w, "account."+fn, err, rsp, &protocol.GmBanResponse{})
+}
+
+func (a *App) handleWorldOnline(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use GET"})
+		return
+	}
+	sceneID, _ := parseInt32Query(r, "sceneId")
+	rsp, err := a.callRemote("world", "online", &protocol.GmOnlineRequest{SceneId: sceneID})
+	a.writeProtoResult(w, "world.online", err, rsp, &protocol.GmOnlineResponse{})
+}
+
+func (a *App) handleNotice(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use POST"})
+		return
+	}
+	var req noticeReq
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: err.Error()})
+		return
+	}
+	if strings.TrimSpace(req.Text) == "" {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "text required"})
+		return
+	}
+	rsp, err := a.callRemote("world", "notice", &protocol.GmNoticeRequest{
+		SceneId:  req.SceneId,
+		Text:     strings.TrimSpace(req.Text),
+		Operator: operatorFrom(r),
+	})
+	a.writeProtoResult(w, "world.notice", err, rsp, &protocol.GmNoticeResponse{})
+}
+
+func (a *App) handleTime(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		a.writeTimeJSON(w, false, false, false)
+	case http.MethodPost:
+		a.handleTimeSet(w, r)
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, errorRsp{Code: -1, Message: "method not allowed, use GET or POST"})
+	}
+}
+
+func (a *App) handleTimeSet(w http.ResponseWriter, r *http.Request) {
+	var req timeSetReq
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: err.Error()})
+		return
+	}
+	if req.BiasSeconds < 0 {
+		writeJSON(w, http.StatusBadRequest, errorRsp{Code: code.GmBadRequest, Message: "biasSeconds must be >= 0"})
+		return
+	}
+	if err := persistence.SaveTimeBias(r.Context(), req.BiasSeconds); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, errorRsp{Code: -1, Message: "save time bias: " + err.Error()})
+		return
+	}
+	pbReq := &protocol.GmTimeSetRequest{BiasSeconds: req.BiasSeconds, Operator: operatorFrom(r)}
+	gameOK := false
+	if rsp, err := a.callRemote("time", "set", pbReq); err == nil && rsp.Code == 0 {
+		gameOK = true
+	} else if err != nil {
+		logRemoteErr("time.set.game", err)
+	}
+	loginOK := false
+	if rsp, err := a.callLogin("setGameTime", pbReq); err == nil && rsp.Code == 0 {
+		loginOK = true
+	} else if err != nil {
+		logRemoteErr("time.set.login", err)
+	}
+	a.writeTimeJSON(w, true, gameOK, loginOK)
+}
+
+func (a *App) writeTimeJSON(w http.ResponseWriter, withFlags, gameUpdated, loginUpdated bool) {
+	out := map[string]any{
+		"code":        int32(0),
+		"message":     "ok",
+		"biasSeconds": gtime.BiasSeconds(),
+		"unixNow":     gtime.UnixNow(),
+		"realUnixNow": gtime.RealNow().Unix(),
+	}
+	if withFlags {
+		out["gameUpdated"] = gameUpdated
+		out["loginUpdated"] = loginUpdated
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *App) writeRemoteErr(w http.ResponseWriter, op string, err error) bool {

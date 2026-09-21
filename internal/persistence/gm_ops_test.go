@@ -96,3 +96,33 @@ func TestWriteGMOpLog(t *testing.T) {
 		t.Fatalf("unexpected row %+v", row)
 	}
 }
+
+func TestAccountBanAndQuery(t *testing.T) {
+	resetDBForTest(t)
+	seedGMAccountPlayer(t, 21, "banned", 401, "hero", false)
+
+	found, err := SetAccountBanned(21, true, "cheat")
+	if err != nil || !found {
+		t.Fatalf("ban: found=%v err=%v", found, err)
+	}
+	ok, err := IsAccountBanned(21)
+	if err != nil || !ok {
+		t.Fatalf("is banned: ok=%v err=%v", ok, err)
+	}
+	view, found, err := GetAccountByUID(21)
+	if err != nil || !found || !view.Banned || view.BanReason != "cheat" {
+		t.Fatalf("view after ban: %+v found=%v err=%v", view, found, err)
+	}
+	found, err = SetAccountBanned(21, false, "ignored")
+	if err != nil || !found {
+		t.Fatalf("unban: found=%v err=%v", found, err)
+	}
+	ok, err = IsAccountBanned(21)
+	if err != nil || ok {
+		t.Fatalf("expected unbanned, ok=%v err=%v", ok, err)
+	}
+	view, found, err = GetAccountByUID(21)
+	if err != nil || !found || view.Banned || view.BanReason != "" {
+		t.Fatalf("view after unban: %+v found=%v err=%v", view, found, err)
+	}
+}

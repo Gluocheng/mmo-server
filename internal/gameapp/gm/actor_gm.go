@@ -29,6 +29,10 @@ func (p *ActorGM) OnFindChild(msg *cfacade.Message) (cfacade.IActor, bool) {
 		childActor, err = p.Child().Create(childID, &actorGMPlayer{})
 	case "bag":
 		childActor, err = p.Child().Create(childID, &actorGMBag{})
+	case "world":
+		childActor, err = p.Child().Create(childID, &actorGMWorld{})
+	case "time":
+		childActor, err = p.Child().Create(childID, &actorGMTime{})
 	default:
 		clog.Warnf("gm: unknown domain %s", childID)
 		return nil, false

@@ -3,10 +3,8 @@ package gm
 import (
 	"strings"
 
-	cfacade "github.com/cherry-game/cherry/facade"
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
-	cproto "github.com/cherry-game/cherry/net/proto"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/persistence"
@@ -93,22 +91,8 @@ func (p *actorGMPlayer) kickCluster(req *protocol.GmKickRequest) (*protocol.GmKi
 		uid = rec.Uid
 	}
 	_, inRoom := world.AgentPath(uid)
-	p.kickUIDOnGates(uid)
+	kickUIDOnGates(p, uid)
 	rsp := &protocol.GmKickResponse{Uid: uid, Kicked: inRoom}
 	persistence.WriteGMOpLog(operator, persistence.GMActionKick, uid, playerID, "", code.OK)
 	return rsp, code.OK
-}
-
-func (p *actorGMPlayer) kickUIDOnGates(uid int64) {
-	if p.App() == nil || p.App().Discovery() == nil {
-		return
-	}
-	kick := &cproto.PomeloKick{Uid: uid, Reason: []byte{}, Close: true}
-	members := p.App().Discovery().ListByType(gateNodeType)
-	for _, member := range members {
-		target := cfacade.NewPath(member.GetNodeID(), "user")
-		if rc := p.Call(target, pomelo.KickFuncName, kick); rc != 0 {
-			clog.Warnf("gm kick call gate=%s uid=%d code=%d", member.GetNodeID(), uid, rc)
-		}
-	}
 }

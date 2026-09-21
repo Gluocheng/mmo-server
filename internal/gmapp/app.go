@@ -3,6 +3,7 @@ package gmapp
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	clog "github.com/cherry-game/cherry/logger"
 	cprofile "github.com/cherry-game/cherry/profile"
@@ -23,6 +24,7 @@ type App struct {
 	natsAddr      string
 	natsPrefix    string
 	gameNodeID    string
+	loginNodeID   string
 	token         string
 	profilePath   string
 	bootstrapUser string
@@ -35,11 +37,12 @@ type App struct {
 // New 创建 GM 应用实例。token 为空时除公开接口外须登录会话。
 func New(httpAddr, natsAddr, natsPrefix, gameNodeID, token string) *App {
 	return &App{
-		httpAddr:   httpAddr,
-		natsAddr:   natsAddr,
-		natsPrefix: natsPrefix,
-		gameNodeID: gameNodeID,
-		token:      token,
+		httpAddr:    httpAddr,
+		natsAddr:    natsAddr,
+		natsPrefix:  natsPrefix,
+		gameNodeID:  gameNodeID,
+		loginNodeID: "login-1",
+		token:       token,
 	}
 }
 
@@ -48,6 +51,14 @@ func (a *App) SetProfile(path, bootstrapUser, bootstrapPass string) {
 	a.profilePath = path
 	a.bootstrapUser = bootstrapUser
 	a.bootstrapPass = bootstrapPass
+}
+
+// SetLoginNode 设置热更新游戏时间时通知的 login 节点 ID。
+func (a *App) SetLoginNode(id string) {
+	id = strings.TrimSpace(id)
+	if id != "" {
+		a.loginNodeID = id
+	}
 }
 
 // Run 启动 GM 进程：加载 profile、连接 MySQL/Redis 与 NATS，再启动 HTTP。

@@ -22,9 +22,11 @@ message GmAccountQueryRequest {
 }
 
 message GmAccountView {
-  int64 uid = 1 [json_name = "uid"];
-  string nickname = 2 [json_name = "nickname"];
-  int64 created_at_unix = 3 [json_name = "createdAtUnix"];
+    int64 uid = 1 [json_name = "uid"];
+    string nickname = 2 [json_name = "nickname"];
+    int64 created_at_unix = 3 [json_name = "createdAtUnix"];
+    bool banned = 4 [json_name = "banned"];
+    string ban_reason = 5 [json_name = "banReason"];
 }
 
 message GmPlayerQueryRequest {
@@ -71,6 +73,67 @@ message GmKickRequest {
 }
 
 message GmKickResponse {
-  int64 uid = 1 [json_name = "uid"];
-  bool kicked = 2 [json_name = "kicked"];
+    int64 uid = 1 [json_name = "uid"];
+    bool kicked = 2 [json_name = "kicked"];
+}
+
+message GmDeductRequest {
+    int64 player_id = 1 [json_name = "playerId"];
+    int32 item_id = 2 [json_name = "itemId"];
+    int32 slot = 3 [json_name = "slot"];
+    int32 count = 4 [json_name = "count"];
+    int32 bag_type = 5 [json_name = "bagType"];
+    string operator = 6 [json_name = "operator"];
+}
+
+message GmBanRequest {
+    int64 uid = 1 [json_name = "uid"];
+    string nickname = 2 [json_name = "nickname"];
+    string reason = 3 [json_name = "reason"];
+    string operator = 4 [json_name = "operator"];
+}
+
+message GmBanResponse {
+    int64 uid = 1 [json_name = "uid"];
+    bool banned = 2 [json_name = "banned"];
+    bool kicked = 3 [json_name = "kicked"];
+}
+
+message GmOnlineRequest {
+    int32 scene_id = 1 [json_name = "sceneId"];
+}
+
+message GmOnlinePlayer {
+    int64 uid = 1 [json_name = "uid"];
+    int32 scene_id = 2 [json_name = "sceneId"];
+}
+
+message GmOnlineResponse {
+    repeated GmOnlinePlayer list = 1 [json_name = "list"];
+}
+
+message GmNoticeRequest {
+    int32 scene_id = 1 [json_name = "sceneId"];
+    string text = 2 [json_name = "text"];
+    string operator = 3 [json_name = "operator"];
+}
+
+message GmNoticeResponse {
+    int32 pushed = 1 [json_name = "pushed"];
+}
+
+message GmNoticePush {
+    string text = 1 [json_name = "text"];
+    int32 scene_id = 2 [json_name = "sceneId"];
+}
+
+message GmTimeSetRequest {
+    int64 bias_seconds = 1 [json_name = "biasSeconds"];
+    string operator = 2 [json_name = "operator"];
+}
+
+message GmTimeGetResponse {
+    int64 bias_seconds = 1 [json_name = "biasSeconds"];
+    int64 unix_now = 2 [json_name = "unixNow"];
+    int64 real_unix_now = 3 [json_name = "realUnixNow"];
 }

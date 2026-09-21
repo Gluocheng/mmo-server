@@ -78,6 +78,7 @@ services:
       - -nats=nats://nats:4222
       - -prefix=mmo
       - -game=10001
+      - -login=login-1
       - -path=/app/configs/mmo-docker.json
       - -token=dev-gm-token
     environment:

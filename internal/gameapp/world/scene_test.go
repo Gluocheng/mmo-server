@@ -40,6 +40,41 @@ func TestEnterLeave(t *testing.T) {
 	Leave(3)
 }
 
+func TestListOnlineFiltersScene(t *testing.T) {
+	Leave(11)
+	Leave(12)
+	Leave(13)
+	Enter(11, "gate-1.user", 1)
+	Enter(12, "gate-1.user", 2)
+	Enter(13, "gate-1.user", 1)
+	defer Leave(11)
+	defer Leave(12)
+	defer Leave(13)
+
+	all := ListOnline(0)
+	if len(all) != 3 {
+		t.Fatalf("all=%d %+v", len(all), all)
+	}
+	s1 := ListOnline(1)
+	if len(s1) != 2 {
+		t.Fatalf("scene1=%d %+v", len(s1), s1)
+	}
+	s2 := ListOnline(2)
+	if len(s2) != 1 || s2[0].UID != 12 {
+		t.Fatalf("scene2=%+v", s2)
+	}
+}
+
+func TestBroadcastNoticeEmptyRoom(t *testing.T) {
+	n := BroadcastNotice(nil, 0, &protocol.GmNoticePush{Text: "hi", SceneId: 0})
+	if n != 0 {
+		t.Fatalf("expected 0, got %d", n)
+	}
+	if n := BroadcastNotice(nil, 1, nil); n != 0 {
+		t.Fatalf("nil msg expected 0, got %d", n)
+	}
+}
+
 func TestBroadcastMoveNilMessage(t *testing.T) {
 	Leave(102)
 	Enter(102, "gate-1.user", DefaultSceneID)

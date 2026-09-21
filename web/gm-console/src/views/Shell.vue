@@ -29,11 +29,15 @@ import { NIcon } from 'naive-ui'
 import {
   BagOutline,
   FlashOutline,
+  GlobeOutline,
   GridOutline,
+  HourglassOutline,
   LogOutOutline,
+  MegaphoneOutline,
   PeopleOutline,
   PersonOutline,
   PulseOutline,
+  RemoveCircleOutline,
   SearchOutline,
   TimeOutline,
 } from '@vicons/ionicons5'
@@ -55,7 +59,11 @@ const menuOptions = computed(() => {
     { label: '查角色', key: '/player', icon: renderIcon(PersonOutline) },
     { label: '查背包', key: '/bag', icon: renderIcon(BagOutline) },
     { label: '发道具', key: '/grant', icon: renderIcon(GridOutline) },
+    { label: '扣道具', key: '/deduct', icon: renderIcon(RemoveCircleOutline) },
     { label: '踢下线', key: '/kick', icon: renderIcon(LogOutOutline) },
+    { label: '在线列表', key: '/online', icon: renderIcon(GlobeOutline) },
+    { label: '公告', key: '/notice', icon: renderIcon(MegaphoneOutline) },
+    { label: '游戏时间', key: '/time', icon: renderIcon(HourglassOutline) },
     { label: '配表热更', key: '/reload', icon: renderIcon(FlashOutline) },
     { label: '操作记录', key: '/logs', icon: renderIcon(TimeOutline) },
   ]

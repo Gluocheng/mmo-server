@@ -11,6 +11,10 @@ import Kick from './views/Kick.vue'
 import Reload from './views/Reload.vue'
 import Logs from './views/Logs.vue'
 import Users from './views/Users.vue'
+import Deduct from './views/Deduct.vue'
+import Online from './views/Online.vue'
+import Notice from './views/Notice.vue'
+import Time from './views/Time.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -25,7 +29,11 @@ const router = createRouter({
         { path: 'player', component: Player },
         { path: 'bag', component: Bag },
         { path: 'grant', component: Grant },
+        { path: 'deduct', component: Deduct },
         { path: 'kick', component: Kick },
+        { path: 'online', component: Online },
+        { path: 'notice', component: Notice },
+        { path: 'time', component: Time },
         { path: 'reload', component: Reload },
         { path: 'logs', component: Logs },
         { path: 'users', component: Users, meta: { admin: true } },

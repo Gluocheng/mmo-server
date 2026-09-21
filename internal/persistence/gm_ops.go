@@ -12,9 +12,14 @@ import (
 )
 
 const (
-	GMActionReload = "config.reload"
-	GMActionGrant  = "bag.grant"
-	GMActionKick   = "player.kick"
+	GMActionReload  = "config.reload"
+	GMActionGrant   = "bag.grant"
+	GMActionKick    = "player.kick"
+	GMActionDeduct  = "bag.deduct"
+	GMActionBan     = "account.ban"
+	GMActionUnban   = "account.unban"
+	GMActionNotice  = "world.notice"
+	GMActionTimeSet = "time.set"
 )
 
 func gmPlayerRecord(p model.Player) *protocol.GmPlayerRecord {
@@ -33,6 +38,8 @@ func gmAccountView(a model.Account) *protocol.GmAccountView {
 		Uid:           a.UID,
 		Nickname:      a.Nickname,
 		CreatedAtUnix: a.CreatedAt.Unix(),
+		Banned:        a.Banned,
+		BanReason:     a.BanReason,
 	}
 }
 
@@ -194,4 +201,58 @@ func WriteGMOpLog(operator, action string, targetUID, targetPlayerID int64, deta
 	if err := db.Create(&row).Error; err != nil {
 		clog.Warnf("gm ops log insert fail action=%s err=%v", action, err)
 	}
+}
+
+// IsAccountBanned 查询账号是否封禁；不存在视为未封禁。
+func IsAccountBanned(uid int64) (bool, error) {
+	return IsAccountBannedContext(context.Background(), uid)
+}
+
+// IsAccountBannedContext 查询账号是否封禁。
+func IsAccountBannedContext(parent context.Context, uid int64) (bool, error) {
+	if err := ensureDB(); err != nil {
+		return false, err
+	}
+	if uid < 1 {
+		return false, nil
+	}
+	ctx, cancel := opContext(parent)
+	defer cancel()
+	var acc model.Account
+	err := DBFromContext(ctx).WithContext(ctx).Select("banned").Where("uid = ?", uid).First(&acc).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return acc.Banned, nil
+}
+
+// SetAccountBanned 设置账号封禁状态；解封时清空原因。found=false 表示账号不存在。
+func SetAccountBanned(uid int64, banned bool, reason string) (bool, error) {
+	return SetAccountBannedContext(context.Background(), uid, banned, reason)
+}
+
+// SetAccountBannedContext 设置账号封禁状态。
+func SetAccountBannedContext(parent context.Context, uid int64, banned bool, reason string) (bool, error) {
+	if err := ensureDB(); err != nil {
+		return false, err
+	}
+	if uid < 1 {
+		return false, nil
+	}
+	ctx, cancel := opContext(parent)
+	defer cancel()
+	reason = strings.TrimSpace(reason)
+	if !banned {
+		reason = ""
+	}
+	res := DBFromContext(ctx).WithContext(ctx).Model(&model.Account{}).
+		Where("uid = ?", uid).
+		Updates(map[string]any{"banned": banned, "ban_reason": reason})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }

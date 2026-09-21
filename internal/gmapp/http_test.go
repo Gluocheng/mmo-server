@@ -104,6 +104,92 @@ func TestAccountXORParams(t *testing.T) {
 	}
 }
 
+func TestDeductXORParams(t *testing.T) {
+	mux := testMux("secret")
+	req := httptest.NewRequest(http.MethodPost, "/gm/bag/deduct", strings.NewReader(`{"playerId":1,"itemId":1,"slot":2}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GM-Token", "secret")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBanXORParams(t *testing.T) {
+	mux := testMux("secret")
+	req := httptest.NewRequest(http.MethodPost, "/gm/account/ban", strings.NewReader(`{"uid":1,"nickname":"a"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GM-Token", "secret")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNoticeEmptyText(t *testing.T) {
+	mux := testMux("secret")
+	req := httptest.NewRequest(http.MethodPost, "/gm/notice", strings.NewReader(`{"sceneId":0,"text":"  "}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GM-Token", "secret")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTimeGetAuthorized(t *testing.T) {
+	mux := testMux("secret")
+	req := httptest.NewRequest(http.MethodGet, "/gm/time", nil)
+	req.Header.Set("X-GM-Token", "secret")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var rsp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &rsp); err != nil {
+		t.Fatal(err)
+	}
+	if rsp["code"] != float64(0) {
+		t.Fatalf("code=%v body=%s", rsp["code"], rec.Body.String())
+	}
+	if _, ok := rsp["biasSeconds"]; !ok {
+		t.Fatalf("missing biasSeconds: %s", rec.Body.String())
+	}
+}
+
+func TestP1RoutesRequireAuth(t *testing.T) {
+	mux := testMux("secret")
+	paths := []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{http.MethodPost, "/gm/bag/deduct", `{"playerId":1,"itemId":1}`},
+		{http.MethodPost, "/gm/account/ban", `{"uid":1}`},
+		{http.MethodGet, "/gm/world/online", ""},
+		{http.MethodPost, "/gm/notice", `{"text":"hi"}`},
+		{http.MethodGet, "/gm/time", ""},
+	}
+	for _, tc := range paths {
+		var req *http.Request
+		if tc.body != "" {
+			req = httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+		} else {
+			req = httptest.NewRequest(tc.method, tc.path, nil)
+		}
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s status=%d body=%s", tc.method, tc.path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestKickXORParams(t *testing.T) {
 	mux := testMux("secret")
 	req := httptest.NewRequest(http.MethodPost, "/gm/player/kick", strings.NewReader(`{"uid":1,"playerId":2}`))

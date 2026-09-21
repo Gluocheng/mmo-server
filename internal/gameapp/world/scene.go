@@ -130,3 +130,47 @@ func BroadcastChat(sender cfacade.IActor, fromUID int64, sceneID int32, m *proto
 		pomelo.PushWithUID(sender, path, uid, "onChat", m)
 	}
 }
+
+// OnlinePlayer 已进场玩家快照。
+type OnlinePlayer struct {
+	UID     int64
+	SceneID int32
+}
+
+// ListOnline 返回已进场玩家；sceneID=0 为全部场景。
+func ListOnline(sceneID int32) []OnlinePlayer {
+	mu.RLock()
+	defer mu.RUnlock()
+	out := make([]OnlinePlayer, 0, len(inRoom))
+	for uid, st := range inRoom {
+		if sceneID != 0 && st.sceneID != sceneID {
+			continue
+		}
+		out = append(out, OnlinePlayer{UID: uid, SceneID: st.sceneID})
+	}
+	return out
+}
+
+// BroadcastNotice 向场景内全部在线玩家推送公告（不跳过任何人）；sceneID=0 为全服。返回推送人数。
+func BroadcastNotice(sender cfacade.IActor, sceneID int32, m *protocol.GmNoticePush) int32 {
+	if m == nil {
+		return 0
+	}
+	mu.RLock()
+	peers := make(map[int64]string)
+	for u, st := range inRoom {
+		if sceneID != 0 && st.sceneID != sceneID {
+			continue
+		}
+		if st.agentPath == "" {
+			continue
+		}
+		peers[u] = st.agentPath
+	}
+	mu.RUnlock()
+
+	for uid, path := range peers {
+		pomelo.PushWithUID(sender, path, uid, "onNotice", m)
+	}
+	return int32(len(peers))
+}

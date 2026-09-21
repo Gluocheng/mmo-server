@@ -172,3 +172,17 @@ func DB() (*gorm.DB, error) {
 	}
 	return db, nil
 }
+
+// SaveTimeBias 将游戏时间偏置写入 Redis 并更新本进程；Redis 不可用则失败。
+func SaveTimeBias(ctx context.Context, sec int64) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if sec < 0 {
+		sec = 0
+	}
+	if rdb == nil {
+		return fmt.Errorf("redis unavailable")
+	}
+	return gtime.SaveBiasToRedis(ctx, rdb, KeyPrefix(), sec)
+}

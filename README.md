@@ -157,7 +157,7 @@ Vue 3 + Naive UI 单页应用由 GM 进程同源托管（构建产物嵌入 `int
 | 本地 `scripts/start.ps1` | [http://127.0.0.1:9080/](http://127.0.0.1:9080/) | `admin` / `admin123` |
 | Docker 预发布 | [http://127.0.0.1:19080/](http://127.0.0.1:19080/) | `admin` / `admin123` |
 
-空表时用环境变量 `GM_BOOTSTRAP_USER` / `GM_BOOTSTRAP_PASSWORD` 种子管理员（脚本与 Docker 默认即上表）。**生产必须改掉默认密码。** 登录后可查账号/角色/背包、发道具、踢下线、配表热更、查操作记录；管理员可开运营号。源码在 `web/gm-console/`。`scripts/start.ps1 -Build` 会先 `npm run build`；Docker 镜像构建含 Node 阶段。本地热更新：`cd web/gm-console && npm install && npm run dev`（把 `/gm` 代理到本机 `:9080`）。
+空表时用环境变量 `GM_BOOTSTRAP_USER` / `GM_BOOTSTRAP_PASSWORD` 种子管理员（脚本与 Docker 默认即上表）。**生产必须改掉默认密码。** 登录后可查账号/角色/背包、发道具、扣道具、封号、踢下线、看在线、发公告、调游戏时间、配表热更、查操作记录；管理员可开运营号。源码在 `web/gm-console/`。`scripts/start.ps1 -Build` 会先 `npm run build`；Docker 镜像构建含 Node 阶段。本地热更新：`cd web/gm-console && npm install && npm run dev`（把 `/gm` 代理到本机 `:9080`）。
 
 浏览器走账号密码 + HttpOnly Cookie。脚本/CI 仍可用共享密钥：请求头 `X-GM-Token` 或 `Authorization: Bearer`（默认 `dev-gm-token`，记审计操作者为 `system`）。`GET /gm/health` 与登录接口免鉴权。写操作的 `operator` 来自会话用户名，不再信任 `X-GM-Operator`。
 
@@ -185,7 +185,7 @@ curl.exe -X POST http://127.0.0.1:9080/gm/config/reload `
 
 前提：`configs/mmo-cluster.json` 中 `gameconfig.allow_reload` 设为 `true`。
 
-### 查询 / 发奖 / 踢人
+### 查询 / 发奖 / 踢人 / 管控
 
 ```powershell
 curl.exe -G http://127.0.0.1:9080/gm/account -H "X-GM-Token: dev-gm-token" --data-urlencode "nickname=alice"
@@ -196,22 +196,44 @@ curl.exe -X POST http://127.0.0.1:9080/gm/bag/grant `
   -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
   -d '{"playerId":1,"itemId":1001,"count":2}'
 
+curl.exe -X POST http://127.0.0.1:9080/gm/bag/deduct `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"playerId":1,"itemId":1001,"count":1}'
+
 curl.exe -X POST http://127.0.0.1:9080/gm/player/kick `
   -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
   -d '{"uid":100}'
+
+curl.exe -X POST http://127.0.0.1:9080/gm/account/ban `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"uid":100,"reason":"cheat"}'
+
+curl.exe -X POST http://127.0.0.1:9080/gm/account/unban `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"uid":100}'
+
+curl.exe -G http://127.0.0.1:9080/gm/world/online -H "X-GM-Token: dev-gm-token"
+curl.exe -X POST http://127.0.0.1:9080/gm/notice `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"sceneId":0,"text":"维护预告"}'
+
+curl.exe -G http://127.0.0.1:9080/gm/time -H "X-GM-Token: dev-gm-token"
+curl.exe -X POST http://127.0.0.1:9080/gm/time `
+  -H "Content-Type: application/json" -H "X-GM-Token: dev-gm-token" `
+  -d '{"biasSeconds":3600}'
 ```
 
-Docker 预发布 GM 端口为 `19080`。发奖不要求玩家在线；已进场则会 Push `onBagChange`。踢人只断连接，不封号、不吊销 token。
+Docker 预发布 GM 端口为 `19080`。发奖/扣道具不要求玩家在线；已进场则会 Push `onBagChange`。踢人只断连接；封号后无法签发或刷新 token（`40033`）。公告 Push `onNotice`。调时间写入 Redis 并热更新 game 与 login（`-login` 默认 `login-1`）。
 
 ### 通信链路
 
 ```
 HTTP /gm/*  →  gm 进程（鉴权）  →  NATS Request (ClusterPacket)
-  →  game 节点 ActorGM.{config|account|player|bag}  →  NATS Response
+  →  game 节点 ActorGM.{config|account|player|bag|world|time}  →  NATS Response
   →  gm 进程  →  JSON 返回
 ```
 
-GM 通过 `cherry-{prefix}.remote.game.{gameNodeID}` subject 向 game 节点发送 Cherry `ClusterPacket`，由 game 节点 `ActorGM` 按 `domain` 路由到对应子 Actor 处理。运营发奖走 persistence，不经过玩家 `game.bag.add`。
+GM 通过 `cherry-{prefix}.remote.game.{gameNodeID}` subject 向 game 节点发送 Cherry `ClusterPacket`。调时间额外请求 `cherry-{prefix}.remote.login.{loginNodeID}`（`{login}.session.setGameTime`）。运营发奖/扣道具走 persistence，不经过玩家 `game.bag.add`。
 
 ## 客户端协议（Pomelo + Protobuf）
 
@@ -252,6 +274,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 进场   | `game.player.enter`     | `EnterGameRequest`                         | `EnterGameResponse`                              |
 | 移动   | `game.player.move`      | `MoveRequest`                              | `Empty`；同场景 AOI 内 Push `onMove`（`MoveBroadcast`） |
 | 聊天   | `game.chat.send`        | `ChatSendRequest`                          | `Empty`；同场景 Push `onChat`（`ChatBroadcast`）       |
+| 公告   | `POST /gm/notice`       | JSON `{sceneId,text}`                      | 在线 Push `onNotice`（`GmNoticePush`）               |
 | 背包列表 | `game.bag.list`         | `BagListRequest`（`bagType`）              | `BagListResponse`（`BagItem` 含 `slot`/`bagType`）    |
 | 背包发放 | `game.bag.add`          | `BagAddRequest`（`bagType` 可选，缺省自动路由） | `BagListResponse` + Push `onBagChange`           |
 | 背包扣除 | `game.bag.remove`       | `BagRemoveRequest`（`bagType`）            | `BagListResponse` + Push `onBagChange`           |
@@ -274,7 +297,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40032`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40033`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -312,6 +335,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40030 | `GmBadRequest`        | GM 查询/踢人条件缺失或互斥 |
 | 40031 | `GmTargetNotFound`    | GM 目标账号或角色不存在 |
 | 40032 | `GmForbidden`         | GM 非管理员访问管号等接口 |
+| 40033 | `AccountBanned`       | 账号已封禁（登录/刷新/鉴权） |
 
 
 ### 重新生成 Protobuf Go 代码

@@ -48,6 +48,17 @@ type (
 	GmGrantResponse       = pb.GmGrantResponse
 	GmKickRequest         = pb.GmKickRequest
 	GmKickResponse        = pb.GmKickResponse
+	GmDeductRequest       = pb.GmDeductRequest
+	GmBanRequest          = pb.GmBanRequest
+	GmBanResponse         = pb.GmBanResponse
+	GmOnlineRequest       = pb.GmOnlineRequest
+	GmOnlinePlayer        = pb.GmOnlinePlayer
+	GmOnlineResponse      = pb.GmOnlineResponse
+	GmNoticeRequest       = pb.GmNoticeRequest
+	GmNoticeResponse      = pb.GmNoticeResponse
+	GmNoticePush          = pb.GmNoticePush
+	GmTimeSetRequest      = pb.GmTimeSetRequest
+	GmTimeGetResponse     = pb.GmTimeGetResponse
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

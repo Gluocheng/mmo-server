@@ -36,6 +36,7 @@ const (
 	GmBadRequest        int32 = 40030 // GM 查询/踢人条件缺失或互斥
 	GmTargetNotFound    int32 = 40031 // GM 目标账号或角色不存在
 	GmForbidden         int32 = 40032 // GM 非管理员访问管理接口
+	AccountBanned       int32 = 40033 // 账号已封禁（登录/刷新/鉴权）
 )
 
 func IsFail(c int32) bool {
