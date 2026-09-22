@@ -1,0 +1,13 @@
+<module name="skill">
+	<bean name="Skill" comment="技能">
+		<var name="id" type="int" comment="技能id"/>
+		<var name="name" type="string" comment="名称"/>
+		<var name="target" type="string" comment="single 或 aoe_self"/>
+		<var name="cast_range" type="int" comment="点名距离"/>
+		<var name="radius" type="int" comment="自身圆心半径"/>
+		<var name="cooldown_ms" type="int" comment="冷却毫秒"/>
+		<var name="damage" type="int" comment="伤害"/>
+		<var name="buff_id" type="int" comment="命中时施加的 buff，0 为不挂"/>
+	</bean>
+	<table name="TbSkill" value="Skill" input="skill.csv" comment="技能表"/>
+</module>

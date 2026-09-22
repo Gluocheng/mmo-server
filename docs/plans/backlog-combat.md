@@ -1,11 +1,6 @@
 # 战斗骨架（Backlog）
 
-> **Status:** planned
+> **Status:** superseded  
+> **替代：** [`2026-09-22-combat-skeleton-design.md`](2026-09-22-combat-skeleton-design.md)
 
-**Goal:** 最小可演示的战斗请求/结算与广播（具体玩法待定）。
-
-## 范围草案
-
-- [ ] 协议与 `game.combat` Actor 边界
-- [ ] 与场景/AOI 联动
-- [ ] 错误码区间规划
+一期已立项为配表驱动的同场景战斗框架。阵营、怪物、药水仍不在该期，见策划「不包含」。

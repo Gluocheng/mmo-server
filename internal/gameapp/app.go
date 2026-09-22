@@ -11,6 +11,7 @@ import (
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/gameapp/bag"
 	"github.com/example/mmo-server/internal/gameapp/chat"
+	"github.com/example/mmo-server/internal/gameapp/combat"
 	"github.com/example/mmo-server/internal/gameapp/config"
 	"github.com/example/mmo-server/internal/gameapp/gm"
 	"github.com/example/mmo-server/internal/gameapp/player"
@@ -30,6 +31,7 @@ func Run(profileFilePath, nodeID string) {
 	mustLoadGameConfig()
 	app.AddActors(&player.ActorPlayers{})
 	app.AddActors(&chat.ActorChats{})
+	app.AddActors(&combat.ActorCombats{})
 	app.AddActors(&bag.ActorBags{})
 	app.AddActors(&config.ActorConfig{})
 	app.AddActors(&gm.ActorGM{})

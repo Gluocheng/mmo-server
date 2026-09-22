@@ -44,6 +44,22 @@ func main() {
 	}
 	bagTypeRows := importdata.BagTypesToSchema(bagTypeTable.GetDataList())
 
+	skillRows, err := importdata.LoadSkillsFromJSONFile(filepath.Join(*dataDir, importdata.SkillTableFile))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	buffRows, err := importdata.LoadBuffsFromJSONFile(filepath.Join(*dataDir, importdata.BuffTableFile))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	constRow, err := importdata.LoadCombatConstFromJSONFile(filepath.Join(*dataDir, importdata.CombatConstTableFile))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -71,6 +87,28 @@ func main() {
 		if err := tx.Create(&bagTypeRows).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgSkill{}).Error; err != nil {
+			return err
+		}
+		if len(skillRows) > 0 {
+			if err := tx.Create(&skillRows).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgBuff{}).Error; err != nil {
+			return err
+		}
+		if len(buffRows) > 0 {
+			if err := tx.Create(&buffRows).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgCombatConst{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&constRow).Error; err != nil {
+			return err
+		}
 		var ver schema.CfgVersion
 		if err := tx.First(&ver, 1).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
@@ -90,5 +128,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("imported %d items, %d bag_types, cfg_version=%d\n", len(schemaRows), len(bagTypeRows), newVersion)
+	fmt.Printf("imported %d items, %d bag_types, %d skills, %d buffs, cfg_version=%d\n", len(schemaRows), len(bagTypeRows), len(skillRows), len(buffRows), newVersion)
 }

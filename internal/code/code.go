@@ -39,6 +39,13 @@ const (
 	AccountBanned       int32 = 40033 // 账号已封禁（登录/刷新/鉴权）
 	ChatMuted           int32 = 40034 // 账号禁言中（发聊天）
 	ServerMaintenance   int32 = 40035 // 服务器维护中（登录/刷新/鉴权）
+	CombatSkillInvalid  int32 = 40040 // 技能不存在或目标方式非法
+	CombatBuffInvalid   int32 = 40041 // Buff 不存在或效果非法
+	CombatTargetInvalid int32 = 40042 // 目标不在同场景，或点名打到自己
+	CombatOutOfRange    int32 = 40043 // 超出技能距离
+	CombatCooldown      int32 = 40044 // 技能冷却中
+	CombatSelfDead      int32 = 40045 // 自己已死亡
+	CombatTargetDead    int32 = 40046 // 目标已死亡
 )
 
 func IsFail(c int32) bool {

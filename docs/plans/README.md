@@ -33,7 +33,7 @@
 | done | 本地 Docker CI/CD 一条龙 | [2026-06-25-local-docker-cicd-design.md](2026-06-25-local-docker-cicd-design.md) | 实施 [2026-06-25-local-docker-cicd.md](2026-06-25-local-docker-cicd.md) |
 | superseded | 道具系统（JSON 文件方案） | [2026-05-28-item-system-design.md](2026-05-28-item-system-design.md) | 已由 gameconfig 策划替代 |
 | done | 全局 ID 生成策略 | [2026-06-25-global-id-design.md](2026-06-25-global-id-design.md) | 实施 [2026-06-25-global-id.md](2026-06-25-global-id.md) |
-| planned | 战斗骨架 | [backlog-combat.md](backlog-combat.md) | — |
+| done | 战斗骨架 | [2026-09-22-combat-skeleton-design.md](2026-09-22-combat-skeleton-design.md) | 实施 [2026-09-22-combat-skeleton.md](2026-09-22-combat-skeleton.md)；配表技能/Buff、50 人合包广播 |
 | done | 一账号多角 | [2026-06-25-multi-character-design.md](2026-06-25-multi-character-design.md) | 实施 [2026-06-25-multi-character.md](2026-06-25-multi-character.md) |
 | done | 多背包（bag_type 维度） | [2026-09-09-multi-bag-design.md](2026-09-09-multi-bag-design.md) | 实施 [2026-09-09-multi-bag.md](2026-09-09-multi-bag.md) |
 | done | GM 运营后台 P0 | [2026-09-14-gm-ops-p0-design.md](2026-09-14-gm-ops-p0-design.md) | 实施 [2026-09-14-gm-ops-p0.md](2026-09-14-gm-ops-p0.md) |

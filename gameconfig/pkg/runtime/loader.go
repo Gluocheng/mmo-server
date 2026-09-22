@@ -53,12 +53,29 @@ func Load(ctx context.Context, db *gorm.DB) error {
 		bagTypes[bt.Id] = bt
 	}
 
+	var skillRows []schema.CfgSkill
+	if err := db.WithContext(ctx).Order("id asc").Find(&skillRows).Error; err != nil {
+		return fmt.Errorf("load cfg_skill: %w", err)
+	}
+	var buffRows []schema.CfgBuff
+	if err := db.WithContext(ctx).Order("id asc").Find(&buffRows).Error; err != nil {
+		return fmt.Errorf("load cfg_buff: %w", err)
+	}
+	var constRows []schema.CfgCombatConst
+	if err := db.WithContext(ctx).Order("id asc").Find(&constRows).Error; err != nil {
+		return fmt.Errorf("load cfg_combat_const: %w", err)
+	}
+
 	swapSnapshot(&snapshot{
 		version:    versionRow.Version,
 		tableCount: int32(len(itemRows)),
 		tables: &tables{
-			items:    items,
-			bagTypes: bagTypes,
+			items:       items,
+			bagTypes:    bagTypes,
+			skills:      skillsFromSchema(skillRows),
+			buffs:       buffsFromSchema(buffRows),
+			combatConst: constFromSchema(constRows),
+			hasConst:    len(constRows) > 0,
 		},
 	})
 	return nil

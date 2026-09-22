@@ -1,0 +1,12 @@
+<module name="buff">
+	<bean name="Buff" comment="持续效果">
+		<var name="id" type="int" comment="buff id"/>
+		<var name="name" type="string" comment="名称"/>
+		<var name="duration_ms" type="int" comment="持续毫秒"/>
+		<var name="interval_ms" type="int" comment="跳伤间隔毫秒"/>
+		<var name="effect" type="string" comment="dot 或 hot"/>
+		<var name="value" type="int" comment="每跳数值"/>
+		<var name="max_stack" type="int" comment="最大层数"/>
+	</bean>
+	<table name="TbBuff" value="Buff" input="buff.csv" comment="Buff 表"/>
+</module>

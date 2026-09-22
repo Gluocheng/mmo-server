@@ -64,6 +64,9 @@ type (
 	GmNoticePush          = pb.GmNoticePush
 	GmTimeSetRequest      = pb.GmTimeSetRequest
 	GmTimeGetResponse     = pb.GmTimeGetResponse
+	CombatCastRequest     = pb.CombatCastRequest
+	CombatHit             = pb.CombatHit
+	CombatFrame           = pb.CombatFrame
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

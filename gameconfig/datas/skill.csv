@@ -1,0 +1,3 @@
+##,id,name,target,cast_range,radius,cooldown_ms,damage,buff_id
+,1,普攻,single,3,0,1000,10,0
+,2,范围斩,aoe_self,0,5,3000,8,1

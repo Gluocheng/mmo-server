@@ -288,6 +288,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 进场   | `game.player.enter`     | `EnterGameRequest`                         | `EnterGameResponse`                              |
 | 移动   | `game.player.move`      | `MoveRequest`                              | `Empty`；同场景 AOI 内 Push `onMove`（`MoveBroadcast`） |
 | 聊天   | `game.chat.send`        | `ChatSendRequest`                          | `Empty`；同场景 Push `onChat`（`ChatBroadcast`）       |
+| 放技能 | `game.combat.cast`      | `CombatCastRequest`（`skillId`，点名再填 `targetUid`） | `Empty`；下一心跳 AOI 内 Push `onCombatFrame`（每人每拍一条） |
 | 公告   | `POST /gm/notice`       | JSON `{sceneId,text}`                      | 在线 Push `onNotice`（`GmNoticePush`）               |
 | 背包列表 | `game.bag.list`         | `BagListRequest`（`bagType`）              | `BagListResponse`（`BagItem` 含 `slot`/`bagType`）    |
 | 背包发放 | `game.bag.add`          | `BagAddRequest`（`bagType` 可选，缺省自动路由） | `BagListResponse` + Push `onBagChange`           |
@@ -303,6 +304,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 未完成 `enter` 时，除 `select` / `create` / `enter` 外请求会被网关拒绝
 - 移动广播带简单 **AOI 半径过滤**（默认 15，见 `internal/gameapp/world/scene.go`）
 - 聊天为同场景全员广播（无 AOI 裁剪）
+- 战斗须已 `enter`。技能与 Buff 读配表 `cfg_skill` / `cfg_buff` / `cfg_combat_const`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活玩家。每人每拍最多一条 `onCombatFrame`
 - 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
 - `add` 缺省按 `item.bag_type` 自动路由；显式指定 `bag_type`（GM）时严格校验，不符返回 `40028`
@@ -311,7 +313,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40035`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40046`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -352,6 +354,13 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40033 | `AccountBanned`       | 账号已封禁（登录/刷新/鉴权） |
 | 40034 | `ChatMuted`           | 账号禁言中（发聊天） |
 | 40035 | `ServerMaintenance`   | 服务器维护中（登录/刷新/鉴权） |
+| 40040 | `CombatSkillInvalid`  | 技能不存在或目标方式非法 |
+| 40041 | `CombatBuffInvalid`   | Buff 不存在或效果非法 |
+| 40042 | `CombatTargetInvalid` | 目标不在同场景，或点名打到自己 |
+| 40043 | `CombatOutOfRange`    | 超出技能距离 |
+| 40044 | `CombatCooldown`      | 技能冷却中 |
+| 40045 | `CombatSelfDead`      | 自己已死亡 |
+| 40046 | `CombatTargetDead`    | 目标已死亡 |
 
 
 ### 重新生成 Protobuf Go 代码

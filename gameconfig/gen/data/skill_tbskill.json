@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "name": "普攻",
+    "target": "single",
+    "cast_range": 3,
+    "radius": 0,
+    "cooldown_ms": 1000,
+    "damage": 10,
+    "buff_id": 0
+  },
+  {
+    "id": 2,
+    "name": "范围斩",
+    "target": "aoe_self",
+    "cast_range": 0,
+    "radius": 5,
+    "cooldown_ms": 3000,
+    "damage": 8,
+    "buff_id": 1
+  }
+]

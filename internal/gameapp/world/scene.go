@@ -112,6 +112,57 @@ func withinAOI(x1, z1, x2, z2 float32) bool {
 	return math.Sqrt(dx*dx+dz*dz) <= float64(aoiRadius)
 }
 
+// InAOI 判断两点是否落在演示用 AOI 半径内。
+func InAOI(x1, z1, x2, z2 float32) bool {
+	return withinAOI(x1, z1, x2, z2)
+}
+
+// Pose 是已进场玩家的场景坐标。
+type Pose struct {
+	UID       int64
+	SceneID   int32
+	X, Z      float32
+	AgentPath string
+}
+
+// PoseOf 返回已进场玩家坐标。
+func PoseOf(uid int64) (Pose, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
+	st, ok := inRoom[uid]
+	if !ok {
+		return Pose{}, false
+	}
+	return Pose{UID: uid, SceneID: st.sceneID, X: st.x, Z: st.z, AgentPath: st.agentPath}, true
+}
+
+// PosesInScene 返回该场景内全部已进场玩家。
+func PosesInScene(sceneID int32) []Pose {
+	mu.RLock()
+	defer mu.RUnlock()
+	out := make([]Pose, 0)
+	for uid, st := range inRoom {
+		if st.sceneID != sceneID {
+			continue
+		}
+		out = append(out, Pose{UID: uid, SceneID: st.sceneID, X: st.x, Z: st.z, AgentPath: st.agentPath})
+	}
+	return out
+}
+
+// SetPosition 更新已进场玩家坐标。未进场返回 false。
+func SetPosition(uid int64, x, y, z float32) bool {
+	mu.Lock()
+	defer mu.Unlock()
+	st, ok := inRoom[uid]
+	if !ok {
+		return false
+	}
+	st.x, st.y, st.z = x, y, z
+	inRoom[uid] = st
+	return true
+}
+
 func BroadcastChat(sender cfacade.IActor, fromUID int64, sceneID int32, m *protocol.ChatBroadcast) {
 	mu.RLock()
 	peers := make(map[int64]string)

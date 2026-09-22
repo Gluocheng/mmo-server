@@ -10,6 +10,7 @@ import (
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	cproto "github.com/cherry-game/cherry/net/proto"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gameapp/combat"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
@@ -34,6 +35,7 @@ func (p *actorPlayer) OnInit() {
 func (p *actorPlayer) sessionClose() {
 	uid, _ := strconv.ParseInt(p.ActorID(), 10, 64)
 	world.Leave(uid)
+	combat.Leave(uid)
 	p.Exit()
 	clog.Debugf("player actor exit uid=%d path=%s", uid, p.PathString())
 }
@@ -111,6 +113,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		sceneID = req.SceneId
 	}
 	all := world.Enter(session.Uid, session.AgentPath, sceneID)
+	combat.Enter(session.Uid)
 	p.Response(session, &protocol.EnterGameResponse{SceneId: sceneID, Players: all})
 }
 
