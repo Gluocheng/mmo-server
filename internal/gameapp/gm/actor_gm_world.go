@@ -31,7 +31,7 @@ func (p *actorGMWorld) onlineCluster(req *protocol.GmOnlineRequest) (*protocol.G
 	list := world.ListOnline(sceneID)
 	out := make([]*protocol.GmOnlinePlayer, 0, len(list))
 	for _, row := range list {
-		out = append(out, &protocol.GmOnlinePlayer{Uid: row.UID, SceneId: row.SceneID})
+		out = append(out, &protocol.GmOnlinePlayer{Uid: row.UID, SceneId: row.SceneID, Line: row.Line})
 	}
 	return &protocol.GmOnlineResponse{List: out}, code.OK
 }

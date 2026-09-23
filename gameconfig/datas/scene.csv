@@ -1,0 +1,4 @@
+##,id,name,main,allow_combat,max_online,max_lines,spawn_x,spawn_y,spawn_z,switch_cd_ms
+,1,主城,true,false,200,5,0,0,0,0
+,2,演武场,false,true,50,1,0,0,0,10000
+,3,荒野,false,true,50,1,10,0,10,10000

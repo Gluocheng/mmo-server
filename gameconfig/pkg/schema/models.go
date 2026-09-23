@@ -78,7 +78,24 @@ type CfgCombatConst struct {
 // TableName 表名 cfg_combat_const。
 func (CfgCombatConst) TableName() string { return "cfg_combat_const" }
 
+// CfgScene 地图静态配置。main 全表只能有一行 true。max_lines 小于 2 表示不能分线。
+type CfgScene struct {
+	ID          int32   `gorm:"primaryKey"`
+	Name        string  `gorm:"size:64;not null"`
+	Main        bool    `gorm:"not null"`
+	AllowCombat bool    `gorm:"not null"`
+	MaxOnline   int32   `gorm:"not null"`
+	MaxLines    int32   `gorm:"not null"`
+	SpawnX      float32 `gorm:"not null"`
+	SpawnY      float32 `gorm:"not null"`
+	SpawnZ      float32 `gorm:"not null"`
+	SwitchCdMs  int32   `gorm:"not null"`
+}
+
+// TableName 表名 cfg_scene。
+func (CfgScene) TableName() string { return "cfg_scene" }
+
 // Models 参与 AutoMigrate 的配置表模型列表。
 func Models() []any {
-	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}}
+	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}}
 }

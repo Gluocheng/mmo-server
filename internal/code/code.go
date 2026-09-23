@@ -46,6 +46,10 @@ const (
 	CombatCooldown      int32 = 40044 // 技能冷却中
 	CombatSelfDead      int32 = 40045 // 自己已死亡
 	CombatTargetDead    int32 = 40046 // 目标已死亡
+	SceneInvalid        int32 = 40050 // 地图不存在、没有主城，或该图不可进入
+	SceneFull           int32 = 40051 // 地图或每一条分线都已满
+	SceneCombatDisabled int32 = 40052 // 当前地图不允许战斗，或地图已不在配表
+	SceneSwitchCooldown int32 = 40053 // 切图冷却未到
 )
 
 func IsFail(c int32) bool {

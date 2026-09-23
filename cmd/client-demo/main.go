@@ -145,7 +145,35 @@ func main() {
 		exitCode = 1
 		return
 	}
-	fmt.Printf("enter OK sceneId=%d online=%d\n", enterRsp.SceneId, len(enterRsp.Players))
+	fmt.Printf("enter OK sceneId=%d line=%d nearby=%d\n", enterRsp.SceneId, enterRsp.Line, len(enterRsp.Nearby))
+
+	scenesMsg, err := c.Request("game.player.scenes", &emptypb.Empty{})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "scenes failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	scenesRsp := &protocol.SceneListResponse{}
+	if err := c.Serializer().Unmarshal(scenesMsg.Data, scenesRsp); err != nil {
+		fmt.Fprintf(os.Stderr, "unmarshal SceneListResponse failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	fmt.Printf("scenes OK maps=%d\n", len(scenesRsp.Scenes))
+
+	switchMsg, err := c.Request("game.player.switchScene", &protocol.SceneSwitchRequest{SceneId: 2})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "switch scene failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	switchRsp := &protocol.SceneSwitchResponse{}
+	if err := c.Serializer().Unmarshal(switchMsg.Data, switchRsp); err != nil {
+		fmt.Fprintf(os.Stderr, "unmarshal SceneSwitchResponse failed: %v\n", err)
+		exitCode = 1
+		return
+	}
+	fmt.Printf("switch OK sceneId=%d line=%d\n", switchRsp.SceneId, switchRsp.Line)
 
 	// 5) bag add（自动路由：1001 生命药水 → 消耗品背包 bag_type=2）
 	addReq := &protocol.BagAddRequest{ItemId: 1001, Count: 2}

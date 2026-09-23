@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "name": "主城",
+    "main": true,
+    "allow_combat": false,
+    "max_online": 200,
+    "max_lines": 5,
+    "spawn_x": 0,
+    "spawn_y": 0,
+    "spawn_z": 0,
+    "switch_cd_ms": 0
+  },
+  {
+    "id": 2,
+    "name": "演武场",
+    "main": false,
+    "allow_combat": true,
+    "max_online": 50,
+    "max_lines": 1,
+    "spawn_x": 0,
+    "spawn_y": 0,
+    "spawn_z": 0,
+    "switch_cd_ms": 10000
+  },
+  {
+    "id": 3,
+    "name": "荒野",
+    "main": false,
+    "allow_combat": true,
+    "max_online": 50,
+    "max_lines": 1,
+    "spawn_x": 10,
+    "spawn_y": 0,
+    "spawn_z": 10,
+    "switch_cd_ms": 10000
+  }
+]

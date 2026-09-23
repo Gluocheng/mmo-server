@@ -1,0 +1,15 @@
+<module name="scene">
+	<bean name="Scene" comment="地图">
+		<var name="id" type="int" comment="地图id"/>
+		<var name="name" type="string" comment="名称"/>
+		<var name="main" type="bool" comment="是否登录出生图"/>
+		<var name="allow_combat" type="bool" comment="能否放技能"/>
+		<var name="max_online" type="int" comment="每条线人数上限"/>
+		<var name="max_lines" type="int" comment="小于2表示不能分线"/>
+		<var name="spawn_x" type="float" comment="出生点x"/>
+		<var name="spawn_y" type="float" comment="出生点y"/>
+		<var name="spawn_z" type="float" comment="出生点z"/>
+		<var name="switch_cd_ms" type="int" comment="离开后再次换图的冷却毫秒"/>
+	</bean>
+	<table name="TbScene" value="Scene" input="scene.csv" comment="地图表"/>
+</module>

@@ -137,6 +137,7 @@ message GmOnlineRequest {
 message GmOnlinePlayer {
     int64 uid = 1 [json_name = "uid"];
     int32 scene_id = 2 [json_name = "sceneId"];
+    int32 line = 3 [json_name = "line"];
 }
 
 message GmOnlineResponse {

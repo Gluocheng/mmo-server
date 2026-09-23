@@ -15,6 +15,7 @@ type Tables struct {
     TbBuff *BuffTbBuff
     TbCombatConst *Combat_constTbCombatConst
     TbItem *ItemTbItem
+    TbScene *SceneTbScene
     TbSkill *SkillTbSkill
 }
 
@@ -45,6 +46,12 @@ func NewTables(loader JsonLoader) (*Tables, error) {
         return nil, err
     }
     if tables.TbItem, err = NewItemTbItem(buf) ; err != nil {
+        return nil, err
+    }
+    if buf, err = loader("scene_tbscene") ; err != nil {
+        return nil, err
+    }
+    if tables.TbScene, err = NewSceneTbScene(buf) ; err != nil {
         return nil, err
     }
     if buf, err = loader("skill_tbskill") ; err != nil {

@@ -289,6 +289,8 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 移动   | `game.player.move`      | `MoveRequest`                              | `Empty`；同场景 AOI 内 Push `onMove`（`MoveBroadcast`） |
 | 聊天   | `game.chat.send`        | `ChatSendRequest`                          | `Empty`；同场景 Push `onChat`（`ChatBroadcast`）       |
 | 放技能 | `game.combat.cast`      | `CombatCastRequest`（`skillId`，点名再填 `targetUid`） | `Empty`；下一心跳 AOI 内 Push `onCombatFrame`（每人每拍一条） |
+| 地图列表 | `game.player.scenes` | `google.protobuf.Empty` | `SceneListResponse`（每张图的分线人数） |
+| 切图 | `game.player.switchScene` | `SceneSwitchRequest`（`sceneId`） | `SceneSwitchResponse`；新旧线 AOI 内 Push `onScenePresence` |
 | 公告   | `POST /gm/notice`       | JSON `{sceneId,text}`                      | 在线 Push `onNotice`（`GmNoticePush`）               |
 | 背包列表 | `game.bag.list`         | `BagListRequest`（`bagType`）              | `BagListResponse`（`BagItem` 含 `slot`/`bagType`）    |
 | 背包发放 | `game.bag.add`          | `BagAddRequest`（`bagType` 可选，缺省自动路由） | `BagListResponse` + Push `onBagChange`           |
@@ -305,6 +307,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 移动广播带简单 **AOI 半径过滤**（默认 15，见 `internal/gameapp/world/scene.go`）
 - 聊天为同场景全员广播（无 AOI 裁剪）
 - 战斗须已 `enter`。技能与 Buff 读配表 `cfg_skill` / `cfg_buff` / `cfg_combat_const`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活玩家。每人每拍最多一条 `onCombatFrame`
+- 进场忽略请求里的 `sceneId`，出生在配表主城。`max_lines >= 2` 的图才会在满员后进入下一条线。切图成功会满血，并按离开的那张图的 `switch_cd_ms` 冷却。主城默认不能放技能，以地图表 `allow_combat` 为准
 - 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
 - `add` 缺省按 `item.bag_type` 自动路由；显式指定 `bag_type`（GM）时严格校验，不符返回 `40028`
@@ -313,7 +316,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40046`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40053`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -361,6 +364,10 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40044 | `CombatCooldown`      | 技能冷却中 |
 | 40045 | `CombatSelfDead`      | 自己已死亡 |
 | 40046 | `CombatTargetDead`    | 目标已死亡 |
+| 40050 | `SceneInvalid`        | 地图不存在、没有主城，或该图不可进入 |
+| 40051 | `SceneFull`           | 地图或每一条分线都已满 |
+| 40052 | `SceneCombatDisabled` | 当前地图不允许战斗，或地图已不在配表 |
+| 40053 | `SceneSwitchCooldown` | 切图冷却未到 |
 
 
 ### 重新生成 Protobuf Go 代码

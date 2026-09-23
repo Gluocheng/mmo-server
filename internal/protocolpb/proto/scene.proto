@@ -12,6 +12,61 @@ message EnterGameRequest {
 message EnterGameResponse {
   int32 scene_id = 1 [json_name = "sceneId"];
   repeated int64 players = 2 [json_name = "players"];
+  int32 line = 3 [json_name = "line"];
+  float x = 4 [json_name = "x"];
+  float y = 5 [json_name = "y"];
+  float z = 6 [json_name = "z"];
+  repeated SceneActor nearby = 7 [json_name = "nearby"];
+}
+
+// SceneActor 是同一条线 AOI 内的其他玩家。
+message SceneActor {
+  int64 uid = 1 [json_name = "uid"];
+  float x = 2 [json_name = "x"];
+  float y = 3 [json_name = "y"];
+  float z = 4 [json_name = "z"];
+}
+
+message SceneSwitchRequest {
+  int32 scene_id = 1 [json_name = "sceneId"];
+}
+
+message SceneSwitchResponse {
+  int32 scene_id = 1 [json_name = "sceneId"];
+  int32 line = 2 [json_name = "line"];
+  float x = 3 [json_name = "x"];
+  float y = 4 [json_name = "y"];
+  float z = 5 [json_name = "z"];
+  repeated SceneActor nearby = 6 [json_name = "nearby"];
+}
+
+// ScenePresence 通知周围的人有人进入或离开这条线。
+message ScenePresence {
+  int64 uid = 1 [json_name = "uid"];
+  int32 scene_id = 2 [json_name = "sceneId"];
+  int32 line = 3 [json_name = "line"];
+  float x = 4 [json_name = "x"];
+  float y = 5 [json_name = "y"];
+  float z = 6 [json_name = "z"];
+  bool enter = 7 [json_name = "enter"];
+}
+
+message SceneListResponse {
+  repeated SceneInfo scenes = 1 [json_name = "scenes"];
+}
+
+message SceneInfo {
+  int32 scene_id = 1 [json_name = "sceneId"];
+  string name = 2 [json_name = "name"];
+  bool allow_combat = 3 [json_name = "allowCombat"];
+  int32 max_online = 4 [json_name = "maxOnline"];
+  int32 max_lines = 5 [json_name = "maxLines"];
+  repeated SceneLineCount lines = 6 [json_name = "lines"];
+}
+
+message SceneLineCount {
+  int32 line = 1 [json_name = "line"];
+  int32 online = 2 [json_name = "online"];
 }
 
 message MoveRequest {

@@ -59,6 +59,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	sceneRows, err := importdata.LoadScenesFromJSONFile(filepath.Join(*dataDir, importdata.SceneTableFile))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -109,6 +114,14 @@ func main() {
 		if err := tx.Create(&constRow).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgScene{}).Error; err != nil {
+			return err
+		}
+		if len(sceneRows) > 0 {
+			if err := tx.Create(&sceneRows).Error; err != nil {
+				return err
+			}
+		}
 		var ver schema.CfgVersion
 		if err := tx.First(&ver, 1).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
@@ -128,5 +141,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("imported %d items, %d bag_types, %d skills, %d buffs, cfg_version=%d\n", len(schemaRows), len(bagTypeRows), len(skillRows), len(buffRows), newVersion)
+	fmt.Printf("imported %d items, %d bag_types, %d skills, %d buffs, %d scenes, cfg_version=%d\n", len(schemaRows), len(bagTypeRows), len(skillRows), len(buffRows), len(sceneRows), newVersion)
 }

@@ -23,6 +23,9 @@ func seed(t *testing.T, cap int32) {
 		},
 		gcruntime.CombatConst{MaxHP: 100, TickMs: 100, RespawnMs: 5000, FrameEventCap: cap},
 	)
+	gcruntime.BuildScenes([]gcruntime.SceneDef{{
+		ID: world.DefaultSceneID, Name: "测试", AllowCombat: true, MaxOnline: 100, MaxLines: 1,
+	}})
 }
 
 func join(t *testing.T, uid int64, x float32) {
@@ -185,6 +188,58 @@ func TestFiftyOverlappedUnitsOneFrameEach(t *testing.T) {
 		if len(f.Hits) != n-1 {
 			t.Fatalf("viewer %d hits=%d", f.ViewerUID, len(f.Hits))
 		}
+	}
+}
+
+func TestAOEDoesNotCrossLine(t *testing.T) {
+	seed(t, 64)
+	gcruntime.BuildScenes([]gcruntime.SceneDef{{
+		ID: world.DefaultSceneID, Name: "测试", AllowCombat: true, MaxOnline: 10, MaxLines: 2,
+	}})
+	join(t, 96001, 0)
+	join(t, 96002, 0)
+	join(t, 96003, 0)
+	world.Place(96003, "gate.user", world.DefaultSceneID, 2, 0, 0, 0)
+	if c := Cast(96001, 2, 0); c != code.OK {
+		t.Fatal(c)
+	}
+	Tick()
+	if hp, _, _, _ := Snapshot(96002); hp != 92 {
+		t.Fatalf("same line hp %d", hp)
+	}
+	if hp, _, _, _ := Snapshot(96003); hp != 100 {
+		t.Fatalf("other line hp %d", hp)
+	}
+}
+
+func TestCastRejectsDisabledOrMissingScene(t *testing.T) {
+	seed(t, 64)
+	join(t, 96101, 0)
+	gcruntime.BuildScenes([]gcruntime.SceneDef{{
+		ID: world.DefaultSceneID, Name: "测试", AllowCombat: false, MaxOnline: 10, MaxLines: 1,
+	}})
+	if c := Cast(96101, 1, 96101); c != code.SceneCombatDisabled {
+		t.Fatalf("disabled %d", c)
+	}
+	world.Place(96101, "gate.user", 99, 1, 0, 0, 0)
+	if c := Cast(96101, 1, 96101); c != code.SceneCombatDisabled {
+		t.Fatalf("missing %d", c)
+	}
+}
+
+func TestQueuedHitStopsWhenCombatDisabled(t *testing.T) {
+	seed(t, 64)
+	join(t, 96201, 0)
+	join(t, 96202, 0)
+	if c := Cast(96201, 1, 96202); c != code.OK {
+		t.Fatal(c)
+	}
+	gcruntime.BuildScenes([]gcruntime.SceneDef{{
+		ID: world.DefaultSceneID, Name: "测试", AllowCombat: false, MaxOnline: 10, MaxLines: 1,
+	}})
+	Tick()
+	if hp, _, _, _ := Snapshot(96202); hp != 100 {
+		t.Fatalf("hp %d", hp)
 	}
 }
 

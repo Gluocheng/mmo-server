@@ -146,6 +146,9 @@ func Cast(uid int64, skillID int32, targetUID int64) int32 {
 	if u.dead {
 		return code.CombatSelfDead
 	}
+	if !sceneAllowsCombat(uid) {
+		return code.SceneCombatDisabled
+	}
 	now := nowFn()
 	if ready, exists := cds[uid][skillID]; exists && now < ready {
 		return code.CombatCooldown
@@ -228,7 +231,7 @@ func validBuff(def gcruntime.BuffDef) bool {
 
 func resolveIntent(it intent, now int64) []Hit {
 	u := units[it.uid]
-	if u == nil || u.dead {
+	if u == nil || u.dead || !sceneAllowsCombat(it.uid) {
 		return nil
 	}
 	switch it.skill.target {
@@ -272,7 +275,7 @@ func hitAOE(src int64, sk skillSnap, now int64) []Hit {
 			continue
 		}
 		tp, ok := world.PoseOf(uid)
-		if !ok || tp.SceneID != sp.SceneID {
+		if !ok || tp.SceneID != sp.SceneID || tp.Line != sp.Line {
 			continue
 		}
 		if distance(sp.X, sp.Z, tp.X, tp.Z) > float32(sk.radius) {
@@ -428,7 +431,7 @@ func tickRespawn(now int64) []Hit {
 func inRange(a, b int64, dist int32) bool {
 	pa, oka := world.PoseOf(a)
 	pb, okb := world.PoseOf(b)
-	if !oka || !okb || pa.SceneID != pb.SceneID {
+	if !oka || !okb || pa.SceneID != pb.SceneID || pa.Line != pb.Line {
 		return false
 	}
 	return distance(pa.X, pa.Z, pb.X, pb.Z) <= float32(dist)
@@ -459,11 +462,11 @@ func buildFrames(hits []Hit, capN int) []Frame {
 		mine := make([]Hit, 0)
 		for _, h := range hits {
 			target, okT := world.PoseOf(h.TargetUID)
-			if !okT || target.SceneID != viewer.SceneID {
+			if !okT || target.SceneID != viewer.SceneID || target.Line != viewer.Line {
 				continue
 			}
 			see := world.InAOI(viewer.X, viewer.Z, target.X, target.Z)
-			if source, okS := world.PoseOf(h.SourceUID); okS && source.SceneID == viewer.SceneID && world.InAOI(viewer.X, viewer.Z, source.X, source.Z) {
+			if source, okS := world.PoseOf(h.SourceUID); okS && source.SceneID == viewer.SceneID && source.Line == viewer.Line && world.InAOI(viewer.X, viewer.Z, source.X, source.Z) {
 				see = true
 			}
 			if see {
@@ -484,6 +487,14 @@ func buildFrames(hits []Hit, capN int) []Frame {
 		frames = append(frames, Frame{ViewerUID: uid, AgentPath: viewer.AgentPath, Hits: mine, Truncated: truncated})
 	}
 	return frames
+}
+
+func sceneAllowsCombat(uid int64) bool {
+	pose, ok := world.PoseOf(uid)
+	if !ok {
+		return false
+	}
+	return gcruntime.SceneAllowsCombat(pose.SceneID)
 }
 
 func hitRank(viewer int64, h Hit) int {

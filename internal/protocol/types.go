@@ -12,6 +12,13 @@ type (
 	CodeOnly              = pb.CodeOnly
 	EnterGameRequest      = pb.EnterGameRequest
 	EnterGameResponse     = pb.EnterGameResponse
+	SceneActor            = pb.SceneActor
+	SceneSwitchRequest    = pb.SceneSwitchRequest
+	SceneSwitchResponse   = pb.SceneSwitchResponse
+	ScenePresence         = pb.ScenePresence
+	SceneListResponse     = pb.SceneListResponse
+	SceneInfo             = pb.SceneInfo
+	SceneLineCount        = pb.SceneLineCount
 	MoveRequest           = pb.MoveRequest
 	MoveBroadcast         = pb.MoveBroadcast
 	PlayerInfo            = pb.PlayerInfo

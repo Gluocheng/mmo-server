@@ -65,6 +65,10 @@ func Load(ctx context.Context, db *gorm.DB) error {
 	if err := db.WithContext(ctx).Order("id asc").Find(&constRows).Error; err != nil {
 		return fmt.Errorf("load cfg_combat_const: %w", err)
 	}
+	var sceneRows []schema.CfgScene
+	if err := db.WithContext(ctx).Order("id asc").Find(&sceneRows).Error; err != nil {
+		return fmt.Errorf("load cfg_scene: %w", err)
+	}
 
 	swapSnapshot(&snapshot{
 		version:    versionRow.Version,
@@ -76,6 +80,7 @@ func Load(ctx context.Context, db *gorm.DB) error {
 			buffs:       buffsFromSchema(buffRows),
 			combatConst: constFromSchema(constRows),
 			hasConst:    len(constRows) > 0,
+			scenes:      scenesFromSchema(sceneRows),
 		},
 	})
 	return nil

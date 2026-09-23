@@ -18,9 +18,11 @@ const (
 )
 
 type playerState struct {
-	agentPath string
-	sceneID   int32
-	x, y, z   float32
+	agentPath    string
+	sceneID      int32
+	line         int32
+	x, y, z      float32
+	nextSwitchAt int64
 }
 
 var (
@@ -29,12 +31,9 @@ var (
 )
 
 func Enter(uid int64, agentPath string, sceneID int32) []int64 {
-	mu.Lock()
-	defer mu.Unlock()
-	inRoom[uid] = playerState{
-		agentPath: agentPath,
-		sceneID:   sceneID,
-	}
+	Place(uid, agentPath, sceneID, 1, 0, 0, 0)
+	mu.RLock()
+	defer mu.RUnlock()
 	out := make([]int64, 0, len(inRoom))
 	for u, st := range inRoom {
 		if st.sceneID != sceneID {
@@ -43,6 +42,23 @@ func Enter(uid int64, agentPath string, sceneID int32) []int64 {
 		out = append(out, u)
 	}
 	return out
+}
+
+// Place 把玩家放到指定地图和分线，并清掉切图冷却。线号小于 1 时按 1 线。
+func Place(uid int64, agentPath string, sceneID, line int32, x, y, z float32) {
+	if line < 1 {
+		line = 1
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	inRoom[uid] = playerState{
+		agentPath: agentPath,
+		sceneID:   sceneID,
+		line:      line,
+		x:         x,
+		y:         y,
+		z:         z,
+	}
 }
 
 func Leave(uid int64) {
@@ -90,7 +106,7 @@ func BroadcastMove(sender cfacade.IActor, fromUID int64, m *protocol.MoveBroadca
 		if u == fromUID {
 			continue
 		}
-		if st.sceneID != from.sceneID {
+		if st.sceneID != from.sceneID || st.line != from.line {
 			continue
 		}
 		if !withinAOI(from.x, from.z, st.x, st.z) {
@@ -121,7 +137,8 @@ func InAOI(x1, z1, x2, z2 float32) bool {
 type Pose struct {
 	UID       int64
 	SceneID   int32
-	X, Z      float32
+	Line      int32
+	X, Y, Z   float32
 	AgentPath string
 }
 
@@ -133,7 +150,7 @@ func PoseOf(uid int64) (Pose, bool) {
 	if !ok {
 		return Pose{}, false
 	}
-	return Pose{UID: uid, SceneID: st.sceneID, X: st.x, Z: st.z, AgentPath: st.agentPath}, true
+	return Pose{UID: uid, SceneID: st.sceneID, Line: st.line, X: st.x, Y: st.y, Z: st.z, AgentPath: st.agentPath}, true
 }
 
 // PosesInScene 返回该场景内全部已进场玩家。
@@ -145,7 +162,7 @@ func PosesInScene(sceneID int32) []Pose {
 		if st.sceneID != sceneID {
 			continue
 		}
-		out = append(out, Pose{UID: uid, SceneID: st.sceneID, X: st.x, Z: st.z, AgentPath: st.agentPath})
+		out = append(out, Pose{UID: uid, SceneID: st.sceneID, Line: st.line, X: st.x, Y: st.y, Z: st.z, AgentPath: st.agentPath})
 	}
 	return out
 }
@@ -165,15 +182,21 @@ func SetPosition(uid int64, x, y, z float32) bool {
 
 func BroadcastChat(sender cfacade.IActor, fromUID int64, sceneID int32, m *protocol.ChatBroadcast) {
 	mu.RLock()
+	from, ok := inRoom[fromUID]
+	if ok && sceneID != 0 && from.sceneID != sceneID {
+		ok = false
+	}
 	peers := make(map[int64]string)
-	for u, st := range inRoom {
-		if u == fromUID {
-			continue
+	if ok {
+		for u, st := range inRoom {
+			if u == fromUID {
+				continue
+			}
+			if st.sceneID != from.sceneID || st.line != from.line {
+				continue
+			}
+			peers[u] = st.agentPath
 		}
-		if st.sceneID != sceneID {
-			continue
-		}
-		peers[u] = st.agentPath
 	}
 	mu.RUnlock()
 
@@ -186,6 +209,7 @@ func BroadcastChat(sender cfacade.IActor, fromUID int64, sceneID int32, m *proto
 type OnlinePlayer struct {
 	UID     int64
 	SceneID int32
+	Line    int32
 }
 
 // ListOnline 返回已进场玩家；sceneID=0 为全部场景。
@@ -197,7 +221,7 @@ func ListOnline(sceneID int32) []OnlinePlayer {
 		if sceneID != 0 && st.sceneID != sceneID {
 			continue
 		}
-		out = append(out, OnlinePlayer{UID: uid, SceneID: st.sceneID})
+		out = append(out, OnlinePlayer{UID: uid, SceneID: st.sceneID, Line: st.line})
 	}
 	return out
 }
@@ -220,6 +244,9 @@ func BroadcastNotice(sender cfacade.IActor, sceneID int32, m *protocol.GmNoticeP
 	}
 	mu.RUnlock()
 
+	if sender == nil {
+		return int32(len(peers))
+	}
 	for uid, path := range peers {
 		pomelo.PushWithUID(sender, path, uid, "onNotice", m)
 	}

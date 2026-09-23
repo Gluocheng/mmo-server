@@ -9,9 +9,11 @@ import (
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	cproto "github.com/cherry-game/cherry/net/proto"
+	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/gameapp/combat"
 	"github.com/example/mmo-server/internal/gameapp/world"
+	"github.com/example/mmo-server/internal/gtime"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
@@ -28,6 +30,8 @@ func (p *actorPlayer) OnInit() {
 	p.Local().Register("select", p.selectPlayer)
 	p.Local().Register("create", p.createPlayer)
 	p.Local().Register("enter", p.enter)
+	p.Local().Register("switchScene", p.switchScene)
+	p.Local().Register("scenes", p.scenes)
 	p.Local().Register("delete", p.deletePlayer)
 	p.Local().Register("move", p.move)
 }
@@ -102,19 +106,105 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		return
 	}
 
-	// 回写网关 session，启用后续 gameplay 路由
+	main, ok := gcruntime.MainScene()
+	if !ok || main.MaxOnline < 1 {
+		p.ResponseCode(session, code.SceneInvalid)
+		return
+	}
+	view, c := world.ArriveMain(p, session.Uid, session.AgentPath, lineRule(main))
+	if c != code.OK {
+		p.ResponseCode(session, c)
+		return
+	}
+
+	// 进房成功后再回写网关 session，避免主城满员时解锁后续玩法路由
 	p.Call(session.ActorPath(), "setSession", &protocol.StringKeyValue{
 		Key:   sessionkey.PlayerID,
 		Value: cstring.ToString(info.PlayerId),
 	})
-
-	sceneID := world.DefaultSceneID
-	if req.SceneId > 0 {
-		sceneID = req.SceneId
-	}
-	all := world.Enter(session.Uid, session.AgentPath, sceneID)
 	combat.Enter(session.Uid)
-	p.Response(session, &protocol.EnterGameResponse{SceneId: sceneID, Players: all})
+	nearby, ids := nearbyProto(view.Nearby)
+	p.Response(session, &protocol.EnterGameResponse{
+		SceneId: view.SceneID, Line: view.Line, X: view.X, Y: view.Y, Z: view.Z,
+		Players: ids, Nearby: nearby,
+	})
+}
+
+// switchScene 换到另一张地图。当前图留在当前线，不重置战斗。
+func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSwitchRequest) {
+	if !session.Contains(sessionkey.PlayerID) {
+		p.ResponseCode(session, code.PlayerNotEntered)
+		return
+	}
+	if req == nil || req.SceneId < 1 {
+		p.ResponseCode(session, code.SceneInvalid)
+		return
+	}
+	target, ok := gcruntime.Scene(req.SceneId)
+	if !ok || target.MaxOnline < 1 {
+		p.ResponseCode(session, code.SceneInvalid)
+		return
+	}
+	leftCd := int32(0)
+	if pose, in := world.PoseOf(session.Uid); in {
+		if cur, found := gcruntime.Scene(pose.SceneID); found {
+			leftCd = cur.SwitchCdMs
+		}
+	}
+	view, c := world.SwitchMap(p, session.Uid, lineRule(target), leftCd, gtime.Now().UnixMilli())
+	if c != code.OK {
+		p.ResponseCode(session, c)
+		return
+	}
+	if view.Changed {
+		combat.Leave(session.Uid)
+		combat.Enter(session.Uid)
+	}
+	nearby, _ := nearbyProto(view.Nearby)
+	p.Response(session, &protocol.SceneSwitchResponse{
+		SceneId: view.SceneID, Line: view.Line, X: view.X, Y: view.Y, Z: view.Z, Nearby: nearby,
+	})
+}
+
+// scenes 返回配表里的地图和每一条线的当前人数。
+func (p *actorPlayer) scenes(session *cproto.Session, _ *protocol.None) {
+	if !session.Contains(sessionkey.PlayerID) {
+		p.ResponseCode(session, code.PlayerNotEntered)
+		return
+	}
+	rows := gcruntime.Scenes()
+	rsp := &protocol.SceneListResponse{Scenes: make([]*protocol.SceneInfo, 0, len(rows))}
+	for _, row := range rows {
+		info := &protocol.SceneInfo{
+			SceneId: row.ID, Name: row.Name, AllowCombat: row.AllowCombat,
+			MaxOnline: row.MaxOnline, MaxLines: row.LineCount(),
+			Lines: make([]*protocol.SceneLineCount, 0, row.LineCount()),
+		}
+		for line := int32(1); line <= row.LineCount(); line++ {
+			info.Lines = append(info.Lines, &protocol.SceneLineCount{
+				Line: line, Online: world.LineOnline(row.ID, line),
+			})
+		}
+		rsp.Scenes = append(rsp.Scenes, info)
+	}
+	p.Response(session, rsp)
+}
+
+func lineRule(def gcruntime.SceneDef) world.LineRule {
+	return world.LineRule{
+		SceneID: def.ID, MaxOnline: def.MaxOnline, MaxLines: def.MaxLines,
+		SpawnX: def.SpawnX, SpawnY: def.SpawnY, SpawnZ: def.SpawnZ, SwitchCdMs: def.SwitchCdMs,
+	}
+}
+
+func nearbyProto(in []world.Nearby) ([]*protocol.SceneActor, []int64) {
+	actors := make([]*protocol.SceneActor, 0, len(in))
+	ids := make([]int64, 0, len(in))
+	for _, n := range in {
+		actors = append(actors, &protocol.SceneActor{Uid: n.UID, X: n.X, Y: n.Y, Z: n.Z})
+		ids = append(ids, n.UID)
+	}
+	return actors, ids
 }
 
 // deletePlayer 软删除角色，校验归属；已删除返回 40027。
