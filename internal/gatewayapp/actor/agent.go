@@ -279,6 +279,8 @@ func (p *AgentActor) logout(session *cproto.Session, req *protocol.LogoutRequest
 	if session.Uid > 0 {
 		_ = persistence.RemoveDeviceSession(session.Uid, agent.Session().GetString(sessionkey.DeviceID))
 	}
+	// 先入发送队列再 Unbind。pomelo.Response 按 sid 异步查表，Unbind 会立刻删掉记录，客户端收不到回包。
+	agent.Response(session, rsp)
 	agent.Unbind()
 	agent.Session().Remove(sessionkey.Token)
 	agent.Session().Remove(sessionkey.AccessToken)
@@ -286,7 +288,6 @@ func (p *AgentActor) logout(session *cproto.Session, req *protocol.LogoutRequest
 	agent.Session().Remove(sessionkey.DeviceID)
 	agent.Session().Remove(sessionkey.PlayerID)
 	agent.Session().Remove(sessionkey.ServerID)
-	pomelo.Response(p, session.AgentPath, session.Sid, session.GetMID(), rsp)
 }
 
 func (p *AgentActor) setSession(req *protocol.StringKeyValue) {
