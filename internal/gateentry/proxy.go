@@ -21,6 +21,11 @@ type profileFile struct {
 	GateEntry struct {
 		Listen                string `json:"listen"`
 		MaxConnectionsPerGate int    `json:"max_connections_per_gate"`
+		// Upstreams 非空时作为转发目标。容器里网关不在本机回环上，不能用 node.gate 的监听地址。
+		Upstreams []struct {
+			ID      string `json:"id"`
+			Address string `json:"address"`
+		} `json:"upstreams"`
 	} `json:"gate_entry"`
 	Node struct {
 		Gate []struct {
@@ -51,17 +56,29 @@ func LoadConfig(path string) (Config, error) {
 	if cfg.MaxConnectionsPerGate < 1 {
 		cfg.MaxConnectionsPerGate = 2000
 	}
-	for _, g := range raw.Node.Gate {
-		if !g.Enable {
-			continue
+	if len(raw.GateEntry.Upstreams) > 0 {
+		for _, g := range raw.GateEntry.Upstreams {
+			addr := dialAddr(g.Address)
+			if addr == "" || g.ID == "" {
+				continue
+			}
+			cfg.Gates = append(cfg.Gates, Gate{
+				ID: g.ID, Address: addr, Max: cfg.MaxConnectionsPerGate,
+			})
 		}
-		addr := listenAddr(g.Address)
-		if addr == "" || g.NodeID == "" {
-			continue
+	} else {
+		for _, g := range raw.Node.Gate {
+			if !g.Enable {
+				continue
+			}
+			addr := dialAddr(g.Address)
+			if addr == "" || g.NodeID == "" {
+				continue
+			}
+			cfg.Gates = append(cfg.Gates, Gate{
+				ID: g.NodeID, Address: addr, Max: cfg.MaxConnectionsPerGate,
+			})
 		}
-		cfg.Gates = append(cfg.Gates, Gate{
-			ID: g.NodeID, Address: addr, Max: cfg.MaxConnectionsPerGate,
-		})
 	}
 	if len(cfg.Gates) == 0 {
 		return Config{}, fmt.Errorf("no enabled gate in %s", path)
@@ -69,7 +86,7 @@ func LoadConfig(path string) (Config, error) {
 	return cfg, nil
 }
 
-func listenAddr(address string) string {
+func dialAddr(address string) string {
 	address = strings.TrimSpace(address)
 	if address == "" {
 		return ""

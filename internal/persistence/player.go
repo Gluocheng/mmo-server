@@ -106,9 +106,9 @@ func GetPlayerByPlayerID(uid, playerID int64) (*protocol.PlayerInfo, bool, error
 	return GetPlayerByPlayerIDContext(context.Background(), uid, playerID)
 }
 
-// createPlayerInTx 在事务内创建新角色，受 MaxCharacters 上限约束；
-// 不再像一账号一角色时直接返回旧角色。名称全服未删除唯一由查询保证。
-func createPlayerInTx(ctx context.Context, uid int64, name string) (*protocol.PlayerInfo, bool, error) {
+// createPlayerInTx 在事务内创建角色，受角色数上限和全服未删除重名约束。
+// playerID 大于 0 时使用已经领走的编号；否则仍在本事务内发号，回滚会退回编号。
+func createPlayerInTx(ctx context.Context, uid int64, name string, playerID int64) (*protocol.PlayerInfo, bool, error) {
 	name = strings.TrimSpace(name)
 	if uid < 1 || name == "" {
 		return nil, false, nil
@@ -134,9 +134,12 @@ func createPlayerInTx(ctx context.Context, uid int64, name string) (*protocol.Pl
 		return nil, false, dupErr
 	}
 
-	playerID, err := nextPlayerIDInTx(ctx)
-	if err != nil {
-		return nil, false, err
+	if playerID < 1 {
+		var err error
+		playerID, err = nextPlayerIDInTx(ctx)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 
 	p := model.Player{

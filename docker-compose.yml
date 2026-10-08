@@ -41,6 +41,17 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  login2:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/login
+      - -path=/app/configs/mmo-docker.json
+      - -node=login-2
+    depends_on:
+      master:
+        condition: service_started
+    restart: unless-stopped
+
   game:
     image: mmo-server:${MMO_IMAGE_TAG:-local}
     command:
@@ -62,12 +73,56 @@ services:
       - /app/gateway
       - -path=/app/configs/mmo-docker.json
       - -node=gate-1
-    ports:
-      - "10100:10100"
     depends_on:
       game:
         condition: service_started
+      login:
+        condition: service_started
+      login2:
+        condition: service_started
     restart: unless-stopped
+
+  gateway2:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/gateway
+      - -path=/app/configs/mmo-docker.json
+      - -node=gate-2
+    depends_on:
+      game:
+        condition: service_started
+      login:
+        condition: service_started
+      login2:
+        condition: service_started
+    restart: unless-stopped
+
+  gate-entry:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    command:
+      - /app/gate-entry
+      - -path=/app/configs/mmo-docker.json
+    ports:
+      - "10100:10100"
+    sysctls:
+      net.core.somaxconn: "4096"
+    depends_on:
+      gateway:
+        condition: service_started
+      gateway2:
+        condition: service_started
+    restart: unless-stopped
+
+  loadtest:
+    image: mmo-server:${MMO_IMAGE_TAG:-local}
+    profiles: ["load"]
+    command:
+      - /app/lt-scale
+      - -addr=gate-entry:10100
+    depends_on:
+      gate-entry:
+        condition: service_started
+    restart: "no"
 
   # Web 控制台：http://127.0.0.1:${GM_HTTP_PORT:-19080}/  默认 admin / admin123
   gm:

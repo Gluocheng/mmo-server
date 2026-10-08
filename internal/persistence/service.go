@@ -47,7 +47,7 @@ func LoginOrCreateAccount(nickname, password string) (int64, error) {
 	return LoginOrCreateAccountContext(context.Background(), nickname, password)
 }
 
-// CreatePlayerForUID 为账号创建角色，MySQL 写操作在统一事务内完成，缓存于提交后刷新。
+// CreatePlayerForUID 为账号创建角色。编号先单独领走，角色行仍在统一事务内写入。
 func CreatePlayerForUIDContext(parent context.Context, uid int64, name string) (*protocol.PlayerInfo, bool, error) {
 	if err := ensureDB(); err != nil {
 		return nil, false, err
@@ -60,13 +60,19 @@ func CreatePlayerForUIDContext(parent context.Context, uid int64, name string) (
 	ctx, cancel := opContext(parent)
 	defer cancel()
 
+	// 先领号再进创角事务。领号单独提交，创角事务不再占着序列行锁。
+	playerID, err := reservePlayerID(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
 	var (
 		info    *protocol.PlayerInfo
 		created bool
 	)
-	err := WithinTx(ctx, func(txCtx context.Context) error {
+	err = WithinTx(ctx, func(txCtx context.Context) error {
 		var innerErr error
-		info, created, innerErr = createPlayerInTx(txCtx, uid, name)
+		info, created, innerErr = createPlayerInTx(txCtx, uid, name, playerID)
 		return innerErr
 	})
 	return info, created, err

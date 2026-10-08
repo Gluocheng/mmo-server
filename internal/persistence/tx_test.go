@@ -201,7 +201,7 @@ func TestCreatePlayerInTxAllowsMultiplePerUID(t *testing.T) {
 	ctx := context.Background()
 
 	if err := WithinTx(ctx, func(txCtx context.Context) error {
-		_, created, err := createPlayerInTx(txCtx, 1001, "Knight")
+		_, created, err := createPlayerInTx(txCtx, 1001, "Knight", 0)
 		if err != nil || !created {
 			t.Fatalf("first create failed created=%v err=%v", created, err)
 		}
@@ -211,7 +211,7 @@ func TestCreatePlayerInTxAllowsMultiplePerUID(t *testing.T) {
 	}
 
 	if err := WithinTx(ctx, func(txCtx context.Context) error {
-		info, created, err := createPlayerInTx(txCtx, 1001, "Knight2")
+		info, created, err := createPlayerInTx(txCtx, 1001, "Knight2", 0)
 		if err != nil {
 			return err
 		}

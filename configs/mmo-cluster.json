@@ -12,7 +12,7 @@
       "address": "nats://127.0.0.1:4222",
       "reconnect_delay": 1,
       "max_reconnects": 0,
-      "request_timeout": 5,
+      "request_timeout": 20,
       "user": "",
       "password": ""
     }

@@ -25,6 +25,8 @@ func UseMemoryDBForTest(t *testing.T) *gorm.DB {
 		t.Fatalf("migrate: %v", err)
 	}
 
+	resetPlayerIDBatch()
+
 	oldDB := db
 	oldRDB := rdb
 	oldInitErr := initErr

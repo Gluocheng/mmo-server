@@ -15,6 +15,7 @@ import (
 	"github.com/example/mmo-server/internal/gameapp/config"
 	"github.com/example/mmo-server/internal/gameapp/gm"
 	"github.com/example/mmo-server/internal/gameapp/player"
+	"github.com/example/mmo-server/internal/nodecfg"
 	"github.com/example/mmo-server/internal/persistence"
 )
 
@@ -27,6 +28,7 @@ func Run(profileFilePath, nodeID string) {
 	cherrySnowflake.SetDefaultNode(serverID)
 
 	app := cherry.Configure(profileFilePath, nodeID, false, cherry.Cluster)
+	nodecfg.ApplyCallTimeout(app)
 	app.SetSerializer(cserializer.NewProtobuf())
 	mustLoadGameConfig()
 	app.AddActors(&player.ActorPlayers{})

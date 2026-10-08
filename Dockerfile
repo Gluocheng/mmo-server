@@ -27,6 +27,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/game ./cmd/game && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gateway ./cmd/gateway && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gm ./cmd/gm && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gate-entry ./cmd/gate-entry && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/lt-scale ./cmd/lt-scale && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/import-config ./gameconfig/cmd/import
 
 FROM debian:bookworm-slim AS runtime
@@ -37,7 +39,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY --from=builder /out/master /out/login /out/game /out/gateway /out/gm /out/import-config /app/
+COPY --from=builder /out/master /out/login /out/game /out/gateway /out/gm /out/gate-entry /out/lt-scale /out/import-config /app/
 COPY configs/mmo-docker.json /app/configs/mmo-docker.json
 COPY gameconfig/gen/data /app/gameconfig/gen/data
 

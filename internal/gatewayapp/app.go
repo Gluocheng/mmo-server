@@ -6,11 +6,13 @@ import (
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	cserializer "github.com/cherry-game/cherry/net/serializer"
 	"github.com/example/mmo-server/internal/gatewayapp/actor"
+	"github.com/example/mmo-server/internal/nodecfg"
 )
 
 // Run 启动网关节点（WebSocket + Pomelo 协议）
 func Run(profileFilePath, nodeID string) {
 	app := cherry.Configure(profileFilePath, nodeID, true, cherry.Cluster)
+	nodecfg.ApplyCallTimeout(app)
 	app.SetSerializer(cserializer.NewProtobuf())
 	app.AddActors(&actor.ActorOps{})
 

@@ -4,6 +4,7 @@ import (
 	"github.com/cherry-game/cherry"
 	cserializer "github.com/cherry-game/cherry/net/serializer"
 	"github.com/example/mmo-server/internal/loginapp/actor"
+	"github.com/example/mmo-server/internal/nodecfg"
 	"github.com/example/mmo-server/internal/persistence"
 )
 
@@ -14,6 +15,7 @@ func Run(profileFilePath, nodeID string) {
 	}
 
 	app := cherry.Configure(profileFilePath, nodeID, false, cherry.Cluster)
+	nodecfg.ApplyCallTimeout(app)
 	app.SetSerializer(cserializer.NewProtobuf())
 	app.AddActors(&actor.ActorSession{})
 	app.Startup()

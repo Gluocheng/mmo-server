@@ -130,7 +130,7 @@ powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage rollback
 powershell -ExecutionPolicy Bypass -File scripts/cicd.ps1 -Stage down
 ```
 
-Compose 使用 [`configs/mmo-docker.json`](configs/mmo-docker.json)：NATS 由本栈启动；MySQL/Redis 使用你已有的 Docker/本机服务，容器内通过 `host.docker.internal:3306/6379` 访问，并自动执行 `import-config` 初始化配表。
+Compose 使用 [`configs/mmo-docker.json`](configs/mmo-docker.json)：NATS 由本栈启动；MySQL/Redis 使用你已有的 Docker/本机服务，容器内通过 `host.docker.internal:3306/6379` 访问，并自动执行 `import-config` 初始化配表。栈内启动 `login-1`、`login-2`、`gate-1`、`gate-2`，对外 `10100` 由 `gate-entry` 转发。
 
 - 网关 WebSocket：`ws://127.0.0.1:10100`
 - GM 控制台（Docker）：浏览器打开 `http://127.0.0.1:19080/`（默认 `admin` / `admin123`）；可用 `-GMPort` 或环境变量 `GM_HTTP_PORT` 调整宿主机映射端口

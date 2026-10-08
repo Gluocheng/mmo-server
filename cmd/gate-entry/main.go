@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"net"
 	"os"
 
 	"github.com/example/mmo-server/internal/gateentry"
@@ -16,7 +15,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ln, err := net.Listen("tcp", cfg.Listen)
+	ln, err := gateentry.Listen(cfg.Listen)
 	if err != nil {
 		log.Fatal(err)
 	}
