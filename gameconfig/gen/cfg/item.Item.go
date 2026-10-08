@@ -19,6 +19,7 @@ type ItemItem struct {
     Discardable bool
     BindType string
     BagType int32
+    UseBuffId int32
 }
 
 const TypeId_ItemItem = 2107285806
@@ -36,6 +37,7 @@ func (_v *ItemItem)Deserialize(_buf map[string]interface{}) (err error) {
     { var _ok_ bool; if _v.Discardable, _ok_ = _buf["discardable"].(bool); !_ok_ { err = errors.New("discardable error"); return } }
     { var _ok_ bool; if _v.BindType, _ok_ = _buf["bind_type"].(string); !_ok_ { err = errors.New("bind_type error"); return } }
     { var _ok_ bool; var _tempNum_ float64; if _tempNum_, _ok_ = _buf["bag_type"].(float64); !_ok_ { err = errors.New("bag_type error"); return }; _v.BagType = int32(_tempNum_) }
+    { var _ok_ bool; var _tempNum_ float64; if _tempNum_, _ok_ = _buf["use_buff_id"].(float64); !_ok_ { err = errors.New("use_buff_id error"); return }; _v.UseBuffId = int32(_tempNum_) }
     return
 }
 

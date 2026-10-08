@@ -7,7 +7,8 @@
     "stackable": true,
     "discardable": true,
     "bind_type": "none",
-    "bag_type": 2
+    "bag_type": 2,
+    "use_buff_id": 2
   },
   {
     "id": 1002,
@@ -17,7 +18,8 @@
     "stackable": true,
     "discardable": true,
     "bind_type": "none",
-    "bag_type": 3
+    "bag_type": 3,
+    "use_buff_id": 0
   },
   {
     "id": 2001,
@@ -27,7 +29,8 @@
     "stackable": false,
     "discardable": true,
     "bind_type": "none",
-    "bag_type": 4
+    "bag_type": 4,
+    "use_buff_id": 0
   },
   {
     "id": 3001,
@@ -37,6 +40,7 @@
     "stackable": false,
     "discardable": false,
     "bind_type": "none",
-    "bag_type": 5
+    "bag_type": 5,
+    "use_buff_id": 0
   }
 ]

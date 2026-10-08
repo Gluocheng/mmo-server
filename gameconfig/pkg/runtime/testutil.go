@@ -54,7 +54,7 @@ func SeedTestItems(ctx context.Context, db *gorm.DB) error {
 // SeedDemoItems 写入演示道具并 Load。
 func SeedDemoItems(ctx context.Context, db *gorm.DB) error {
 	items := []*cfg.ItemItem{
-		{Id: 1001, Name: "小型生命药水", Type: "consumable", MaxStack: 99, Stackable: true, Discardable: true, BindType: "none", BagType: 2},
+		{Id: 1001, Name: "小型生命药水", Type: "consumable", MaxStack: 99, Stackable: true, Discardable: true, BindType: "none", BagType: 2, UseBuffId: 2},
 		{Id: 1002, Name: "铜币袋", Type: "material", MaxStack: 9999, Stackable: true, Discardable: true, BindType: "none", BagType: 3},
 		{Id: 2001, Name: "新手木剑", Type: "equipment", MaxStack: 1, Stackable: false, Discardable: true, BindType: "none", BagType: 4},
 		{Id: 3001, Name: "任务信件", Type: "quest", MaxStack: 1, Stackable: false, Discardable: false, BindType: "none", BagType: 5},
@@ -67,7 +67,7 @@ func SeedDemoItems(ctx context.Context, db *gorm.DB) error {
 		schemaRows = append(schemaRows, schema.CfgItem{
 			ID: it.Id, Name: it.Name, Type: it.Type, MaxStack: it.MaxStack,
 			Stackable: it.Stackable, Discardable: it.Discardable, BindType: it.BindType,
-			BagType: it.BagType,
+			BagType: it.BagType, UseBuffID: it.UseBuffId,
 		})
 	}
 	if err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

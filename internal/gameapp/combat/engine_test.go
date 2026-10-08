@@ -274,3 +274,87 @@ func TestCastRejectsRangeCooldownAndDeath(t *testing.T) {
 		t.Fatal("expected respawn")
 	}
 }
+
+func setupStun(t *testing.T) {
+	t.Helper()
+	ResetForTest()
+	SetClockForTest(0)
+	gcruntime.BuildCombat(
+		[]gcruntime.SkillDef{
+			{ID: 1, Name: "普攻", Target: "single", CastRange: 3, CooldownMs: 1000, Damage: 10},
+			{ID: 4, Name: "禁手", Target: "single", CastRange: 3, CooldownMs: 5000, BuffID: 3},
+		},
+		[]gcruntime.BuffDef{
+			{ID: 2, Name: "愈合", DurationMs: 1100, IntervalMs: 1000, Effect: "hot", Value: 30, MaxStack: 1},
+			{ID: 3, Name: "禁手", DurationMs: 2000, Effect: "stun", MaxStack: 1},
+		},
+		gcruntime.CombatConst{MaxHP: 100, TickMs: 100, RespawnMs: 5000, FrameEventCap: 64},
+	)
+	gcruntime.BuildScenes([]gcruntime.SceneDef{{
+		ID: world.DefaultSceneID, Name: "测试", AllowCombat: true, MaxOnline: 100, MaxLines: 1,
+	}})
+}
+
+func TestStunBlocksCastAndPotionUntilExpire(t *testing.T) {
+	setupStun(t)
+	join(t, 98001, 0)
+	join(t, 98002, 0)
+	if c := ApplyBuff(98001, 3); c != code.OK {
+		t.Fatalf("apply %d", c)
+	}
+	if c := Cast(98001, 1, 98002); c != code.CombatStunned {
+		t.Fatalf("cast %d", c)
+	}
+	if c := ApplyBuff(98001, 2); c != code.CombatStunned {
+		t.Fatalf("potion %d", c)
+	}
+	SetClockForTest(2000)
+	if c := Cast(98001, 1, 98002); c != code.OK {
+		t.Fatalf("after expire %d", c)
+	}
+}
+
+func TestStunDoesNotChangeHP(t *testing.T) {
+	setupStun(t)
+	join(t, 98101, 0)
+	if c := ApplyBuff(98101, 3); c != code.OK {
+		t.Fatal(c)
+	}
+	SetClockForTest(1000)
+	Tick()
+	if hp, _, _, _ := Snapshot(98101); hp != 100 {
+		t.Fatalf("hp %d", hp)
+	}
+}
+
+func TestStunSkillAppliesControl(t *testing.T) {
+	setupStun(t)
+	join(t, 98201, 0)
+	join(t, 98202, 0)
+	if c := Cast(98201, 4, 98202); c != code.OK {
+		t.Fatalf("cast %d", c)
+	}
+	Tick()
+	if c := Cast(98202, 1, 98201); c != code.CombatStunned {
+		t.Fatalf("target %d", c)
+	}
+	if hp, _, _, _ := Snapshot(98202); hp != 100 {
+		t.Fatalf("hp %d", hp)
+	}
+}
+
+func TestQueuedCastDroppedWhenStunned(t *testing.T) {
+	setupStun(t)
+	join(t, 98301, 0)
+	join(t, 98302, 0)
+	if c := Cast(98301, 1, 98302); c != code.OK {
+		t.Fatalf("queue %d", c)
+	}
+	if c := ApplyBuff(98301, 3); c != code.OK {
+		t.Fatalf("stun %d", c)
+	}
+	Tick()
+	if hp, _, _, _ := Snapshot(98302); hp != 100 {
+		t.Fatalf("hp %d", hp)
+	}
+}

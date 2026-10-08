@@ -17,7 +17,18 @@ func TestLoadItemsFromJSONFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(table.GetDataList()) < 4 {
-		t.Fatalf("expected demo items, got %d", len(table.GetDataList()))
+	rows := importdata.ItemsToSchema(table.GetDataList())
+	if len(rows) < 4 {
+		t.Fatalf("expected demo items, got %d", len(rows))
 	}
+	for _, row := range rows {
+		if row.ID != 1001 {
+			continue
+		}
+		if row.UseBuffID != 2 {
+			t.Fatalf("potion use_buff_id=%d", row.UseBuffID)
+		}
+		return
+	}
+	t.Fatal("item 1001 missing")
 }

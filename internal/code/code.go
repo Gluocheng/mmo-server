@@ -50,6 +50,8 @@ const (
 	SceneFull           int32 = 40051 // 地图或每一条分线都已满
 	SceneCombatDisabled int32 = 40052 // 当前地图不允许战斗，或地图已不在配表
 	SceneSwitchCooldown int32 = 40053 // 切图冷却未到
+	ItemNotUsable       int32 = 40054 // 道具 use_buff_id 为 0，不能使用
+	CombatStunned       int32 = 40055 // 身上有未到期的禁手，不能出手或喝药
 )
 
 func IsFail(c int32) bool {

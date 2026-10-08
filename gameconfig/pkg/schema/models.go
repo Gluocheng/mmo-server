@@ -12,7 +12,7 @@ type CfgVersion struct {
 // TableName 表名 cfg_version。
 func (CfgVersion) TableName() string { return "cfg_version" }
 
-// CfgItem 道具静态配置行（与 Luban Item / gen/cfg.Item 同构）。
+// CfgItem 道具静态配置行（与 Luban Item / gen/cfg.Item 同构）。UseBuffID 为 0 表示不能使用。
 type CfgItem struct {
 	ID          int32  `gorm:"primaryKey"`
 	Name        string `gorm:"size:64;not null"`
@@ -22,6 +22,7 @@ type CfgItem struct {
 	Discardable bool   `gorm:"not null;default:true"`
 	BindType    string `gorm:"size:16;not null;default:none"`
 	BagType     int32  `gorm:"not null;default:1"`
+	UseBuffID   int32  `gorm:"column:use_buff_id;not null;default:0"`
 }
 
 // TableName 表名 cfg_item。

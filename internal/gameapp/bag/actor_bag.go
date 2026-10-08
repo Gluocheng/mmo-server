@@ -7,6 +7,7 @@ import (
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	cproto "github.com/cherry-game/cherry/net/proto"
+	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
@@ -18,13 +19,14 @@ type actorBag struct {
 	pomelo.ActorBase
 }
 
-// OnInit 注册路由 list / add / remove / move / split（对应 game.bag.*）。
+// OnInit 注册路由 list / add / remove / move / split / use（对应 game.bag.*）。
 func (p *actorBag) OnInit() {
 	p.Local().Register("list", p.list)
 	p.Local().Register("add", p.add)
 	p.Local().Register("remove", p.remove)
 	p.Local().Register("move", p.move)
 	p.Local().Register("split", p.split)
+	p.Local().Register("use", p.use)
 }
 
 func (p *actorBag) playerIDFromSession(session *cproto.Session) (int64, bool) {
@@ -138,6 +140,53 @@ func (p *actorBag) move(session *cproto.Session, req *protocol.BagMoveRequest) {
 		return
 	}
 	if err := persistence.MoveItem(playerID, req.BagType, req.FromSlot, req.ToSlot); err != nil {
+		p.respondBagError(session, playerID, err)
+		return
+	}
+	p.respondBagMutate(session, playerID, req.BagType)
+}
+
+// use 使用槽位上的 1 个道具。先挂 Buff，成功后才扣数量并推 onBagChange。
+func (p *actorBag) use(session *cproto.Session, req *protocol.BagUseRequest) {
+	playerID, ok := p.playerIDFromSession(session)
+	if !ok {
+		p.ResponseCode(session, code.PlayerNotEntered)
+		return
+	}
+	if req == nil || req.BagType < 1 {
+		p.ResponseCode(session, code.BagSlotInvalid)
+		return
+	}
+	bag, err := persistence.GetBagByPlayerID(playerID, req.BagType)
+	if err != nil {
+		clog.Warnf("bag use load fail player_id=%d bag_type=%d err=%v", playerID, req.BagType, err)
+		p.ResponseCode(session, code.BagLoadFail)
+		return
+	}
+	var itemID int32
+	found := false
+	for _, it := range bag.Items {
+		if it != nil && it.Slot == req.Slot {
+			itemID = it.ItemId
+			found = true
+			break
+		}
+	}
+	if !found || itemID < 1 {
+		p.ResponseCode(session, code.BagSlotInvalid)
+		return
+	}
+	def, ok := gcruntime.Get(itemID)
+	if !ok {
+		p.ResponseCode(session, code.ItemNotFound)
+		return
+	}
+	if c := ApplyUse(session.Uid, def.UseBuffID); c != code.OK {
+		p.ResponseCode(session, c)
+		return
+	}
+	if err := persistence.RemoveItemAtSlot(playerID, req.BagType, req.Slot, 1); err != nil {
+		clog.Warnf("bag use consume fail player_id=%d slot=%d err=%v", playerID, req.Slot, err)
 		p.respondBagError(session, playerID, err)
 		return
 	}

@@ -47,6 +47,7 @@ func ItemsToSchema(items []*cfg.ItemItem) []schema.CfgItem {
 			Discardable: it.Discardable,
 			BindType:    it.BindType,
 			BagType:     it.BagType,
+			UseBuffID:   it.UseBuffId,
 		})
 	}
 	return out
@@ -66,6 +67,7 @@ func SchemaToItems(rows []schema.CfgItem) []*cfg.ItemItem {
 			Discardable: r.Discardable,
 			BindType:    r.BindType,
 			BagType:     r.BagType,
+			UseBuffId:   r.UseBuffID,
 		})
 	}
 	return out

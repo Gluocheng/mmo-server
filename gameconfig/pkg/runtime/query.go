@@ -14,6 +14,7 @@ type ItemDef struct {
 	Discardable bool
 	BindType    string
 	BagType     int32
+	UseBuffID   int32
 }
 
 func toItemDef(item *cfg.ItemItem) ItemDef {
@@ -29,6 +30,7 @@ func toItemDef(item *cfg.ItemItem) ItemDef {
 		Discardable: item.Discardable,
 		BindType:    item.BindType,
 		BagType:     item.BagType,
+		UseBuffID:   item.UseBuffId,
 	}
 }
 

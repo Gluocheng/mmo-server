@@ -1,5 +1,5 @@
-##,id,name,type,max_stack,stackable,discardable,bind_type,bag_type
-,1001,小型生命药水,consumable,99,true,true,none,2
-,1002,铜币袋,material,9999,true,true,none,3
-,2001,新手木剑,equipment,1,false,true,none,4
-,3001,任务信件,quest,1,false,false,none,5
+##,id,name,type,max_stack,stackable,discardable,bind_type,bag_type,use_buff_id
+,1001,小型生命药水,consumable,99,true,true,none,2,2
+,1002,铜币袋,material,9999,true,true,none,3,0
+,2001,新手木剑,equipment,1,false,true,none,4,0
+,3001,任务信件,quest,1,false,false,none,5,0

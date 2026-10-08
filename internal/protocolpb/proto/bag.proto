@@ -44,3 +44,9 @@ message BagSplitRequest {
   int32 count = 2 [json_name = "count"];
   int32 bag_type = 3 [json_name = "bagType"];
 }
+
+// BagUseRequest 使用槽位上的 1 个道具。use_buff_id 为 0 时不可使用。
+message BagUseRequest {
+  int32 bag_type = 1 [json_name = "bagType"];
+  int32 slot = 2 [json_name = "slot"];
+}

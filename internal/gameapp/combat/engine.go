@@ -131,7 +131,7 @@ func Snapshot(uid int64) (hp, maxHP int32, alive, ok bool) {
 	return u.hp, u.maxHP, !u.dead, true
 }
 
-// Cast 接受技能意图。非法技能、冷却、距离和死亡立刻返回；扣血在下一拍。
+// Cast 接受技能意图。非法技能、禁手、冷却、距离和死亡立刻返回；扣血在下一拍。
 func Cast(uid int64, skillID int32, targetUID int64) int32 {
 	sk, ok := gcruntime.Skill(skillID)
 	if !ok || (sk.Target != "single" && sk.Target != "aoe_self") {
@@ -146,10 +146,13 @@ func Cast(uid int64, skillID int32, targetUID int64) int32 {
 	if u.dead {
 		return code.CombatSelfDead
 	}
+	now := nowFn()
+	if stunned(u, now) {
+		return code.CombatStunned
+	}
 	if !sceneAllowsCombat(uid) {
 		return code.SceneCombatDisabled
 	}
-	now := nowFn()
 	if ready, exists := cds[uid][skillID]; exists && now < ready {
 		return code.CombatCooldown
 	}
@@ -198,7 +201,11 @@ func ApplyBuff(uid int64, buffID int32) int32 {
 	if u.dead {
 		return code.CombatSelfDead
 	}
-	applyBuff(u, uid, def, nowFn())
+	now := nowFn()
+	if stunned(u, now) {
+		return code.CombatStunned
+	}
+	applyBuff(u, uid, def, now)
 	return code.OK
 }
 
@@ -223,15 +230,35 @@ func Tick() []Frame {
 }
 
 func validBuff(def gcruntime.BuffDef) bool {
-	if def.Effect != "dot" && def.Effect != "hot" {
+	if def.DurationMs < 1 {
 		return false
 	}
-	return def.Value > 0 && def.DurationMs > 0
+	switch def.Effect {
+	case "dot", "hot":
+		return def.Value > 0
+	case "stun":
+		return true
+	default:
+		return false
+	}
+}
+
+// stunned 表示身上还有未到期的禁手。now 由调用方在持锁时取。
+func stunned(u *unit, now int64) bool {
+	if u == nil {
+		return false
+	}
+	for _, b := range u.buffs {
+		if b != nil && b.effect == "stun" && now < b.expireAt {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveIntent(it intent, now int64) []Hit {
 	u := units[it.uid]
-	if u == nil || u.dead || !sceneAllowsCombat(it.uid) {
+	if u == nil || u.dead || stunned(u, now) || !sceneAllowsCombat(it.uid) {
 		return nil
 	}
 	switch it.skill.target {
@@ -372,7 +399,7 @@ func tickBuffs(now int64) []Hit {
 			if u.dead || now >= b.expireAt {
 				continue
 			}
-			if now >= b.nextTick {
+			if now >= b.nextTick && b.effect != "stun" {
 				amt := b.value * b.stacks
 				if amt < 1 {
 					amt = b.value

@@ -297,6 +297,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 背包扣除 | `game.bag.remove`       | `BagRemoveRequest`（`bagType`）            | `BagListResponse` + Push `onBagChange`           |
 | 背包移动 | `game.bag.move`         | `BagMoveRequest`（`bagType`/`fromSlot`/`toSlot`） | `BagListResponse` + Push `onBagChange`           |
 | 背包拆分 | `game.bag.split`        | `BagSplitRequest`（`bagType`/`fromSlot`/`count`） | `BagListResponse` + Push `onBagChange`           |
+| 使用道具 | `game.bag.use`          | `BagUseRequest`（`bagType`/`slot`）            | `BagListResponse` + Push `onBagChange`；治疗在后续 `onCombatFrame` |
 | 配置热更 | `POST /gm/config/reload` | JSON `{tableName}` | `{code,version,tables}` | 需 GM token；内部 `GmReloadRequest` |
 
 
@@ -307,6 +308,8 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 移动广播带简单 **AOI 半径过滤**（默认 15，见 `internal/gameapp/world/scene.go`）
 - 聊天为同场景全员广播（无 AOI 裁剪）
 - 战斗须已 `enter`。技能与 Buff 读配表 `cfg_skill` / `cfg_buff` / `cfg_combat_const`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活玩家。每人每拍最多一条 `onCombatFrame`
+- `game.bag.use` 按道具 `use_buff_id` 调用 `ApplyBuff`，成功才扣 1 个。`0` 返回 `40054`。死亡不扣。禁战地图仍可使用。治疗在下一心跳，不是当场加血
+- 禁手是 Buff 效果 `stun`。效果还在时放技能和喝药返回 `40055`，不入队也不进冷却。已经进下一拍的技能若结算时施法者已禁手，这一拍不造成伤害，冷却不退回。移动不拦
 - 进场忽略请求里的 `sceneId`，出生在配表主城。`max_lines >= 2` 的图才会在满员后进入下一条线。切图成功会满血，并按离开的那张图的 `switch_cd_ms` 冷却。主城默认不能放技能，以地图表 `allow_combat` 为准
 - 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
@@ -316,7 +319,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40053`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40055`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -368,6 +371,8 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40051 | `SceneFull`           | 地图或每一条分线都已满 |
 | 40052 | `SceneCombatDisabled` | 当前地图不允许战斗，或地图已不在配表 |
 | 40053 | `SceneSwitchCooldown` | 切图冷却未到 |
+| 40054 | `ItemNotUsable`       | 道具不能使用（`use_buff_id` 为 0） |
+| 40055 | `CombatStunned`       | 禁手中，不能出手或喝药 |
 
 
 ### 重新生成 Protobuf Go 代码

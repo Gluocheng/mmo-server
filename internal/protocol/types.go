@@ -43,6 +43,7 @@ type (
 	BagRemoveRequest      = pb.BagRemoveRequest
 	BagMoveRequest        = pb.BagMoveRequest
 	BagSplitRequest       = pb.BagSplitRequest
+	BagUseRequest         = pb.BagUseRequest
 	GmReloadRequest       = pb.GmReloadRequest
 	GmReloadResponse      = pb.GmReloadResponse
 	GmAccountQueryRequest = pb.GmAccountQueryRequest
