@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/example/mmo-server/gameconfig/pkg/schema"
 	"github.com/example/mmo-server/internal/persistence/model"
@@ -38,15 +39,66 @@ func autoMigrateModels(db *gorm.DB) error {
 // GORM AutoMigrate 不会自动删除既有索引，这里显式处理；索引不存在时忽略错误。
 func downgradePlayerUIDUniqueIndex(db *gorm.DB) error {
 	migrator := db.Migrator()
-	// 旧唯一索引名遵循 GORM 默认命名：idx_players_uid
-	if migrator.HasIndex(&model.Player{}, "idx_players_uid") {
-		_ = migrator.DropIndex(&model.Player{}, "idx_players_uid")
-	}
 	// 部分历史库可能为 uni_players_uid，一并尝试清理
 	if migrator.HasIndex(&model.Player{}, "uni_players_uid") {
 		_ = migrator.DropIndex(&model.Player{}, "uni_players_uid")
 	}
-	return migrator.CreateIndex(&model.Player{}, "idx_players_uid")
+	// 内存库没有 information_schema，索引已在时直接留下。
+	if db.Dialector.Name() == "sqlite" {
+		if migrator.HasIndex(&model.Player{}, "idx_players_uid") {
+			return nil
+		}
+		return migrator.CreateIndex(&model.Player{}, "idx_players_uid")
+	}
+	// 已经是普通索引时不再删除重建。两个登录进程同时迁移时，删除再建会撞上 Duplicate key name。
+	state, err := indexUniqueness(db, "players", "idx_players_uid")
+	if err != nil {
+		return err
+	}
+	if state == indexNonUnique {
+		return nil
+	}
+	if state == indexUnique {
+		_ = migrator.DropIndex(&model.Player{}, "idx_players_uid")
+	}
+	if err := migrator.CreateIndex(&model.Player{}, "idx_players_uid"); err != nil && !isDuplicateKeyName(err) {
+		return err
+	}
+	return nil
+}
+
+const (
+	indexMissing = iota
+	indexUnique
+	indexNonUnique
+)
+
+func indexUniqueness(db *gorm.DB, table, index string) (int, error) {
+	var rows []struct {
+		NonUnique int `gorm:"column:NON_UNIQUE"`
+	}
+	err := db.Raw(
+		`SELECT NON_UNIQUE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
+		table, index,
+	).Scan(&rows).Error
+	if err != nil {
+		return indexMissing, err
+	}
+	if len(rows) == 0 {
+		return indexMissing, nil
+	}
+	if rows[0].NonUnique == 0 {
+		return indexUnique, nil
+	}
+	return indexNonUnique, nil
+}
+
+func isDuplicateKeyName(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "Duplicate key name") || strings.Contains(msg, "Error 1061")
 }
 
 // initializePlayerIDSequence 按历史最大角色 ID 初始化短数字序列，避免迁移后新角色撞号。

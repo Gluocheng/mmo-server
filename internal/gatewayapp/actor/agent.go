@@ -12,7 +12,9 @@ import (
 	pmessage "github.com/cherry-game/cherry/net/parser/pomelo/message"
 	cproto "github.com/cherry-game/cherry/net/proto"
 	cprofile "github.com/cherry-game/cherry/profile"
+	"github.com/example/mmo-server/internal/authcfg"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/loginroute"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
@@ -38,11 +40,32 @@ var beforeEnterRoutes = map[string]struct{}{
 var notLoginKick = &protocol.CodeOnly{Code: code.PlayerDenyLogin}
 
 func loginTargetPath(app cfacade.IApplication) string {
-	list := app.Discovery().ListByType("login")
-	if len(list) < 1 {
+	if app == nil || app.Discovery() == nil {
 		return ""
 	}
-	return cstring.ToString(list[0].GetNodeID()) + ".session"
+	list := app.Discovery().ListByType("login")
+	ids := make([]string, 0, len(list))
+	for _, member := range list {
+		if member == nil {
+			continue
+		}
+		id := cstring.ToString(member.GetNodeID())
+		if id != "" {
+			ids = append(ids, id)
+		}
+	}
+	sortStrings(ids)
+	return loginroute.NextSessionPath(ids, authcfg.SessionWorkers())
+}
+
+func sortStrings(ids []string) {
+	for i := 1; i < len(ids); i++ {
+		j := i
+		for j > 0 && ids[j] < ids[j-1] {
+			ids[j], ids[j-1] = ids[j-1], ids[j]
+			j--
+		}
+	}
 }
 
 // AgentActor 每个连接一个子 Actor

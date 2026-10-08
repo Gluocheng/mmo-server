@@ -46,6 +46,14 @@
         "__settings__": {
           "ref_logger": "login_log"
         }
+      },
+      {
+        "node_id": "login-2",
+        "address": "",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "login2_log"
+        }
       }
     ],
     "game": [
@@ -84,6 +92,13 @@
       "file_link_path": "",
       "file_path_format": "logs/login.log"
     },
+    "login2_log": {
+      "level": "debug",
+      "enable_console": false,
+      "enable_write_file": true,
+      "file_link_path": "",
+      "file_path_format": "logs/login-2.log"
+    },
     "game_log": {
       "level": "debug",
       "enable_console": false,
@@ -113,7 +128,8 @@
   },
   "auth": {
     "session_policy": "kick_old",
-    "max_devices_per_uid": 2
+    "max_devices_per_uid": 2,
+    "session_workers": 8
   },
   "redis": {
     "address": "127.0.0.1:6379",

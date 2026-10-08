@@ -11,7 +11,7 @@ flowchart LR
   Client[WebSocket 客户端]
   Admin[GM 管理端]
   Gate[gate-1 网关]
-  Login[login-1 登录]
+  Login[login-1 / login-2 登录]
   Game[10001 游戏]
   GM[gm-1 管理]
   Master[master-1 发现]
@@ -41,7 +41,7 @@ flowchart LR
 | --------- | ------------- | ------------------------------------------- |
 | `master`  | `cmd/master`  | NATS 模式集群注册发现（无业务路由）                        |
 | `gateway` | `cmd/gateway` | WebSocket + Pomelo 协议、鉴权路由、转发至 login/game   |
-| `login`   | `cmd/login`   | 帐号密码签发 Token、校验、刷新、登出                       |
+| `login`   | `cmd/login`   | 帐号密码签发 Token、校验、刷新、登出。profile 里每个启用的登录节点各起一个进程，节点内按 `auth.session_workers` 并行 |
 | `game`    | `cmd/game`    | 选角/创角/进场、场景移动（AOI）、聊天、背包、GM 指令处理            |
 | `gm`      | `cmd/gm`      | **独立管理进程**：HTTP API，通过 NATS 向 game 节点下发管理指令 |
 
@@ -96,6 +96,7 @@ powershell -ExecutionPolicy Bypass -File scripts/stop.ps1 -StopNats
 ```powershell
 go run ./cmd/master  -path=configs/mmo-cluster.json -node=master-1
 go run ./cmd/login   -path=configs/mmo-cluster.json -node=login-1
+go run ./cmd/login   -path=configs/mmo-cluster.json -node=login-2
 go run ./cmd/game    -path=configs/mmo-cluster.json -node=10001
 go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-1
 go run ./cmd/gm      -http=:9080 -nats=nats://127.0.0.1:4222 -prefix=mmo -game=10001 -path=configs/mmo-cluster.json -token=dev-gm-token
@@ -237,7 +238,7 @@ curl.exe -X POST http://127.0.0.1:9080/gm/maintenance `
   -d '{"enabled":true,"reason":"patch"}'
 ```
 
-Docker 预发布 GM 端口为 `19080`。发奖/扣道具不要求玩家在线；已进场则会 Push `onBagChange`。踢人只断连接；封号后无法签发或刷新 token（`40033`）并吊销该 uid 已签发 token。禁言后发聊天返回 `40034`。维护中登录/鉴权/刷新返回 `40035` 并踢全连接。公告 Push `onNotice`。调时间写入 Redis 并热更新 game 与 login（`-login` 默认 `login-1`）。
+Docker 预发布 GM 端口为 `19080`。发奖/扣道具不要求玩家在线；已进场则会 Push `onBagChange`。踢人只断连接；封号后无法签发或刷新 token（`40033`）并吊销该 uid 已签发 token。禁言后发聊天返回 `40034`。维护中登录/鉴权/刷新返回 `40035` 并踢全连接。公告 Push `onNotice`。调时间写入 Redis 并热更新 game 与 profile 里每一个登录节点。
 
 ### 通信链路
 

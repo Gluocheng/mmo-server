@@ -6,6 +6,7 @@ import (
 
 	clog "github.com/cherry-game/cherry/logger"
 	cproto "github.com/cherry-game/cherry/net/proto"
+	"github.com/example/mmo-server/internal/authcfg"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,6 +31,31 @@ func (a *App) callLogin(funcName string, req proto.Message) (*cproto.Response, e
 	source := fmt.Sprintf("%s.gm.time", gmNodeID)
 	target := fmt.Sprintf("%s.session", loginID)
 	return a.callRemoteAt(a.remoteSubjectFor("login", loginID), source, target, funcName, req)
+}
+
+// callAllLogins 把调时间打到 profile 里每一个启用的登录节点。任一失败则返回 false。
+func (a *App) callAllLogins(funcName string, req proto.Message) bool {
+	ids := authcfg.EnabledLoginNodeIDs()
+	if len(ids) == 0 {
+		if a.loginNodeID != "" {
+			ids = []string{a.loginNodeID}
+		} else {
+			ids = []string{"login-1"}
+		}
+	}
+	ok := true
+	for _, id := range ids {
+		source := fmt.Sprintf("%s.gm.time", gmNodeID)
+		target := fmt.Sprintf("%s.session", id)
+		rsp, err := a.callRemoteAt(a.remoteSubjectFor("login", id), source, target, funcName, req)
+		if err != nil || rsp == nil || rsp.Code != 0 {
+			ok = false
+			if err != nil {
+				logRemoteErr("time.set.login."+id, err)
+			}
+		}
+	}
+	return ok
 }
 
 func (a *App) callRemoteAt(subject, source, target, funcName string, req proto.Message) (*cproto.Response, error) {

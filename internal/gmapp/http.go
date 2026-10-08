@@ -502,12 +502,7 @@ func (a *App) handleTimeSet(w http.ResponseWriter, r *http.Request) {
 	} else if err != nil {
 		logRemoteErr("time.set.game", err)
 	}
-	loginOK := false
-	if rsp, err := a.callLogin("setGameTime", pbReq); err == nil && rsp.Code == 0 {
-		loginOK = true
-	} else if err != nil {
-		logRemoteErr("time.set.login", err)
-	}
+	loginOK := a.callAllLogins("setGameTime", pbReq)
 	a.writeTimeJSON(w, true, gameOK, loginOK)
 }
 

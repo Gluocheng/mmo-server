@@ -126,7 +126,7 @@ function Start-GMNode {
     }
     if (-not $env:GM_BOOTSTRAP_USER) { $env:GM_BOOTSTRAP_USER = "admin" }
     if (-not $env:GM_BOOTSTRAP_PASSWORD) { $env:GM_BOOTSTRAP_PASSWORD = "admin123" }
-    $procArgs = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode", "-login=login-1", "-path=$Profile", "-token=dev-gm-token")
+    $procArgs = @("-http=$HTTPAddr", "-nats=$NATSAddr", "-prefix=$Prefix", "-game=$GameNode", "-path=$Profile", "-token=dev-gm-token")
     $errLog = Join-Path $root "logs/gm.stderr.log"
     if (Test-Path $errLog) { Remove-Item $errLog -Force }
     Start-Process `
@@ -145,6 +145,69 @@ function Start-GMNode {
         throw "[gm] failed to start, see logs/gm.log (recompile with -Build if binary is stale)"
     }
     Write-Host "[gm] started (http=$HTTPAddr, game=$GameNode)."
+}
+
+function Get-EnabledProfileNodes {
+    param([string]$Kind)
+    $file = Join-Path $root $Profile
+    $nodes = @()
+    if (Test-Path $file) {
+        $json = Get-Content $file -Raw | ConvertFrom-Json
+        $list = @($json.node.$Kind)
+        foreach ($n in $list) {
+            if ($null -eq $n) { continue }
+            $enabled = $true
+            if ($null -ne $n.enable) { $enabled = [bool]$n.enable }
+            if ($enabled -and $n.node_id) {
+                $nodes += [pscustomobject]@{
+                    Id      = [string]$n.node_id
+                    Address = [string]$n.address
+                }
+            }
+        }
+    }
+    return $nodes
+}
+
+function Test-NodeProcessRunning {
+    param(
+        [string]$ProcessName,
+        [string]$NodeID
+    )
+    $procs = Get-CimInstance Win32_Process -Filter "Name = '$ProcessName.exe'" -ErrorAction SilentlyContinue
+    foreach ($p in @($procs)) {
+        if ($p.CommandLine -and $p.CommandLine -like "*-node=$NodeID*") {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Start-ProfileNode {
+    param(
+        [string]$ProcessName,
+        [string]$NodeID,
+        [int]$WaitSec = 2
+    )
+    if (Test-NodeProcessRunning -ProcessName $ProcessName -NodeID $NodeID) {
+        Write-Host "[$ProcessName] $NodeID already running, skip."
+        return
+    }
+    $exe = Join-Path $root "bin/$ProcessName.exe"
+    if (-not (Test-Path $exe)) {
+        throw "binary not found: $exe (run with -Build)"
+    }
+    $procArgs = @("-path=$Profile", "-node=$NodeID")
+    Start-Process `
+        -FilePath $exe `
+        -ArgumentList $procArgs `
+        -WorkingDirectory $root `
+        -WindowStyle Hidden | Out-Null
+    Start-Sleep -Seconds $WaitSec
+    if (-not (Test-NodeProcessRunning -ProcessName $ProcessName -NodeID $NodeID)) {
+        throw "[$ProcessName] $NodeID failed to start, see logs/"
+    }
+    Write-Host "[$ProcessName] started (node=$NodeID)."
 }
 
 function Start-MMONode {
@@ -190,7 +253,9 @@ if (-not (Test-PortOpen 6379)) {
 Ensure-Nats
 
 Start-MMONode -ProcessName "master"  -NodeID "master-1" -WaitSec 2
-Start-MMONode -ProcessName "login"   -NodeID "login-1"  -WaitSec 2
+foreach ($loginNode in @(Get-EnabledProfileNodes "login")) {
+    Start-ProfileNode -ProcessName "login" -NodeID $loginNode.Id -WaitSec 2
+}
 Start-MMONode -ProcessName "game"    -NodeID "10001"    -WaitSec 2
 Start-MMONode -ProcessName "gateway" -NodeID "gate-1"   -WaitSec 3
 
