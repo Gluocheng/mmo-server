@@ -15,6 +15,8 @@ type tables struct {
 	combatConst CombatConst
 	hasConst    bool
 	scenes      map[int32]SceneDef
+	monsters    map[int32]MonsterDef
+	spawns      map[int32]SpawnDef
 }
 
 func (t *tables) clone() *tables {
@@ -29,6 +31,8 @@ func (t *tables) clone() *tables {
 		combatConst: t.combatConst,
 		hasConst:    t.hasConst,
 		scenes:      t.scenes,
+		monsters:    t.monsters,
+		spawns:      t.spawns,
 	}
 }
 

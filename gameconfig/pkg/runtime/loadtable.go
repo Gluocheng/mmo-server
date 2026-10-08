@@ -11,7 +11,7 @@ import (
 )
 
 // ReloadTable 按表名重新加载指定配置表；失败时保留旧快照。
-// 支持: item、bag_type、skill、buff、combat_const、scene。后四张整包重载，失败保留旧快照。
+// 支持: item、bag_type、skill、buff、combat_const、scene、monster、spawn。除 item 与 bag_type 外整包重载，失败保留旧快照。
 func ReloadTable(ctx context.Context, db *gorm.DB, tableName string) error {
 	if db == nil {
 		return fmt.Errorf("gameconfig reload table: db is nil")
@@ -60,7 +60,7 @@ func ReloadTable(ctx context.Context, db *gorm.DB, tableName string) error {
 			tables:     next,
 		})
 		return nil
-	case "skill", "buff", "combat_const", "scene":
+	case "skill", "buff", "combat_const", "scene", "monster", "spawn":
 		return Reload(ctx, db)
 	default:
 		return fmt.Errorf("unknown config table: %s", tableName)

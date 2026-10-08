@@ -1,0 +1,2 @@
+##,id,name,hp,attack,defense,move_speed,attack_range,attack_interval_ms,aggro_range,leash_range
+,1,野狼,80,6,2,4,2,1200,6,12

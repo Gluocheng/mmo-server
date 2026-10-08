@@ -201,7 +201,10 @@ func nearbyProto(in []world.Nearby) ([]*protocol.SceneActor, []int64) {
 	actors := make([]*protocol.SceneActor, 0, len(in))
 	ids := make([]int64, 0, len(in))
 	for _, n := range in {
-		actors = append(actors, &protocol.SceneActor{Uid: n.UID, X: n.X, Y: n.Y, Z: n.Z})
+		actors = append(actors, &protocol.SceneActor{
+			Uid: n.UID, X: n.X, Y: n.Y, Z: n.Z,
+			ActorType: n.ActorType, ConfigId: n.ConfigID,
+		})
 		ids = append(ids, n.UID)
 	}
 	return actors, ids

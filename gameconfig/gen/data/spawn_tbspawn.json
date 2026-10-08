@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "feature": "wild",
+    "scene_id": 3,
+    "line": 1,
+    "monster_id": 1,
+    "x": 18,
+    "y": 0,
+    "z": 10,
+    "count": 1,
+    "respawn_ms": 8000
+  }
+]

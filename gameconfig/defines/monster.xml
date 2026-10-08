@@ -1,0 +1,15 @@
+<module name="monster">
+	<bean name="Monster" comment="怪物模板">
+		<var name="id" type="int" comment="模板id"/>
+		<var name="name" type="string" comment="名称"/>
+		<var name="hp" type="int" comment="生命"/>
+		<var name="attack" type="int" comment="攻击"/>
+		<var name="defense" type="int" comment="防御"/>
+		<var name="move_speed" type="float" comment="每秒位移"/>
+		<var name="attack_range" type="float" comment="攻击距离"/>
+		<var name="attack_interval_ms" type="int" comment="攻击间隔毫秒"/>
+		<var name="aggro_range" type="float" comment="仇恨距离"/>
+		<var name="leash_range" type="float" comment="回家距离"/>
+	</bean>
+	<table name="TbMonster" value="Monster" input="monster.csv" comment="怪物表"/>
+</module>

@@ -20,10 +20,12 @@ type LineRule struct {
 	SwitchCdMs int32
 }
 
-// Nearby 是同一条线 AOI 内的其他玩家。
+// Nearby 是同一条线 AOI 内的其他单位。ActorType 为 0 表示玩家。
 type Nearby struct {
-	UID     int64
-	X, Y, Z float32
+	UID       int64
+	X, Y, Z   float32
+	ActorType int32
+	ConfigID  int32
 }
 
 // RoomView 是进场或切图后回给客户端的位置。Changed 为 true 时调用方要重置战斗。
@@ -155,7 +157,7 @@ func pickLine(rule LineRule, skip int64) (int32, bool) {
 func countLine(sceneID, line int32, skip int64) int32 {
 	var n int32
 	for uid, st := range inRoom {
-		if uid == skip || st.sceneID != sceneID || st.line != line {
+		if uid == skip || st.actorType == ActorMonster || st.sceneID != sceneID || st.line != line {
 			continue
 		}
 		n++
@@ -180,7 +182,10 @@ func nearbyOf(st playerState, skip int64) []Nearby {
 		if !withinAOI(st.x, st.z, other.x, other.z) {
 			continue
 		}
-		out = append(out, Nearby{UID: uid, X: other.x, Y: other.y, Z: other.z})
+		out = append(out, Nearby{
+			UID: uid, X: other.x, Y: other.y, Z: other.z,
+			ActorType: other.actorType, ConfigID: other.configID,
+		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].UID < out[j].UID })
 	return out
@@ -200,7 +205,53 @@ func presenceOf(uid int64, st playerState, enter bool) *protocol.ScenePresence {
 	return &protocol.ScenePresence{
 		Uid: uid, SceneId: st.sceneID, Line: st.line,
 		X: st.x, Y: st.y, Z: st.z, Enter: enter,
+		ActorType: st.actorType, ConfigId: st.configID,
 	}
+}
+
+// PlaceMonster 把怪物放到指定线的坐标上。它不占人数上限。
+func PlaceMonster(uid int64, sceneID, line int32, x, y, z float32, configID int32) {
+	if uid < 1 || sceneID < 1 {
+		return
+	}
+	if line < 1 {
+		line = 1
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	inRoom[uid] = playerState{
+		sceneID: sceneID, line: line, x: x, y: y, z: z,
+		actorType: ActorMonster, configID: configID,
+	}
+}
+
+// AnnounceMonster 通知同线 AOI 内的玩家：这只怪物出现了。调用前要先 PlaceMonster。
+func AnnounceMonster(sender cfacade.IActor, uid int64) {
+	mu.RLock()
+	st, ok := inRoom[uid]
+	if !ok {
+		mu.RUnlock()
+		return
+	}
+	peers := peersOf(st, uid)
+	msg := presenceOf(uid, st, true)
+	mu.RUnlock()
+	pushPresence(sender, peers, msg)
+}
+
+// DropMonster 从房间移除怪物，并通知周围玩家它离开了。
+func DropMonster(sender cfacade.IActor, uid int64) {
+	mu.Lock()
+	st, ok := inRoom[uid]
+	if !ok {
+		mu.Unlock()
+		return
+	}
+	peers := peersOf(st, uid)
+	msg := presenceOf(uid, st, false)
+	delete(inRoom, uid)
+	mu.Unlock()
+	pushPresence(sender, peers, msg)
 }
 
 func pushPresence(sender cfacade.IActor, peers []presencePeer, msg *protocol.ScenePresence) {

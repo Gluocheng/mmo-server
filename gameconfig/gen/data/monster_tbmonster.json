@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "name": "野狼",
+    "hp": 80,
+    "attack": 6,
+    "defense": 2,
+    "move_speed": 4,
+    "attack_range": 2,
+    "attack_interval_ms": 1200,
+    "aggro_range": 6,
+    "leash_range": 12
+  }
+]

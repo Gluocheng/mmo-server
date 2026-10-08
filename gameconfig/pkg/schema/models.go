@@ -96,7 +96,41 @@ type CfgScene struct {
 // TableName 表名 cfg_scene。
 func (CfgScene) TableName() string { return "cfg_scene" }
 
+// CfgMonster 怪物模板。生成实例时拷贝这些数值。
+type CfgMonster struct {
+	ID               int32   `gorm:"primaryKey"`
+	Name             string  `gorm:"size:64;not null"`
+	HP               int32   `gorm:"column:hp;not null"`
+	Attack           int32   `gorm:"not null"`
+	Defense          int32   `gorm:"not null"`
+	MoveSpeed        float32 `gorm:"column:move_speed;not null"`
+	AttackRange      float32 `gorm:"column:attack_range;not null"`
+	AttackIntervalMs int32   `gorm:"column:attack_interval_ms;not null"`
+	AggroRange       float32 `gorm:"column:aggro_range;not null"`
+	LeashRange       float32 `gorm:"column:leash_range;not null"`
+}
+
+// TableName 表名 cfg_monster。
+func (CfgMonster) TableName() string { return "cfg_monster" }
+
+// CfgSpawn 刷怪点。一条点按数量生成多只，每只有自己的出生点。
+type CfgSpawn struct {
+	ID        int32   `gorm:"primaryKey"`
+	Feature   string  `gorm:"size:32;not null"`
+	SceneID   int32   `gorm:"column:scene_id;not null"`
+	Line      int32   `gorm:"not null"`
+	MonsterID int32   `gorm:"column:monster_id;not null"`
+	X         float32 `gorm:"not null"`
+	Y         float32 `gorm:"not null"`
+	Z         float32 `gorm:"not null"`
+	Count     int32   `gorm:"not null"`
+	RespawnMs int32   `gorm:"column:respawn_ms;not null"`
+}
+
+// TableName 表名 cfg_spawn。
+func (CfgSpawn) TableName() string { return "cfg_spawn" }
+
 // Models 参与 AutoMigrate 的配置表模型列表。
 func Models() []any {
-	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}}
+	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}}
 }

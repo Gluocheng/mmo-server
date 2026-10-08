@@ -19,12 +19,14 @@ message EnterGameResponse {
   repeated SceneActor nearby = 7 [json_name = "nearby"];
 }
 
-// SceneActor 是同一条线 AOI 内的其他玩家。
+// SceneActor 是同一条线 AOI 内的其他单位。actor_type 为 0 表示玩家，1 表示怪物。
 message SceneActor {
   int64 uid = 1 [json_name = "uid"];
   float x = 2 [json_name = "x"];
   float y = 3 [json_name = "y"];
   float z = 4 [json_name = "z"];
+  int32 actor_type = 5 [json_name = "actorType"];
+  int32 config_id = 6 [json_name = "configId"];
 }
 
 message SceneSwitchRequest {
@@ -49,6 +51,8 @@ message ScenePresence {
   float y = 5 [json_name = "y"];
   float z = 6 [json_name = "z"];
   bool enter = 7 [json_name = "enter"];
+  int32 actor_type = 8 [json_name = "actorType"];
+  int32 config_id = 9 [json_name = "configId"];
 }
 
 message SceneListResponse {

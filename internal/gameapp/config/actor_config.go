@@ -9,6 +9,7 @@ import (
 	cprofile "github.com/cherry-game/cherry/profile"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gameapp/combat"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 )
@@ -40,6 +41,7 @@ func (p *actorConfig) reload(session *cproto.Session, _ *protocol.None) {
 		p.ResponseCode(session, code.ConfigReloadFail)
 		return
 	}
+	combat.SyncSpawns(p)
 	// 复用 RefreshTokenResponse 字段承载：accessExpireAt=version，refreshExpireAt=tableCount（待 genproto 专用消息后替换）。
 	p.Response(session, &protocol.RefreshTokenResponse{
 		AccessExpireAt:  gcruntime.Version(),

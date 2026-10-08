@@ -36,7 +36,8 @@
 
 ### 不包含
 
-- 阵营、吟唱、装备、仇恨、怪物、掉落、生命落库、客户端预演
+- 阵营、吟唱、装备、仇恨、掉落、生命落库、客户端预演
+- 怪物已另立 [`2026-10-08-combat-monster-design.md`](2026-10-08-combat-monster-design.md)
 - 药水已另立 [`2026-10-08-combat-potion-design.md`](2026-10-08-combat-potion-design.md)
 - 禁手已另立 [`2026-10-08-combat-control-design.md`](2026-10-08-combat-control-design.md)
 

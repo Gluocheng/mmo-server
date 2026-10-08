@@ -7,6 +7,7 @@ import (
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
+	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/protocol"
 )
 
@@ -22,6 +23,7 @@ func (p *ActorCombats) AliasID() string {
 
 // OnInit 启动心跳。间隔读配表，未配置时 100ms 空转。
 func (p *ActorCombats) OnInit() {
+	SyncSpawns(p)
 	p.schedule()
 }
 
@@ -42,6 +44,11 @@ func (p *ActorCombats) broadcast() {
 			continue
 		}
 		pomelo.PushWithUID(p, f.AgentPath, f.ViewerUID, "onCombatFrame", toProto(f))
+	}
+	for _, step := range TakeMonsterSteps() {
+		world.BroadcastMove(p, step.UID, &protocol.MoveBroadcast{
+			Uid: step.UID, X: step.X, Y: step.Y, Z: step.Z,
+		})
 	}
 }
 

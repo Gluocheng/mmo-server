@@ -64,6 +64,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	monsterRows, err := importdata.LoadMonstersFromJSONFile(filepath.Join(*dataDir, importdata.MonsterTableFile))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	spawnRows, err := importdata.LoadSpawnsFromJSONFile(filepath.Join(*dataDir, importdata.SpawnTableFile))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -122,6 +132,22 @@ func main() {
 				return err
 			}
 		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgMonster{}).Error; err != nil {
+			return err
+		}
+		if len(monsterRows) > 0 {
+			if err := tx.Create(&monsterRows).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgSpawn{}).Error; err != nil {
+			return err
+		}
+		if len(spawnRows) > 0 {
+			if err := tx.Create(&spawnRows).Error; err != nil {
+				return err
+			}
+		}
 		var ver schema.CfgVersion
 		if err := tx.First(&ver, 1).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
@@ -141,5 +167,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("imported %d items, %d bag_types, %d skills, %d buffs, %d scenes, cfg_version=%d\n", len(schemaRows), len(bagTypeRows), len(skillRows), len(buffRows), len(sceneRows), newVersion)
+	fmt.Printf("imported %d items, %d bag_types, %d skills, %d buffs, %d scenes, %d monsters, %d spawns, cfg_version=%d\n", len(schemaRows), len(bagTypeRows), len(skillRows), len(buffRows), len(sceneRows), len(monsterRows), len(spawnRows), newVersion)
 }

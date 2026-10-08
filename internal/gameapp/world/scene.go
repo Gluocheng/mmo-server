@@ -17,12 +17,21 @@ const (
 	aoiRadius = float32(15) // 演示用 AOI 半径
 )
 
+const (
+	// ActorPlayer 玩家。协议里的 0 也是玩家。
+	ActorPlayer int32 = 0
+	// ActorMonster 怪物。不占分线人数，也没有网关连接。
+	ActorMonster int32 = 1
+)
+
 type playerState struct {
 	agentPath    string
 	sceneID      int32
 	line         int32
 	x, y, z      float32
 	nextSwitchAt int64
+	actorType    int32
+	configID     int32
 }
 
 var (
@@ -192,6 +201,9 @@ func BroadcastChat(sender cfacade.IActor, fromUID int64, sceneID int32, m *proto
 			if u == fromUID {
 				continue
 			}
+			if st.actorType == ActorMonster || st.agentPath == "" {
+				continue
+			}
 			if st.sceneID != from.sceneID || st.line != from.line {
 				continue
 			}
@@ -218,6 +230,9 @@ func ListOnline(sceneID int32) []OnlinePlayer {
 	defer mu.RUnlock()
 	out := make([]OnlinePlayer, 0, len(inRoom))
 	for uid, st := range inRoom {
+		if st.actorType == ActorMonster {
+			continue
+		}
 		if sceneID != 0 && st.sceneID != sceneID {
 			continue
 		}

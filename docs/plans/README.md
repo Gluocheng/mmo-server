@@ -36,6 +36,7 @@
 | done | 战斗骨架 | [2026-09-22-combat-skeleton-design.md](2026-09-22-combat-skeleton-design.md) | 实施 [2026-09-22-combat-skeleton.md](2026-09-22-combat-skeleton.md)；配表技能/Buff、50 人合包广播 |
 | done | 战斗药水 | [2026-10-08-combat-potion-design.md](2026-10-08-combat-potion-design.md) | 实施 [2026-10-08-combat-potion.md](2026-10-08-combat-potion.md)；使用只调用 ApplyBuff，成功才扣 1 个 |
 | done | 战斗禁手 | [2026-10-08-combat-control-design.md](2026-10-08-combat-control-design.md) | 实施 [2026-10-08-combat-control.md](2026-10-08-combat-control.md)；stun 禁止出手和喝药，已入队技能结算时作废 |
+| done | 怪物生成 | [2026-10-08-combat-monster-design.md](2026-10-08-combat-monster-design.md) | 实施 [2026-10-08-combat-monster.md](2026-10-08-combat-monster.md)；模板加刷怪点，荒野野狼会追击、出手并回出生点复活 |
 | done | 多地图与分线 | [2026-09-23-multi-scene-design.md](2026-09-23-multi-scene-design.md) | 实施 [2026-09-23-multi-scene.md](2026-09-23-multi-scene.md)；主城分线、切图冷却、按图决定能否战斗 |
 | done | 一账号多角 | [2026-06-25-multi-character-design.md](2026-06-25-multi-character-design.md) | 实施 [2026-06-25-multi-character.md](2026-06-25-multi-character.md) |
 | done | 多背包（bag_type 维度） | [2026-09-09-multi-bag-design.md](2026-09-09-multi-bag-design.md) | 实施 [2026-09-09-multi-bag.md](2026-09-09-multi-bag.md) |

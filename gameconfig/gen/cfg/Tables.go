@@ -15,8 +15,10 @@ type Tables struct {
     TbBuff *BuffTbBuff
     TbCombatConst *Combat_constTbCombatConst
     TbItem *ItemTbItem
+    TbMonster *MonsterTbMonster
     TbScene *SceneTbScene
     TbSkill *SkillTbSkill
+    TbSpawn *SpawnTbSpawn
 }
 
 func NewTables(loader JsonLoader) (*Tables, error) {
@@ -48,6 +50,12 @@ func NewTables(loader JsonLoader) (*Tables, error) {
     if tables.TbItem, err = NewItemTbItem(buf) ; err != nil {
         return nil, err
     }
+    if buf, err = loader("monster_tbmonster") ; err != nil {
+        return nil, err
+    }
+    if tables.TbMonster, err = NewMonsterTbMonster(buf) ; err != nil {
+        return nil, err
+    }
     if buf, err = loader("scene_tbscene") ; err != nil {
         return nil, err
     }
@@ -58,6 +66,12 @@ func NewTables(loader JsonLoader) (*Tables, error) {
         return nil, err
     }
     if tables.TbSkill, err = NewSkillTbSkill(buf) ; err != nil {
+        return nil, err
+    }
+    if buf, err = loader("spawn_tbspawn") ; err != nil {
+        return nil, err
+    }
+    if tables.TbSpawn, err = NewSpawnTbSpawn(buf) ; err != nil {
         return nil, err
     }
     return tables, nil

@@ -8,6 +8,7 @@ import (
 	cprofile "github.com/cherry-game/cherry/profile"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gameapp/combat"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 )
@@ -55,6 +56,7 @@ func (p *actorGMConfig) doReload(tableName string) (*protocol.GmReloadResponse, 
 			return nil, code.ConfigReloadFail
 		}
 	}
+	combat.SyncSpawns(p)
 	return &protocol.GmReloadResponse{
 		Version: gcruntime.Version(),
 		Tables:  int64(gcruntime.TableCount()),

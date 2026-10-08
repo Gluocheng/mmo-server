@@ -60,9 +60,29 @@ type buffInst struct {
 
 type unit struct {
 	hp, maxHP int32
+	defense   int32
 	dead      bool
 	deadAt    int64
 	buffs     []*buffInst
+
+	monster        bool
+	templateID     int32
+	spawnID        int32
+	slot           int32
+	attack         int32
+	moveSpeed      float32
+	attackRange    float32
+	attackInterval int64
+	aggroRange     float32
+	leashRange     float32
+	respawnMs      int64
+	homeX          float32
+	homeY          float32
+	homeZ          float32
+	sceneID        int32
+	line           int32
+	target         int64
+	nextAttack     int64
 }
 
 var (
@@ -81,6 +101,7 @@ func ResetForTest() {
 	cds = map[int64]map[int32]int64{}
 	queue = nil
 	nowFn = func() int64 { return gtime.Now().UnixMilli() }
+	storeMonsterSteps(nil)
 }
 
 // SetClockForTest 固定当前毫秒，便于步进心跳。仅测试调用。
@@ -209,10 +230,10 @@ func ApplyBuff(uid int64, buffID int32) int32 {
 	return code.OK
 }
 
-// Tick 结算队列、Buff 和复活，并按观众合成广播包。
+// Tick 结算队列、Buff、怪物行动和复活，并按观众合成广播包。
+// 怪物位移在放开战斗锁之后才写入房间。
 func Tick() []Frame {
 	mu.Lock()
-	defer mu.Unlock()
 	now := nowFn()
 	pending := queue
 	queue = nil
@@ -222,11 +243,19 @@ func Tick() []Frame {
 	}
 	hits = append(hits, tickBuffs(now)...)
 	hits = append(hits, tickRespawn(now)...)
+	steps, attacks := tickMonsters(now)
+	hits = append(hits, attacks...)
 	capN := 64
 	if c, ok := gcruntime.CombatConstRow(); ok && c.FrameEventCap > 0 {
 		capN = int(c.FrameEventCap)
 	}
-	return buildFrames(hits, capN)
+	frames := buildFrames(hits, capN)
+	mu.Unlock()
+	for _, step := range steps {
+		world.SetPosition(step.UID, step.X, step.Y, step.Z)
+	}
+	storeMonsterSteps(steps)
+	return frames
 }
 
 func validBuff(def gcruntime.BuffDef) bool {
@@ -318,6 +347,12 @@ func applyHit(src, dst int64, tgt *unit, sk skillSnap, now int64) Hit {
 	if dmg < 0 {
 		dmg = 0
 	}
+	if tgt.monster && dmg > 0 {
+		dmg -= tgt.defense
+		if dmg < 1 {
+			dmg = 1
+		}
+	}
 	applyDamage(tgt, dmg, now)
 	h := Hit{SourceUID: src, TargetUID: dst, SkillID: sk.id, Amount: dmg, TargetHP: tgt.hp, Dead: tgt.dead}
 	if !tgt.dead && sk.buffID > 0 {
@@ -369,6 +404,7 @@ func applyDamage(u *unit, amount int32, now int64) {
 		u.dead = true
 		u.deadAt = now
 		u.buffs = nil
+		u.target = 0
 	}
 }
 
@@ -441,7 +477,7 @@ func tickRespawn(now int64) []Hit {
 	var hits []Hit
 	for _, uid := range ids {
 		u := units[uid]
-		if u == nil || !u.dead {
+		if u == nil || !u.dead || u.monster {
 			continue
 		}
 		if now-u.deadAt < int64(c.RespawnMs) {
@@ -482,6 +518,9 @@ func buildFrames(hits []Hit, capN int) []Frame {
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	var frames []Frame
 	for _, uid := range ids {
+		if u := units[uid]; u == nil || u.monster {
+			continue
+		}
 		viewer, ok := world.PoseOf(uid)
 		if !ok {
 			continue

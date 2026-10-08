@@ -310,6 +310,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 战斗须已 `enter`。技能与 Buff 读配表 `cfg_skill` / `cfg_buff` / `cfg_combat_const`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活玩家。每人每拍最多一条 `onCombatFrame`
 - `game.bag.use` 按道具 `use_buff_id` 调用 `ApplyBuff`，成功才扣 1 个。`0` 返回 `40054`。死亡不扣。禁战地图仍可使用。治疗在下一心跳，不是当场加血
 - 禁手是 Buff 效果 `stun`。效果还在时放技能和喝药返回 `40055`，不入队也不进冷却。已经进下一拍的技能若结算时施法者已禁手，这一拍不造成伤害，冷却不退回。移动不拦
+- 怪物模板在 `cfg_monster`，刷在哪张图由 `cfg_spawn` 的怪物 id 决定。实例不占分线人数。附近单位带 `actorType`（0 玩家，1 怪物）和 `configId`。打到怪物时技能伤害减去防御，至少为 1；伤害为 0 时仍是 0。狼出手记在 `onCombatFrame` 里，`skill_id=0`。禁手时它不追也不打。种子是荒野 `(18,0,10)` 的野狼，会追击、按攻击距离出手，死亡后按刷怪点时间回出生点复活
 - 进场忽略请求里的 `sceneId`，出生在配表主城。`max_lines >= 2` 的图才会在满员后进入下一条线。切图成功会满血，并按离开的那张图的 `switch_cd_ms` 冷却。主城默认不能放技能，以地图表 `allow_combat` 为准
 - 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
