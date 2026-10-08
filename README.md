@@ -10,7 +10,7 @@
 flowchart LR
   Client[WebSocket 客户端]
   Admin[GM 管理端]
-  Gate[gate-1 网关]
+  Gate[gate-1 / gate-2 网关]
   Login[login-1 / login-2 登录]
   Game[10001 游戏]
   GM[gm-1 管理]
@@ -40,7 +40,7 @@ flowchart LR
 | 节点        | 进程            | 职责                                          |
 | --------- | ------------- | ------------------------------------------- |
 | `master`  | `cmd/master`  | NATS 模式集群注册发现（无业务路由）                        |
-| `gateway` | `cmd/gateway` | WebSocket + Pomelo 协议、鉴权路由、转发至 login/game   |
+| `gateway` | `cmd/gateway` | WebSocket + Pomelo 协议、鉴权路由、转发至 login/game。profile 里每个启用的网关各起一个进程，端口用各自的 `address` |
 | `login`   | `cmd/login`   | 帐号密码签发 Token、校验、刷新、登出。profile 里每个启用的登录节点各起一个进程，节点内按 `auth.session_workers` 并行 |
 | `game`    | `cmd/game`    | 选角/创角/进场、场景移动（AOI）、聊天、背包、GM 指令处理            |
 | `gm`      | `cmd/gm`      | **独立管理进程**：HTTP API，通过 NATS 向 game 节点下发管理指令 |
@@ -83,9 +83,10 @@ powershell -ExecutionPolicy Bypass -File scripts/stop.ps1
 powershell -ExecutionPolicy Bypass -File scripts/stop.ps1 -StopNats
 ```
 
-日志目录：`logs/`（`master.log`、`gate.log`、`login.log`、`game.log`、`gm.log`，与 profile 中 `ref_logger` 对应）。
+日志目录：`logs/`（`master.log`、`gate.log`、`gate-2.log`、`login.log`、`login-2.log`、`game.log`、`gm.log`，与 profile 中 `ref_logger` 对应）。登录和网关都按 profile 里 `enable=true` 的节点启动。
 
-- 网关 WebSocket：`ws://127.0.0.1:10100`
+- 对外只连网关入口：`ws://127.0.0.1:10100`（`gate-entry` 按各网关当前连接数分配，满了返回 HTTP 503）
+- 网关进程：`gate-1` 听 `:10110`，`gate-2` 听 `:10111`。不要让客户端直接连这两个端口
 - GM 控制台：浏览器打开 `http://127.0.0.1:9080/`（默认账号 `admin` / `admin123`）
 - GM HTTP API：`http://127.0.0.1:9080/gm/*`
 
@@ -99,6 +100,7 @@ go run ./cmd/login   -path=configs/mmo-cluster.json -node=login-1
 go run ./cmd/login   -path=configs/mmo-cluster.json -node=login-2
 go run ./cmd/game    -path=configs/mmo-cluster.json -node=10001
 go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-1
+go run ./cmd/gateway -path=configs/mmo-cluster.json -node=gate-2
 go run ./cmd/gm      -http=:9080 -nats=nats://127.0.0.1:4222 -prefix=mmo -game=10001 -path=configs/mmo-cluster.json -token=dev-gm-token
 ```
 
@@ -525,7 +527,7 @@ CI：`.github/workflows/go.yml`（`go test` + 五节点 `go build` + Docker 镜�
 `configs/mmo-cluster.json` 常用项：
 
 - `cluster.nats.address` / `master_node_id`
-- `node.gate[].address` → `:10100`
+- `node.gate[].address` → `gate-1` 为 `:10110`，`gate-2` 为 `:10111`。对外 `10100` 由 `gate_entry.listen` 转发，按当前连接数选择网关
 - `mysql.dsn`
 - `auth.session_policy`（`kick_old` / `coexist` / `device_limit`）、`auth.max_devices_per_uid`
 - `redis.`*（TTL、限流、`key_prefix`）

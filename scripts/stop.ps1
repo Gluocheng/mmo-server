@@ -28,6 +28,17 @@ function Stop-MMOProcess {
 Write-Host "=== MMO server stop ==="
 
 # 先停 GM，再停网关，再后端，最后 master
+if (Get-Command docker -ErrorAction SilentlyContinue) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    docker stop mmo-gate-nginx 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[nginx] Docker container mmo-gate-nginx stopped."
+    }
+    $ErrorActionPreference = $prev
+}
+
+Stop-MMOProcess "gate-entry"
 Stop-MMOProcess "gm"
 Stop-MMOProcess "gateway"
 Stop-MMOProcess "game"

@@ -31,10 +31,18 @@
     "gate": [
       {
         "node_id": "gate-1",
-        "address": ":10100",
+        "address": ":10110",
         "enable": true,
         "__settings__": {
           "ref_logger": "gate_log"
+        }
+      },
+      {
+        "node_id": "gate-2",
+        "address": ":10111",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "gate2_log"
         }
       }
     ],
@@ -85,6 +93,13 @@
       "file_link_path": "",
       "file_path_format": "logs/gate.log"
     },
+    "gate2_log": {
+      "level": "debug",
+      "enable_console": false,
+      "enable_write_file": true,
+      "file_link_path": "",
+      "file_path_format": "logs/gate-2.log"
+    },
     "login_log": {
       "level": "debug",
       "enable_console": false,
@@ -125,6 +140,10 @@
     "dsn": "root:123456@tcp(127.0.0.1:3306)/mmo?charset=utf8mb4&parseTime=True&loc=Local",
     "max_open_conns": 20,
     "max_idle_conns": 10
+  },
+  "gate_entry": {
+    "listen": ":10100",
+    "max_connections_per_gate": 2000
   },
   "auth": {
     "session_policy": "kick_old",

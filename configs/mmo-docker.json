@@ -36,6 +36,14 @@
         "__settings__": {
           "ref_logger": "gate_log"
         }
+      },
+      {
+        "node_id": "gate-2",
+        "address": ":10101",
+        "enable": true,
+        "__settings__": {
+          "ref_logger": "gate2_log"
+        }
       }
     ],
     "login": [
@@ -84,6 +92,13 @@
       "enable_write_file": false,
       "file_link_path": "",
       "file_path_format": "logs/gate.log"
+    },
+    "gate2_log": {
+      "level": "info",
+      "enable_console": true,
+      "enable_write_file": false,
+      "file_link_path": "",
+      "file_path_format": "logs/gate-2.log"
     },
     "login_log": {
       "level": "info",

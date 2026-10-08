@@ -55,6 +55,7 @@ function Ensure-Binaries {
         @{ Name = "login";   Path = "cmd/login" },
         @{ Name = "game";    Path = "cmd/game" },
         @{ Name = "gateway"; Path = "cmd/gateway" },
+        @{ Name = "gate-entry"; Path = "cmd/gate-entry" },
         @{ Name = "gm";      Path = "cmd/gm" }
     )
     $needBuild = $Build
@@ -105,6 +106,31 @@ function Ensure-Nats {
         throw "NATS still not listening on 4222"
     }
     Write-Host "[nats] ready."
+}
+
+function Start-GateEntry {
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        docker stop mmo-gate-nginx 2>&1 | Out-Null
+        $ErrorActionPreference = $prev
+    }
+    if (Get-Process -Name "gate-entry" -ErrorAction SilentlyContinue) {
+        Write-Host "[gate-entry] already running, skip."
+        Write-Host "[gate-entry] public ws://127.0.0.1:10100"
+        return
+    }
+    $exe = Join-Path $root "bin/gate-entry.exe"
+    if (-not (Test-Path $exe)) {
+        & go build -o $exe ./cmd/gate-entry
+        if ($LASTEXITCODE -ne 0) { throw "go build failed: cmd/gate-entry" }
+    }
+    Start-Process -FilePath $exe -ArgumentList @("-path=$Profile") -WorkingDirectory $root -WindowStyle Hidden | Out-Null
+    Start-Sleep -Seconds 1
+    if (-not (Get-Process -Name "gate-entry" -ErrorAction SilentlyContinue)) {
+        throw "[gate-entry] failed to start"
+    }
+    Write-Host "[gate-entry] public ws://127.0.0.1:10100"
 }
 
 function Start-GMNode {
@@ -210,6 +236,24 @@ function Start-ProfileNode {
     Write-Host "[$ProcessName] started (node=$NodeID)."
 }
 
+function Write-GatewayAddresses {
+    param($Gates)
+    $any = $false
+    foreach ($g in @($Gates)) {
+        $addr = [string]$g.Address
+        if ($addr -match '^:(\d+)$') {
+            $any = $true
+            Write-Host "[gateway] $($g.Id) internal ws://127.0.0.1:$($Matches[1])"
+        } elseif ($addr) {
+            $any = $true
+            Write-Host "[gateway] $($g.Id) ws://$addr"
+        }
+    }
+    if (-not $any) {
+        Write-Warning "[gateway] no enabled gate address in $Profile"
+    }
+}
+
 function Start-MMONode {
     param(
         [string]$ProcessName,
@@ -257,15 +301,15 @@ foreach ($loginNode in @(Get-EnabledProfileNodes "login")) {
     Start-ProfileNode -ProcessName "login" -NodeID $loginNode.Id -WaitSec 2
 }
 Start-MMONode -ProcessName "game"    -NodeID "10001"    -WaitSec 2
-Start-MMONode -ProcessName "gateway" -NodeID "gate-1"   -WaitSec 3
+$gates = @(Get-EnabledProfileNodes "gate")
+foreach ($gateNode in $gates) {
+    Start-ProfileNode -ProcessName "gateway" -NodeID $gateNode.Id -WaitSec 2
+}
 
 Start-GMNode -HTTPAddr ":$GMPort"
 
-if (-not (Test-PortOpen 10100)) {
-    Write-Warning "[gateway] 10100 not open yet — check logs/gateway.log"
-} else {
-    Write-Host "[gateway] ws://127.0.0.1:10100"
-}
+Write-GatewayAddresses $gates
+Start-GateEntry
 
 if (-not (Test-PortOpen $GMPort)) {
     Write-Warning "[gm] $GMPort not open yet — check logs/gm.log"
