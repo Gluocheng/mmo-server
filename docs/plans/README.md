@@ -59,7 +59,8 @@ docs/plans/
 ├── _template.md                 # 实施计划模板（策划 approved 后）
 ├── YYYY-MM-DD-<feature>-design.md  # 策划：范围、协议、验收
 ├── YYYY-MM-DD-<feature>.md         # 实施：任务勾选、验证
-└── backlog-<topic>.md           # 远期 backlog（立项时升级为 *-design.md）
+├── backlog-<topic>.md           # 远期 backlog（立项时升级为 *-design.md）
+└── load-test.md                 # 功能压测记录：哪些压过、哪些还没有
 ```
 
 ## Agent / 协作者
