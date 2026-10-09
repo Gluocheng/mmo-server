@@ -160,6 +160,18 @@ func main() {
 				return err
 			}
 		}
+		statRows, err := importdata.LoadStatsFromJSONFile(filepath.Join(*dataDir, importdata.StatTableFile))
+		if err != nil {
+			return err
+		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgStat{}).Error; err != nil {
+			return err
+		}
+		if len(statRows) > 0 {
+			if err := tx.Create(&statRows).Error; err != nil {
+				return err
+			}
+		}
 		var ver schema.CfgVersion
 		if err := tx.First(&ver, 1).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {

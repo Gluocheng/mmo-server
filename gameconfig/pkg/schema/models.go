@@ -47,6 +47,7 @@ type CfgSkill struct {
 	Radius     int32  `gorm:"not null"`
 	CooldownMs int32  `gorm:"not null"`
 	Damage     int32  `gorm:"not null"`
+	Factor     int32  `gorm:"not null;default:0"`
 	BuffID     int32  `gorm:"not null"`
 }
 
@@ -62,6 +63,8 @@ type CfgBuff struct {
 	Effect     string `gorm:"size:16;not null"`
 	Value      int32  `gorm:"not null"`
 	MaxStack   int32  `gorm:"not null"`
+	Stat       string `gorm:"size:32;not null;default:''"`
+	Mode       string `gorm:"size:16;not null;default:''"`
 }
 
 // TableName 表名 cfg_buff。
@@ -74,6 +77,8 @@ type CfgCombatConst struct {
 	TickMs        int32 `gorm:"not null"`
 	RespawnMs     int32 `gorm:"not null"`
 	FrameEventCap int32 `gorm:"not null"`
+	Attack        int32 `gorm:"not null;default:0"`
+	Defense       int32 `gorm:"not null;default:0"`
 }
 
 // TableName 表名 cfg_combat_const。
@@ -143,7 +148,19 @@ type CfgKillReward struct {
 // TableName 表名 cfg_kill_reward。
 func (CfgKillReward) TableName() string { return "cfg_kill_reward" }
 
+// CfgStat 属性名单。settle 为 false 的行只登记，挂到 Buff 上时无效。
+type CfgStat struct {
+	ID           int32  `gorm:"primaryKey"`
+	Name         string `gorm:"size:32;not null;uniqueIndex"`
+	AllowFlat    bool   `gorm:"not null"`
+	AllowPercent bool   `gorm:"not null"`
+	Settle       bool   `gorm:"not null"`
+}
+
+// TableName 表名 cfg_stat。
+func (CfgStat) TableName() string { return "cfg_stat" }
+
 // Models 参与 AutoMigrate 的配置表模型列表。
 func Models() []any {
-	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}, &CfgKillReward{}}
+	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}, &CfgKillReward{}, &CfgStat{}}
 }

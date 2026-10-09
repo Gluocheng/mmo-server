@@ -4,9 +4,11 @@
 		<var name="name" type="string" comment="名称"/>
 		<var name="duration_ms" type="int" comment="持续毫秒"/>
 		<var name="interval_ms" type="int" comment="跳伤间隔毫秒"/>
-		<var name="effect" type="string" comment="dot 或 hot"/>
-		<var name="value" type="int" comment="每跳数值"/>
+		<var name="effect" type="string" comment="dot、hot、stun 或 attr"/>
+		<var name="value" type="int" comment="数值。attr 时为一层的固定值或百分比"/>
 		<var name="max_stack" type="int" comment="最大层数"/>
+		<var name="stat" type="string" comment="attr 加成的属性名，其它效果留空"/>
+		<var name="mode" type="string" comment="flat 或 percent，仅 attr 使用"/>
 	</bean>
 	<table name="TbBuff" value="Buff" input="buff.csv" comment="Buff 表"/>
 </module>

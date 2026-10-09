@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module name="stat">
+	<bean name="Stat" comment="属性名单">
+		<var name="id" type="int" comment="属性id"/>
+		<var name="name" type="string" comment="挂到 Buff 上的名字"/>
+		<var name="allow_flat" type="bool" comment="能否加固定值"/>
+		<var name="allow_percent" type="bool" comment="能否加百分比"/>
+		<var name="settle" type="bool" comment="本期是否参与公式"/>
+	</bean>
+	<table name="TbStat" value="Stat" input="stat.csv" comment="属性表"/>
+</module>

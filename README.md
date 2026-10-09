@@ -318,7 +318,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 未完成 `enter` 时，除 `select` / `create` / `enter` 外请求会被网关拒绝
 - 移动广播带简单 **AOI 半径过滤**（默认 15，见 `internal/gameapp/world/scene.go`）
 - 聊天为同场景全员广播（无 AOI 裁剪）
-- 战斗须已 `enter`。技能与 Buff 读配表 `cfg_skill` / `cfg_buff` / `cfg_combat_const`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活玩家。每人每拍最多一条 `onCombatFrame`
+- 战斗须已 `enter`。玩家基础生命、攻击、防御读 `cfg_combat_const`，怪物读模板。最终属性是 `(基础 + 固定加成) × (100 + 百分比) / 100`。技能出手值是附加伤害加攻击乘 `factor`，再减对方最终防御，至少为 1；出手值为 0 时不掉血。`effect=attr` 的 Buff 只允许名单里 `settle=true` 的生命、攻击、防御，其它属性名返回 `40041`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活单位。每人每拍最多一条 `onCombatFrame`
 - `game.bag.use` 按道具 `use_buff_id` 调用 `ApplyBuff`，成功才扣 1 个。`0` 返回 `40054`。死亡不扣。禁战地图仍可使用。治疗在下一心跳，不是当场加血
 - 禁手是 Buff 效果 `stun`。效果还在时放技能和喝药返回 `40055`，不入队也不进冷却。已经进下一拍的技能若结算时施法者已禁手，这一拍不造成伤害，冷却不退回。移动不拦
 - 组队按账号 uid，最多 4 人。邀请 30 秒。断线后席位保留 60 秒，时限内重新进场回到原位；切图不离队。推送按 `party:online` 所在游戏节点投递

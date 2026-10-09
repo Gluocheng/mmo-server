@@ -37,6 +37,7 @@ type skillSnap struct {
 	castRange int32
 	radius    int32
 	damage    int32
+	factor    int32
 	buffID    int32
 }
 
@@ -56,20 +57,25 @@ type buffInst struct {
 	nextTick   int64
 	stacks     int32
 	maxStack   int32
+	stat       string
+	mode       string
 }
 
 type unit struct {
-	hp, maxHP int32
-	defense   int32
-	dead      bool
-	deadAt    int64
-	buffs     []*buffInst
+	hp, maxHP   int32
+	attack      int32
+	defense     int32
+	baseMaxHP   int32
+	baseAttack  int32
+	baseDefense int32
+	dead        bool
+	deadAt      int64
+	buffs       []*buffInst
 
 	monster        bool
 	templateID     int32
 	spawnID        int32
 	slot           int32
-	attack         int32
 	moveSpeed      float32
 	attackRange    float32
 	attackInterval int64
@@ -152,7 +158,11 @@ func Enter(uid int64) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	units[uid] = &unit{hp: c.MaxHP, maxHP: c.MaxHP}
+	units[uid] = &unit{
+		hp: c.MaxHP, maxHP: c.MaxHP, baseMaxHP: c.MaxHP,
+		attack: c.Attack, baseAttack: c.Attack,
+		defense: c.Defense, baseDefense: c.Defense,
+	}
 	delete(cds, uid)
 }
 
@@ -251,7 +261,7 @@ func Cast(uid int64, skillID int32, targetUID int64) int32 {
 		uid: uid,
 		skill: skillSnap{
 			id: sk.ID, target: sk.Target, castRange: sk.CastRange,
-			radius: sk.Radius, damage: sk.Damage, buffID: sk.BuffID,
+			radius: sk.Radius, damage: sk.Damage, factor: sk.Factor, buffID: sk.BuffID,
 		},
 		target: targetUID,
 	})
@@ -318,6 +328,18 @@ func validBuff(def gcruntime.BuffDef) bool {
 		return def.Value > 0
 	case "stun":
 		return true
+	case "attr":
+		st, ok := gcruntime.StatByName(def.Stat)
+		if !ok || !st.Settle {
+			return false
+		}
+		if def.Mode == "flat" {
+			return st.AllowFlat
+		}
+		if def.Mode == "percent" {
+			return st.AllowPercent
+		}
+		return false
 	default:
 		return false
 	}
@@ -394,16 +416,7 @@ func hitAOE(src int64, sk skillSnap, now int64) []Hit {
 }
 
 func applyHit(src, dst int64, tgt *unit, sk skillSnap, now int64) Hit {
-	dmg := sk.damage
-	if dmg < 0 {
-		dmg = 0
-	}
-	if tgt.monster && dmg > 0 {
-		dmg -= tgt.defense
-		if dmg < 1 {
-			dmg = 1
-		}
-	}
+	dmg := strikeDamage(units[src], sk.damage, sk.factor, tgt, now)
 	applyDamage(tgt, dst, src, dmg, now)
 	h := Hit{SourceUID: src, TargetUID: dst, SkillID: sk.id, Amount: dmg, TargetHP: tgt.hp, Dead: tgt.dead}
 	if !tgt.dead && sk.buffID > 0 {
@@ -436,13 +449,18 @@ func applyBuff(u *unit, source int64, def gcruntime.BuffDef, now int64) {
 		b.intervalMs = interval
 		b.maxStack = maxStack
 		b.expireAt = now + int64(def.DurationMs)
+		b.stat = def.Stat
+		b.mode = def.Mode
+		refreshAttrs(u, now)
 		return
 	}
 	u.buffs = append(u.buffs, &buffInst{
 		id: def.ID, source: source, effect: def.Effect, value: def.Value,
 		intervalMs: interval, expireAt: now + int64(def.DurationMs),
 		nextTick: now + interval, stacks: 1, maxStack: maxStack,
+		stat: def.Stat, mode: def.Mode,
 	})
+	refreshAttrs(u, now)
 }
 
 // applyDamage 扣血。实际扣掉的数量不超过剩余生命。怪物被玩家打到 0 时记下伤害榜。
@@ -464,6 +482,7 @@ func applyDamage(u *unit, uid, source int64, amount int32, now int64) {
 		u.target = 0
 		killed = true
 		u.lastHit = source
+		resetBaseStats(u)
 	}
 	if u.monster && dealt > 0 && playerSource(source) {
 		addHurt(u, source, dealt, now)
@@ -567,8 +586,10 @@ func tickBuffs(now int64) []Hit {
 		}
 		if u.dead {
 			u.buffs = nil
+			resetBaseStats(u)
 		} else {
 			u.buffs = kept
+			refreshAttrs(u, now)
 		}
 	}
 	return hits
@@ -594,8 +615,9 @@ func tickRespawn(now int64) []Hit {
 			continue
 		}
 		u.dead = false
-		u.hp = u.maxHP
 		u.buffs = nil
+		resetBaseStats(u)
+		u.hp = u.maxHP
 		hits = append(hits, Hit{SourceUID: uid, TargetUID: uid, Amount: u.maxHP, Heal: true, TargetHP: u.hp})
 	}
 	return hits

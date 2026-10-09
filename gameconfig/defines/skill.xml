@@ -6,7 +6,8 @@
 		<var name="cast_range" type="int" comment="点名距离"/>
 		<var name="radius" type="int" comment="自身圆心半径"/>
 		<var name="cooldown_ms" type="int" comment="冷却毫秒"/>
-		<var name="damage" type="int" comment="伤害"/>
+		<var name="damage" type="int" comment="附加伤害"/>
+		<var name="factor" type="int" comment="攻击力百分比，不填为 0"/>
 		<var name="buff_id" type="int" comment="命中时施加的 buff，0 为不挂"/>
 	</bean>
 	<table name="TbSkill" value="Skill" input="skill.csv" comment="技能表"/>

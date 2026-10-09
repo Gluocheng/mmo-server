@@ -5,6 +5,8 @@
 		<var name="tick_ms" type="int" comment="心跳毫秒"/>
 		<var name="respawn_ms" type="int" comment="死亡后复活毫秒"/>
 		<var name="frame_event_cap" type="int" comment="单包命中上限"/>
+		<var name="attack" type="int" comment="玩家基础攻击"/>
+		<var name="defense" type="int" comment="玩家基础防御"/>
 	</bean>
 	<table name="TbCombatConst" value="CombatConst" input="combat_const.csv" comment="战斗常量表"/>
 </module>

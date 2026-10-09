@@ -11,6 +11,7 @@ type SkillDef struct {
 	Radius     int32
 	CooldownMs int32
 	Damage     int32
+	Factor     int32
 	BuffID     int32
 }
 
@@ -23,6 +24,8 @@ type BuffDef struct {
 	Effect     string
 	Value      int32
 	MaxStack   int32
+	Stat       string
+	Mode       string
 }
 
 // CombatConst 战斗常量。Has 为 false 表示表里没有 id=1。
@@ -31,6 +34,8 @@ type CombatConst struct {
 	TickMs        int32
 	RespawnMs     int32
 	FrameEventCap int32
+	Attack        int32
+	Defense       int32
 }
 
 // Skill 按 id 读取技能。
@@ -95,7 +100,7 @@ func skillsFromSchema(rows []schema.CfgSkill) map[int32]SkillDef {
 	for _, r := range rows {
 		m[r.ID] = SkillDef{
 			ID: r.ID, Name: r.Name, Target: r.Target, CastRange: r.CastRange,
-			Radius: r.Radius, CooldownMs: r.CooldownMs, Damage: r.Damage, BuffID: r.BuffID,
+			Radius: r.Radius, CooldownMs: r.CooldownMs, Damage: r.Damage, Factor: r.Factor, BuffID: r.BuffID,
 		}
 	}
 	return m
@@ -106,7 +111,7 @@ func buffsFromSchema(rows []schema.CfgBuff) map[int32]BuffDef {
 	for _, r := range rows {
 		m[r.ID] = BuffDef{
 			ID: r.ID, Name: r.Name, DurationMs: r.DurationMs, IntervalMs: r.IntervalMs,
-			Effect: r.Effect, Value: r.Value, MaxStack: r.MaxStack,
+			Effect: r.Effect, Value: r.Value, MaxStack: r.MaxStack, Stat: r.Stat, Mode: r.Mode,
 		}
 	}
 	return m
@@ -115,12 +120,12 @@ func buffsFromSchema(rows []schema.CfgBuff) map[int32]BuffDef {
 func constFromSchema(rows []schema.CfgCombatConst) CombatConst {
 	for _, r := range rows {
 		if r.ID == 1 {
-			return CombatConst{MaxHP: r.MaxHP, TickMs: r.TickMs, RespawnMs: r.RespawnMs, FrameEventCap: r.FrameEventCap}
+			return CombatConst{MaxHP: r.MaxHP, TickMs: r.TickMs, RespawnMs: r.RespawnMs, FrameEventCap: r.FrameEventCap, Attack: r.Attack, Defense: r.Defense}
 		}
 	}
 	if len(rows) > 0 {
 		r := rows[0]
-		return CombatConst{MaxHP: r.MaxHP, TickMs: r.TickMs, RespawnMs: r.RespawnMs, FrameEventCap: r.FrameEventCap}
+		return CombatConst{MaxHP: r.MaxHP, TickMs: r.TickMs, RespawnMs: r.RespawnMs, FrameEventCap: r.FrameEventCap, Attack: r.Attack, Defense: r.Defense}
 	}
 	return CombatConst{}
 }

@@ -25,6 +25,7 @@ type skillJSON struct {
 	Radius     int32  `json:"radius"`
 	CooldownMs int32  `json:"cooldown_ms"`
 	Damage     int32  `json:"damage"`
+	Factor     int32  `json:"factor"`
 	BuffID     int32  `json:"buff_id"`
 }
 
@@ -36,6 +37,8 @@ type buffJSON struct {
 	Effect     string `json:"effect"`
 	Value      int32  `json:"value"`
 	MaxStack   int32  `json:"max_stack"`
+	Stat       string `json:"stat"`
+	Mode       string `json:"mode"`
 }
 
 type constJSON struct {
@@ -44,6 +47,8 @@ type constJSON struct {
 	TickMs        int32 `json:"tick_ms"`
 	RespawnMs     int32 `json:"respawn_ms"`
 	FrameEventCap int32 `json:"frame_event_cap"`
+	Attack        int32 `json:"attack"`
+	Defense       int32 `json:"defense"`
 }
 
 // LoadSkillsFromJSONFile 读取技能 JSON 数组。
@@ -59,7 +64,7 @@ func LoadSkillsFromJSONFile(path string) ([]schema.CfgSkill, error) {
 		}
 		out = append(out, schema.CfgSkill{
 			ID: r.ID, Name: r.Name, Target: r.Target, CastRange: r.CastRange,
-			Radius: r.Radius, CooldownMs: r.CooldownMs, Damage: r.Damage, BuffID: r.BuffID,
+			Radius: r.Radius, CooldownMs: r.CooldownMs, Damage: r.Damage, Factor: r.Factor, BuffID: r.BuffID,
 		})
 	}
 	return out, nil
@@ -78,7 +83,7 @@ func LoadBuffsFromJSONFile(path string) ([]schema.CfgBuff, error) {
 		}
 		out = append(out, schema.CfgBuff{
 			ID: r.ID, Name: r.Name, DurationMs: r.DurationMs, IntervalMs: r.IntervalMs,
-			Effect: r.Effect, Value: r.Value, MaxStack: r.MaxStack,
+			Effect: r.Effect, Value: r.Value, MaxStack: r.MaxStack, Stat: r.Stat, Mode: r.Mode,
 		})
 	}
 	return out, nil
@@ -94,10 +99,40 @@ func LoadCombatConstFromJSONFile(path string) (schema.CfgCombatConst, error) {
 		if r.ID == 1 {
 			return schema.CfgCombatConst{
 				ID: 1, MaxHP: r.MaxHP, TickMs: r.TickMs, RespawnMs: r.RespawnMs, FrameEventCap: r.FrameEventCap,
+				Attack: r.Attack, Defense: r.Defense,
 			}, nil
 		}
 	}
 	return schema.CfgCombatConst{}, fmt.Errorf("combat const id=1 missing in %s", path)
+}
+
+// StatTableFile 是属性名单 JSON 文件名。
+const StatTableFile = "stat_tbstat.json"
+
+type statJSON struct {
+	ID           int32  `json:"id"`
+	Name         string `json:"name"`
+	AllowFlat    bool   `json:"allow_flat"`
+	AllowPercent bool   `json:"allow_percent"`
+	Settle       bool   `json:"settle"`
+}
+
+// LoadStatsFromJSONFile 读取属性名单 JSON 数组。
+func LoadStatsFromJSONFile(path string) ([]schema.CfgStat, error) {
+	var rows []statJSON
+	if err := readJSONArray(path, &rows); err != nil {
+		return nil, err
+	}
+	out := make([]schema.CfgStat, 0, len(rows))
+	for _, r := range rows {
+		if r.ID < 1 || r.Name == "" {
+			return nil, fmt.Errorf("invalid stat row in %s", path)
+		}
+		out = append(out, schema.CfgStat{
+			ID: r.ID, Name: r.Name, AllowFlat: r.AllowFlat, AllowPercent: r.AllowPercent, Settle: r.Settle,
+		})
+	}
+	return out, nil
 }
 
 func readJSONArray(path string, dest any) error {

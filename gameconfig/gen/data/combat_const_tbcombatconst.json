@@ -4,6 +4,8 @@
     "max_hp": 100,
     "tick_ms": 100,
     "respawn_ms": 5000,
-    "frame_event_cap": 64
+    "frame_event_cap": 64,
+    "attack": 10,
+    "defense": 0
   }
 ]

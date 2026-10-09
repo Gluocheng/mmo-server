@@ -6,7 +6,9 @@
     "interval_ms": 1000,
     "effect": "dot",
     "value": 4,
-    "max_stack": 1
+    "max_stack": 1,
+    "stat": "",
+    "mode": ""
   },
   {
     "id": 2,
@@ -15,7 +17,9 @@
     "interval_ms": 1000,
     "effect": "hot",
     "value": 30,
-    "max_stack": 1
+    "max_stack": 1,
+    "stat": "",
+    "mode": ""
   },
   {
     "id": 3,
@@ -24,6 +28,19 @@
     "interval_ms": 0,
     "effect": "stun",
     "value": 0,
-    "max_stack": 1
+    "max_stack": 1,
+    "stat": "",
+    "mode": ""
+  },
+  {
+    "id": 5,
+    "name": "战意",
+    "duration_ms": 5000,
+    "interval_ms": 0,
+    "effect": "attr",
+    "value": 5,
+    "max_stack": 1,
+    "stat": "攻击",
+    "mode": "flat"
   }
 ]

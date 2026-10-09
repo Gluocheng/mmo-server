@@ -180,9 +180,10 @@ func sameSlot(u *unit, spec slotSpec) bool {
 
 func unitFromSpec(spec slotSpec) *unit {
 	return &unit{
-		hp: spec.def.HP, maxHP: spec.def.HP, defense: spec.def.Defense,
+		hp: spec.def.HP, maxHP: spec.def.HP, baseMaxHP: spec.def.HP,
+		defense: spec.def.Defense, baseDefense: spec.def.Defense,
 		monster: true, templateID: spec.monsterID, spawnID: spec.spawnID, slot: spec.slot,
-		attack: spec.def.Attack, moveSpeed: spec.def.MoveSpeed, attackRange: spec.def.AttackRange,
+		attack: spec.def.Attack, baseAttack: spec.def.Attack, moveSpeed: spec.def.MoveSpeed, attackRange: spec.def.AttackRange,
 		attackInterval: int64(spec.def.AttackIntervalMs), aggroRange: spec.def.AggroRange,
 		leashRange: spec.def.LeashRange, respawnMs: int64(spec.respawnMs),
 		homeX: spec.x, homeY: spec.y, homeZ: spec.z, sceneID: spec.sceneID, line: spec.line,
@@ -202,8 +203,9 @@ func tickMonsters(now int64) ([]MonsterStep, []Hit) {
 				continue
 			}
 			u.dead = false
-			u.hp = u.maxHP
 			u.buffs = nil
+			resetBaseStats(u)
+			u.hp = u.maxHP
 			u.damage = nil
 			u.lastHit = 0
 			u.target = 0
@@ -254,10 +256,7 @@ func tickMonsters(now int64) ([]MonsterStep, []Hit) {
 		if foe == nil || foe.dead {
 			continue
 		}
-		dmg := u.attack - foe.defense
-		if dmg < 1 {
-			dmg = 1
-		}
+		dmg := strikeDamage(u, 0, 100, foe, now)
 		applyDamage(foe, target, uid, dmg, now)
 		hits = append(hits, Hit{SourceUID: uid, TargetUID: target, Amount: dmg, TargetHP: foe.hp, Dead: foe.dead})
 		u.nextAttack = now + u.attackInterval
