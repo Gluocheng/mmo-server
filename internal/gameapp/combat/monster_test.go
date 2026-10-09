@@ -21,7 +21,7 @@ func ensureSnowflake() {
 
 func wolfDef() gcruntime.MonsterDef {
 	return gcruntime.MonsterDef{
-		ID: 1, Name: "野狼", HP: 80, Attack: 6, Defense: 2,
+		ID: 1, Name: "野狼", Kind: "mob", HP: 80, Attack: 6, Defense: 2,
 		MoveSpeed: 4, AttackRange: 2, AttackIntervalMs: 1200,
 		AggroRange: 6, LeashRange: 12,
 	}
@@ -56,7 +56,7 @@ func setupWolf(t *testing.T) int64 {
 	})
 	gcruntime.BuildMonsters([]gcruntime.MonsterDef{wolfDef()}, []gcruntime.SpawnDef{wildSpawn()})
 	SyncSpawns(nil)
-	uid, ok := MonsterBySlot(1, 0)
+	uid, ok := MonsterBySlot(1, 1, 0)
 	if !ok {
 		t.Fatal("wolf missing")
 	}
@@ -280,7 +280,7 @@ func TestWolfRespawnsAtHomeAndPlayerRespawnsInPlace(t *testing.T) {
 	if !ok || !alive || hp != 80 || pose.X != 18 || pose.Z != 10 {
 		t.Fatalf("respawn hp %d alive %v pose %+v", hp, alive, pose)
 	}
-	again, ok := MonsterBySlot(1, 0)
+	again, ok := MonsterBySlot(1, 1, 0)
 	if !ok || again != wolf {
 		t.Fatalf("uid %d -> %d", wolf, again)
 	}
@@ -308,7 +308,7 @@ func TestReloadKeepsWolfUntilSpawnChanges(t *testing.T) {
 	}
 	Tick()
 	SyncSpawns(nil)
-	kept, ok := MonsterBySlot(1, 0)
+	kept, ok := MonsterBySlot(1, 1, 0)
 	if !ok || kept != wolf {
 		t.Fatal("uid changed")
 	}
@@ -322,7 +322,7 @@ func TestReloadKeepsWolfUntilSpawnChanges(t *testing.T) {
 	if _, _, _, ok := Snapshot(wolf); ok {
 		t.Fatal("old wolf still live")
 	}
-	next, ok := MonsterBySlot(1, 0)
+	next, ok := MonsterBySlot(1, 1, 0)
 	if !ok || next == wolf {
 		t.Fatal("new wolf missing")
 	}
@@ -335,4 +335,75 @@ func TestReloadKeepsWolfUntilSpawnChanges(t *testing.T) {
 		Leave(next)
 		world.Leave(next)
 	})
+}
+
+func TestKillDamageCapsAtRemainingHP(t *testing.T) {
+	ResetForTest()
+	mu.Lock()
+	units[9] = &unit{hp: 5, maxHP: 5, monster: true, templateID: 2, sceneID: 4, line: 1}
+	units[1] = &unit{hp: 100, maxHP: 100, playerID: 70}
+	applyDamage(units[9], 9, 1, 8, 1000)
+	mu.Unlock()
+	kills := TakeKills()
+	if len(kills) != 1 || kills[0].LastHit != 1 || len(kills[0].Hits) != 1 || kills[0].Hits[0].Damage != 5 || kills[0].Hits[0].PlayerID != 70 {
+		t.Fatalf("%+v", kills)
+	}
+	mu.Lock()
+	units[9].dead = false
+	units[9].hp = 5
+	applyDamage(units[9], 9, 1, 1, 2000)
+	applyDamage(units[9], 9, 1, 9, 2001)
+	mu.Unlock()
+	kills = TakeKills()
+	if len(kills) != 1 || kills[0].Hits[0].Damage != 5 {
+		t.Fatalf("respawn ledger %+v", kills)
+	}
+}
+
+func TestWorldBossLineZeroSpawnsEachLine(t *testing.T) {
+	ensureSnowflake()
+	ResetForTest()
+	gcruntime.BuildScenes([]gcruntime.SceneDef{
+		{ID: 3, Name: "荒野", AllowCombat: true, MaxOnline: 50, MaxLines: 1},
+		{ID: 4, Name: "世界BOSS", AllowCombat: true, MaxOnline: 30, MaxLines: 2},
+	})
+	boss := gcruntime.MonsterDef{
+		ID: 2, Name: "荒原霸主", Kind: "boss", HP: 5000, Attack: 15, Defense: 5,
+		MoveSpeed: 3, AttackRange: 3, AttackIntervalMs: 1500, AggroRange: 10, LeashRange: 25,
+	}
+	pack := gcruntime.MonsterDef{
+		ID: 3, Name: "狼群", Kind: "mob", HP: 200, Attack: 8, Defense: 2,
+		MoveSpeed: 4, AttackRange: 2, AttackIntervalMs: 1200, AggroRange: 6, LeashRange: 12,
+	}
+	gcruntime.BuildMonsters([]gcruntime.MonsterDef{wolfDef(), boss, pack}, []gcruntime.SpawnDef{
+		wildSpawn(),
+		{ID: 2, Feature: "worldboss", SceneID: 4, Line: 0, MonsterID: 2, X: 20, Count: 1, RespawnMs: 300000},
+		{ID: 3, Feature: "worldboss", SceneID: 4, Line: 0, MonsterID: 2, X: -20, Z: 10, Count: 1, RespawnMs: 300000},
+		{ID: 4, Feature: "worldboss", SceneID: 4, Line: 0, MonsterID: 3, X: 8, Z: 8, Count: 4, RespawnMs: 15000},
+	})
+	SyncSpawns(nil)
+	if _, ok := MonsterBySlot(1, 1, 0); !ok {
+		t.Fatal("wild wolf missing")
+	}
+	if _, ok := MonsterBySlot(1, 2, 0); ok {
+		t.Fatal("wild wolf copied to line 2")
+	}
+	for _, line := range []int32{1, 2} {
+		if _, ok := MonsterBySlot(2, line, 0); !ok {
+			t.Fatalf("boss spawn 2 line %d", line)
+		}
+		if _, ok := MonsterBySlot(3, line, 0); !ok {
+			t.Fatalf("boss spawn 3 line %d", line)
+		}
+		for slot := int32(0); slot < 4; slot++ {
+			uid, ok := MonsterBySlot(4, line, slot)
+			if !ok {
+				t.Fatalf("pack line %d slot %d", line, slot)
+			}
+			pose, posed := world.PoseOf(uid)
+			if !posed || pose.Line != line || pose.SceneID != 4 {
+				t.Fatalf("pack pose %+v", pose)
+			}
+		}
+	}
 }

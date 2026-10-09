@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+import "bag.proto";
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+// KillRewardItem 是一次击杀结算里发给自己的一条道具。pending 为 true 时进了待领取。
+message KillRewardItem {
+  int32 item_id = 1 [json_name = "itemId"];
+  int32 count = 2 [json_name = "count"];
+  bool pending = 3 [json_name = "pending"];
+}
+
+// KillSettle 推给本线造成过伤害的玩家。class 为 solo、party 或 open。没有名次时 rank 为 0。
+message KillSettle {
+  int64 monster_uid = 1 [json_name = "monsterUid"];
+  int32 monster_id = 2 [json_name = "monsterId"];
+  string class = 3 [json_name = "class"];
+  int32 rank = 4 [json_name = "rank"];
+  int64 last_hit_uid = 5 [json_name = "lastHitUid"];
+  repeated KillRewardItem items = 6 [json_name = "items"];
+}
+
+// RewardClaim 是背包放不下时留下的一条待领取。
+message RewardClaim {
+  int64 id = 1 [json_name = "id"];
+  int32 item_id = 2 [json_name = "itemId"];
+  int32 count = 3 [json_name = "count"];
+  string reason = 4 [json_name = "reason"];
+  int32 monster_id = 5 [json_name = "monsterId"];
+}
+
+// RewardListResponse 是当前角色的待领取列表。
+message RewardListResponse {
+  repeated RewardClaim claims = 1 [json_name = "claims"];
+}
+
+// RewardTakeRequest 领取一条待领取。
+message RewardTakeRequest {
+  int64 claim_id = 1 [json_name = "claimId"];
+}
+
+// RewardTakeResponse 是删掉待领取之后的背包。
+message RewardTakeResponse {
+  BagListResponse bag = 1 [json_name = "bag"];
+}

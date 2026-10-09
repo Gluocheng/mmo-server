@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module name="killreward">
+	<bean name="KillReward" comment="击杀奖励">
+		<var name="id" type="int" comment="行id"/>
+		<var name="monster_id" type="int" comment="怪物模板"/>
+		<var name="kind" type="string" comment="solo、party、rank1、rank2、rank3、last"/>
+		<var name="item_id" type="int" comment="道具"/>
+		<var name="count" type="int" comment="数量"/>
+	</bean>
+	<table name="TbKillReward" value="KillReward" input="kill_reward.csv" comment="击杀奖励表"/>
+</module>

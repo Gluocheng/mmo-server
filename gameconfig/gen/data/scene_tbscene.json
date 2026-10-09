@@ -34,5 +34,17 @@
     "spawn_y": 0,
     "spawn_z": 10,
     "switch_cd_ms": 10000
+  },
+  {
+    "id": 4,
+    "name": "世界BOSS",
+    "main": false,
+    "allow_combat": true,
+    "max_online": 30,
+    "max_lines": 3,
+    "spawn_x": 0,
+    "spawn_y": 0,
+    "spawn_z": 0,
+    "switch_cd_ms": 10000
   }
 ]

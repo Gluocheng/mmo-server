@@ -1,2 +1,4 @@
-##,id,name,hp,attack,defense,move_speed,attack_range,attack_interval_ms,aggro_range,leash_range
-,1,野狼,80,6,2,4,2,1200,6,12
+##,id,name,hp,attack,defense,move_speed,attack_range,attack_interval_ms,aggro_range,leash_range,kind
+,1,野狼,80,6,2,4,2,1200,6,12,mob
+,2,荒原霸主,5000,15,5,3,3,1500,10,25,boss
+,3,狼群,200,8,2,4,2,1200,6,12,mob

@@ -143,6 +143,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		party.NotifyEnter(p, entered)
 	}
 	combat.Enter(session.Uid)
+	combat.SetPlayer(session.Uid, info.PlayerId)
 	nearby, ids := nearbyProto(view.Nearby)
 	p.Response(session, &protocol.EnterGameResponse{
 		SceneId: view.SceneID, Line: view.Line, X: view.X, Y: view.Y, Z: view.Z,
@@ -179,6 +180,9 @@ func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSw
 	if view.Changed {
 		combat.Leave(session.Uid)
 		combat.Enter(session.Uid)
+		if playerID, err := strconv.ParseInt(session.GetString(sessionkey.PlayerID), 10, 64); err == nil {
+			combat.SetPlayer(session.Uid, playerID)
+		}
 	}
 	nearby, _ := nearbyProto(view.Nearby)
 	p.Response(session, &protocol.SceneSwitchResponse{

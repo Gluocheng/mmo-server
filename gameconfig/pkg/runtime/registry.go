@@ -17,6 +17,7 @@ type tables struct {
 	scenes      map[int32]SceneDef
 	monsters    map[int32]MonsterDef
 	spawns      map[int32]SpawnDef
+	killRewards map[string]KillRewardDef
 }
 
 func (t *tables) clone() *tables {
@@ -33,6 +34,7 @@ func (t *tables) clone() *tables {
 		scenes:      t.scenes,
 		monsters:    t.monsters,
 		spawns:      t.spawns,
+		killRewards: t.killRewards,
 	}
 }
 

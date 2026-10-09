@@ -7,6 +7,7 @@ import (
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
+	"github.com/example/mmo-server/internal/gameapp/reward"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/protocol"
 )
@@ -48,6 +49,16 @@ func (p *ActorCombats) broadcast() {
 	for _, step := range TakeMonsterSteps() {
 		world.BroadcastMove(p, step.UID, &protocol.MoveBroadcast{
 			Uid: step.UID, X: step.X, Y: step.Y, Z: step.Z,
+		})
+	}
+	for _, kill := range TakeKills() {
+		hits := make([]reward.Hurt, 0, len(kill.Hits))
+		for _, h := range kill.Hits {
+			hits = append(hits, reward.Hurt{UID: h.UID, PlayerID: h.PlayerID, Damage: h.Damage, At: h.At})
+		}
+		reward.Apply(p, reward.Kill{
+			MonsterUID: kill.MonsterUID, TemplateID: kill.TemplateID,
+			SceneID: kill.SceneID, Line: kill.Line, LastHit: kill.LastHit, Hits: hits,
 		})
 	}
 }

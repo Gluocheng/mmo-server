@@ -83,14 +83,43 @@ type unit struct {
 	line           int32
 	target         int64
 	nextAttack     int64
+	playerID       int64
+	lastHit        int64
+	damage         map[int64]*hurtRec
+}
+
+// hurtRec 是一名玩家对这只怪物这一条命造成的实际扣血。
+type hurtRec struct {
+	total    int32
+	at       int64
+	playerID int64
+}
+
+// Hurt 是结算时抄出来的一条伤害。
+type Hurt struct {
+	UID      int64
+	PlayerID int64
+	Damage   int32
+	At       int64
+}
+
+// KillSnap 是一只怪物死亡时的伤害榜。复活前已经从单位上清掉。
+type KillSnap struct {
+	MonsterUID int64
+	TemplateID int32
+	SceneID    int32
+	Line       int32
+	LastHit    int64
+	Hits       []Hurt
 }
 
 var (
-	mu    sync.Mutex
-	units = map[int64]*unit{}
-	cds   = map[int64]map[int32]int64{}
-	queue []intent
-	nowFn = func() int64 { return gtime.Now().UnixMilli() }
+	mu           sync.Mutex
+	units        = map[int64]*unit{}
+	cds          = map[int64]map[int32]int64{}
+	queue        []intent
+	pendingKills []KillSnap
+	nowFn        = func() int64 { return gtime.Now().UnixMilli() }
 )
 
 // ResetForTest 清空战斗内存状态并恢复时钟。仅测试调用。
@@ -100,6 +129,7 @@ func ResetForTest() {
 	units = map[int64]*unit{}
 	cds = map[int64]map[int32]int64{}
 	queue = nil
+	pendingKills = nil
 	nowFn = func() int64 { return gtime.Now().UnixMilli() }
 	storeMonsterSteps(nil)
 }
@@ -124,6 +154,27 @@ func Enter(uid int64) {
 	defer mu.Unlock()
 	units[uid] = &unit{hp: c.MaxHP, maxHP: c.MaxHP}
 	delete(cds, uid)
+}
+
+// SetPlayer 记下这个 uid 当前进场的角色。击杀奖励发给这个角色。
+func SetPlayer(uid, playerID int64) {
+	if uid < 1 || playerID < 1 {
+		return
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if u := units[uid]; u != nil && !u.monster {
+		u.playerID = playerID
+	}
+}
+
+// TakeKills 取出上一拍死亡怪物的伤害榜。
+func TakeKills() []KillSnap {
+	mu.Lock()
+	defer mu.Unlock()
+	out := pendingKills
+	pendingKills = nil
+	return out
 }
 
 // Leave 离场时丢掉生命、冷却、Buff 和尚未结算的技能。
@@ -353,7 +404,7 @@ func applyHit(src, dst int64, tgt *unit, sk skillSnap, now int64) Hit {
 			dmg = 1
 		}
 	}
-	applyDamage(tgt, dmg, now)
+	applyDamage(tgt, dst, src, dmg, now)
 	h := Hit{SourceUID: src, TargetUID: dst, SkillID: sk.id, Amount: dmg, TargetHP: tgt.hp, Dead: tgt.dead}
 	if !tgt.dead && sk.buffID > 0 {
 		if def, ok := gcruntime.Buff(sk.buffID); ok && validBuff(def) {
@@ -394,17 +445,76 @@ func applyBuff(u *unit, source int64, def gcruntime.BuffDef, now int64) {
 	})
 }
 
-func applyDamage(u *unit, amount int32, now int64) {
+// applyDamage 扣血。实际扣掉的数量不超过剩余生命。怪物被玩家打到 0 时记下伤害榜。
+func applyDamage(u *unit, uid, source int64, amount int32, now int64) {
 	if u == nil || u.dead || amount < 1 {
 		return
 	}
-	u.hp -= amount
+	dealt := amount
+	if dealt > u.hp {
+		dealt = u.hp
+	}
+	u.hp -= dealt
+	killed := false
 	if u.hp <= 0 {
 		u.hp = 0
 		u.dead = true
 		u.deadAt = now
 		u.buffs = nil
 		u.target = 0
+		killed = true
+		u.lastHit = source
+	}
+	if u.monster && dealt > 0 && playerSource(source) {
+		addHurt(u, source, dealt, now)
+	}
+	if killed && u.monster {
+		pendingKills = append(pendingKills, snapKill(uid, u))
+		u.damage = nil
+		u.lastHit = 0
+	}
+}
+
+// playerSource 判断这次伤害算不算玩家。怪物打人、怪打怪不进击杀榜。
+// 来源单位已经离场时仍算玩家，持续伤害记在施加 Buff 的人身上。
+func playerSource(source int64) bool {
+	if source < 1 {
+		return false
+	}
+	src := units[source]
+	return src == nil || !src.monster
+}
+
+// addHurt 累加这名玩家对这只怪这一条命的实际扣血。at 是达到当前伤害合计的时间。
+func addHurt(u *unit, source int64, dealt int32, now int64) {
+	if u.damage == nil {
+		u.damage = map[int64]*hurtRec{}
+	}
+	rec := u.damage[source]
+	if rec == nil {
+		rec = &hurtRec{}
+		u.damage[source] = rec
+	}
+	rec.total += dealt
+	rec.at = now
+	if src := units[source]; src != nil {
+		rec.playerID = src.playerID
+	}
+}
+
+// snapKill 抄下死亡瞬间的伤害榜。调用方随后清空单位上的记账，复活从零开始。
+func snapKill(uid int64, u *unit) KillSnap {
+	hits := make([]Hurt, 0, len(u.damage))
+	for id, rec := range u.damage {
+		if rec == nil || rec.total < 1 {
+			continue
+		}
+		hits = append(hits, Hurt{UID: id, PlayerID: rec.playerID, Damage: rec.total, At: rec.at})
+	}
+	sort.Slice(hits, func(i, j int) bool { return hits[i].UID < hits[j].UID })
+	return KillSnap{
+		MonsterUID: uid, TemplateID: u.templateID, SceneID: u.sceneID, Line: u.line,
+		LastHit: u.lastHit, Hits: hits,
 	}
 }
 
@@ -446,7 +556,7 @@ func tickBuffs(now int64) []Hit {
 					got := u.hp - before
 					hits = append(hits, Hit{SourceUID: b.source, TargetUID: uid, BuffID: b.id, Amount: got, Heal: true, TargetHP: u.hp})
 				} else {
-					applyDamage(u, amt, now)
+					applyDamage(u, uid, b.source, amt, now)
 					hits = append(hits, Hit{SourceUID: b.source, TargetUID: uid, BuffID: b.id, Amount: amt, TargetHP: u.hp, Dead: u.dead})
 				}
 				b.nextTick += b.intervalMs

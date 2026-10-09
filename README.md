@@ -307,6 +307,8 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 离开队伍 | `game.party.leave` | `google.protobuf.Empty` | `Empty`；离开的人 Push 空 `onParty`，留下的人 Push 新 `onParty` |
 | 踢出队伍 | `game.party.kick` | `PartyKickRequest`（`memberUid`） | `Empty`；被踢的人 Push 空 `onParty`，留下的人 Push 新 `onParty` |
 | 队伍状态 | `game.party.state` | `google.protobuf.Empty` | `PartyState`（没有队伍时 `partyId=0`） |
+| 待领取 | `game.reward.list` | `google.protobuf.Empty` | `RewardListResponse` |
+| 领取奖励 | `game.reward.take` | `RewardTakeRequest`（`claimId`） | `RewardTakeResponse`（背包）+ Push `onBagChange`。背包仍满返回 `40022`，条目还在 |
 | 配置热更 | `POST /gm/config/reload` | JSON `{tableName}` | `{code,version,tables}` | 需 GM token；内部 `GmReloadRequest` |
 
 
@@ -320,6 +322,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - `game.bag.use` 按道具 `use_buff_id` 调用 `ApplyBuff`，成功才扣 1 个。`0` 返回 `40054`。死亡不扣。禁战地图仍可使用。治疗在下一心跳，不是当场加血
 - 禁手是 Buff 效果 `stun`。效果还在时放技能和喝药返回 `40055`，不入队也不进冷却。已经进下一拍的技能若结算时施法者已禁手，这一拍不造成伤害，冷却不退回。移动不拦
 - 组队按账号 uid，最多 4 人。邀请 30 秒。断线后席位保留 60 秒，时限内重新进场回到原位；切图不离队。推送按 `party:online` 所在游戏节点投递
+- 地图 4「世界BOSS」可战斗，每线 30 人、3 条线，出生点 `(0,0,0)`。`cfg_spawn.line=0` 会在该图每一条线刷同样的怪；荒野野狼仍只写 1 线。击杀掉血按实际扣血记账，死亡时推 `onKillSettle`。单独击杀、同队至少两人出力、伤害前三和最后一击按 `cfg_kill_reward` 发奖，背包满了进 `player_reward_claims`
 - 怪物模板在 `cfg_monster`，刷在哪张图由 `cfg_spawn` 的怪物 id 决定。实例不占分线人数。附近单位带 `actorType`（0 玩家，1 怪物）和 `configId`。打到怪物时技能伤害减去防御，至少为 1；伤害为 0 时仍是 0。狼出手记在 `onCombatFrame` 里，`skill_id=0`。禁手时它不追也不打。种子是荒野 `(18,0,10)` 的野狼，会追击、按攻击距离出手，死亡后按刷怪点时间回出生点复活
 - 进场忽略请求里的 `sceneId`，出生在配表主城。`max_lines >= 2` 的图才会在满员后进入下一条线。切图成功会满血，并按离开的那张图的 `switch_cd_ms` 冷却。主城默认不能放技能，以地图表 `allow_combat` 为准
 - 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽

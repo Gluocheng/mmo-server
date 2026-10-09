@@ -1,0 +1,14 @@
+[
+  {"id": 1, "monster_id": 2, "kind": "solo", "item_id": 1002, "count": 20},
+  {"id": 2, "monster_id": 2, "kind": "party", "item_id": 1002, "count": 8},
+  {"id": 3, "monster_id": 2, "kind": "rank1", "item_id": 1002, "count": 30},
+  {"id": 4, "monster_id": 2, "kind": "rank2", "item_id": 1002, "count": 15},
+  {"id": 5, "monster_id": 2, "kind": "rank3", "item_id": 1002, "count": 8},
+  {"id": 6, "monster_id": 2, "kind": "last", "item_id": 1001, "count": 5},
+  {"id": 7, "monster_id": 3, "kind": "solo", "item_id": 1002, "count": 2},
+  {"id": 8, "monster_id": 3, "kind": "party", "item_id": 1002, "count": 1},
+  {"id": 9, "monster_id": 3, "kind": "rank1", "item_id": 1002, "count": 3},
+  {"id": 10, "monster_id": 3, "kind": "rank2", "item_id": 1002, "count": 2},
+  {"id": 11, "monster_id": 3, "kind": "rank3", "item_id": 1002, "count": 1},
+  {"id": 12, "monster_id": 3, "kind": "last", "item_id": 1001, "count": 1}
+]

@@ -6,6 +6,7 @@ import "github.com/example/mmo-server/gameconfig/pkg/schema"
 type MonsterDef struct {
 	ID               int32
 	Name             string
+	Kind             string
 	HP               int32
 	Attack           int32
 	Defense          int32
@@ -121,7 +122,7 @@ func monstersFromSchema(rows []schema.CfgMonster) map[int32]MonsterDef {
 	m := make(map[int32]MonsterDef, len(rows))
 	for _, r := range rows {
 		m[r.ID] = MonsterDef{
-			ID: r.ID, Name: r.Name, HP: r.HP, Attack: r.Attack, Defense: r.Defense,
+			ID: r.ID, Name: r.Name, Kind: r.Kind, HP: r.HP, Attack: r.Attack, Defense: r.Defense,
 			MoveSpeed: r.MoveSpeed, AttackRange: r.AttackRange, AttackIntervalMs: r.AttackIntervalMs,
 			AggroRange: r.AggroRange, LeashRange: r.LeashRange,
 		}

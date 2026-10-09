@@ -77,6 +77,10 @@ func Load(ctx context.Context, db *gorm.DB) error {
 	if err := db.WithContext(ctx).Order("id asc").Find(&spawnRows).Error; err != nil {
 		return fmt.Errorf("load cfg_spawn: %w", err)
 	}
+	var rewardRows []schema.CfgKillReward
+	if err := db.WithContext(ctx).Order("id asc").Find(&rewardRows).Error; err != nil {
+		return fmt.Errorf("load cfg_kill_reward: %w", err)
+	}
 
 	swapSnapshot(&snapshot{
 		version:    versionRow.Version,
@@ -91,6 +95,7 @@ func Load(ctx context.Context, db *gorm.DB) error {
 			scenes:      scenesFromSchema(sceneRows),
 			monsters:    monstersFromSchema(monsterRows),
 			spawns:      spawnsFromSchema(spawnRows),
+			killRewards: killRewardsFromSchema(rewardRows),
 		},
 	})
 	return nil

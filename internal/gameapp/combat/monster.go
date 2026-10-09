@@ -19,6 +19,7 @@ type MonsterStep struct {
 
 type slotKey struct {
 	spawnID int32
+	line    int32
 	slot    int32
 }
 
@@ -62,7 +63,7 @@ func SyncSpawns(sender cfacade.IActor) {
 		if u == nil || !u.monster {
 			continue
 		}
-		key := slotKey{spawnID: u.spawnID, slot: u.slot}
+		key := slotKey{spawnID: u.spawnID, line: u.line, slot: u.slot}
 		spec, ok := specs[key]
 		if !ok || !sameSlot(u, spec) {
 			gone = append(gone, uid)
@@ -80,10 +81,13 @@ func SyncSpawns(sender cfacade.IActor) {
 		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].spawnID == keys[j].spawnID {
-			return keys[i].slot < keys[j].slot
+		if keys[i].spawnID != keys[j].spawnID {
+			return keys[i].spawnID < keys[j].spawnID
 		}
-		return keys[i].spawnID < keys[j].spawnID
+		if keys[i].line != keys[j].line {
+			return keys[i].line < keys[j].line
+		}
+		return keys[i].slot < keys[j].slot
 	})
 	for _, key := range keys {
 		spec := specs[key]
@@ -96,18 +100,19 @@ func SyncSpawns(sender cfacade.IActor) {
 	}
 }
 
-// MonsterBySlot 返回某个刷怪点槽位上的实例 uid。
-func MonsterBySlot(spawnID, slot int32) (int64, bool) {
+// MonsterBySlot 返回某个刷怪点、某条线上槽位的实例 uid。
+func MonsterBySlot(spawnID, line, slot int32) (int64, bool) {
 	mu.Lock()
 	defer mu.Unlock()
 	for uid, u := range units {
-		if u != nil && u.monster && u.spawnID == spawnID && u.slot == slot {
+		if u != nil && u.monster && u.spawnID == spawnID && u.line == line && u.slot == slot {
 			return uid, true
 		}
 	}
 	return 0, false
 }
 
+// desiredSlots 按当前配表算出每条线、每个槽位应有的怪物。line=0 会展开到这张图的每一条线。
 func desiredSlots() map[slotKey]slotSpec {
 	out := make(map[slotKey]slotSpec)
 	for _, sp := range gcruntime.Spawns() {
@@ -119,19 +124,40 @@ func desiredSlots() map[slotKey]slotSpec {
 			continue
 		}
 		scene, ok := gcruntime.Scene(sp.SceneID)
-		if !ok || !scene.AllowCombat || sp.Line < 1 || sp.Line > scene.LineCount() {
+		if !ok || !scene.AllowCombat {
 			continue
 		}
-		for i := int32(0); i < sp.Count; i++ {
-			out[slotKey{spawnID: sp.ID, slot: i}] = slotSpec{
-				spawnID: sp.ID, slot: i, monsterID: mon.ID,
-				sceneID: sp.SceneID, line: sp.Line,
-				x: sp.X + float32(i)*2, y: sp.Y, z: sp.Z,
-				respawnMs: sp.RespawnMs, def: mon,
+		lines := spawnLines(sp.Line, scene.LineCount())
+		for _, line := range lines {
+			for i := int32(0); i < sp.Count; i++ {
+				out[slotKey{spawnID: sp.ID, line: line, slot: i}] = slotSpec{
+					spawnID: sp.ID, slot: i, monsterID: mon.ID,
+					sceneID: sp.SceneID, line: line,
+					x: sp.X + float32(i)*2, y: sp.Y, z: sp.Z,
+					respawnMs: sp.RespawnMs, def: mon,
+				}
 			}
 		}
 	}
 	return out
+}
+
+// spawnLines 把 line=0 展开成这张图的每一条线。写了具体线号则只刷那一条。
+func spawnLines(line, lineCount int32) []int32 {
+	if lineCount < 1 {
+		return nil
+	}
+	if line == 0 {
+		out := make([]int32, 0, lineCount)
+		for i := int32(1); i <= lineCount; i++ {
+			out = append(out, i)
+		}
+		return out
+	}
+	if line < 1 || line > lineCount {
+		return nil
+	}
+	return []int32{line}
 }
 
 func usableMonster(def gcruntime.MonsterDef) bool {
@@ -144,7 +170,7 @@ func usableMonster(def gcruntime.MonsterDef) bool {
 	if def.AggroRange < def.AttackRange || def.LeashRange <= def.AggroRange {
 		return false
 	}
-	return true
+	return def.Kind == "boss" || def.Kind == "mob"
 }
 
 func sameSlot(u *unit, spec slotSpec) bool {
@@ -178,6 +204,8 @@ func tickMonsters(now int64) ([]MonsterStep, []Hit) {
 			u.dead = false
 			u.hp = u.maxHP
 			u.buffs = nil
+			u.damage = nil
+			u.lastHit = 0
 			u.target = 0
 			u.nextAttack = 0
 			hits = append(hits, Hit{SourceUID: uid, TargetUID: uid, Amount: u.maxHP, Heal: true, TargetHP: u.hp})
@@ -230,7 +258,7 @@ func tickMonsters(now int64) ([]MonsterStep, []Hit) {
 		if dmg < 1 {
 			dmg = 1
 		}
-		applyDamage(foe, dmg, now)
+		applyDamage(foe, target, uid, dmg, now)
 		hits = append(hits, Hit{SourceUID: uid, TargetUID: target, Amount: dmg, TargetHP: foe.hp, Dead: foe.dead})
 		u.nextAttack = now + u.attackInterval
 	}

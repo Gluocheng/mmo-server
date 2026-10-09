@@ -9,6 +9,33 @@
     "attack_range": 2,
     "attack_interval_ms": 1200,
     "aggro_range": 6,
-    "leash_range": 12
+    "leash_range": 12,
+    "kind": "mob"
+  },
+  {
+    "id": 2,
+    "name": "荒原霸主",
+    "hp": 5000,
+    "attack": 15,
+    "defense": 5,
+    "move_speed": 3,
+    "attack_range": 3,
+    "attack_interval_ms": 1500,
+    "aggro_range": 10,
+    "leash_range": 25,
+    "kind": "boss"
+  },
+  {
+    "id": 3,
+    "name": "狼群",
+    "hp": 200,
+    "attack": 8,
+    "defense": 2,
+    "move_speed": 4,
+    "attack_range": 2,
+    "attack_interval_ms": 1200,
+    "aggro_range": 6,
+    "leash_range": 12,
+    "kind": "mob"
   }
 ]

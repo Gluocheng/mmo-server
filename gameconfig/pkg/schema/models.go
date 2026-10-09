@@ -108,6 +108,7 @@ type CfgMonster struct {
 	AttackIntervalMs int32   `gorm:"column:attack_interval_ms;not null"`
 	AggroRange       float32 `gorm:"column:aggro_range;not null"`
 	LeashRange       float32 `gorm:"column:leash_range;not null"`
+	Kind             string  `gorm:"size:16;not null;default:''"`
 }
 
 // TableName 表名 cfg_monster。
@@ -130,7 +131,19 @@ type CfgSpawn struct {
 // TableName 表名 cfg_spawn。
 func (CfgSpawn) TableName() string { return "cfg_spawn" }
 
+// CfgKillReward 击杀奖励。monster_id + kind 唯一。kind 为 solo、party、rank1、rank2、rank3、last。
+type CfgKillReward struct {
+	ID        int32  `gorm:"primaryKey"`
+	MonsterID int32  `gorm:"column:monster_id;not null;uniqueIndex:uk_kill_reward"`
+	Kind      string `gorm:"size:16;not null;uniqueIndex:uk_kill_reward"`
+	ItemID    int32  `gorm:"column:item_id;not null"`
+	Count     int32  `gorm:"not null"`
+}
+
+// TableName 表名 cfg_kill_reward。
+func (CfgKillReward) TableName() string { return "cfg_kill_reward" }
+
 // Models 参与 AutoMigrate 的配置表模型列表。
 func Models() []any {
-	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}}
+	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}, &CfgKillReward{}}
 }

@@ -148,6 +148,18 @@ func main() {
 				return err
 			}
 		}
+		rewardRows, err := importdata.LoadKillRewardsFromJSONFile(filepath.Join(*dataDir, importdata.KillRewardTableFile))
+		if err != nil {
+			return err
+		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgKillReward{}).Error; err != nil {
+			return err
+		}
+		if len(rewardRows) > 0 {
+			if err := tx.Create(&rewardRows).Error; err != nil {
+				return err
+			}
+		}
 		var ver schema.CfgVersion
 		if err := tx.First(&ver, 1).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {

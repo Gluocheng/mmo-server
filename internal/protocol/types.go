@@ -81,6 +81,12 @@ type (
 	PartyState            = pb.PartyState
 	PartyInvite           = pb.PartyInvite
 	PartyDeliver          = pb.PartyDeliver
+	KillRewardItem        = pb.KillRewardItem
+	KillSettle            = pb.KillSettle
+	RewardClaim           = pb.RewardClaim
+	RewardListResponse    = pb.RewardListResponse
+	RewardTakeRequest     = pb.RewardTakeRequest
+	RewardTakeResponse    = pb.RewardTakeResponse
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

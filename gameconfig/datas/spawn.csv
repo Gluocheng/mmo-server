@@ -1,2 +1,5 @@
 ##,id,feature,scene_id,line,monster_id,x,y,z,count,respawn_ms
 ,1,wild,3,1,1,18,0,10,1,8000
+,2,worldboss,4,0,2,20,0,0,1,300000
+,3,worldboss,4,0,2,-20,0,10,1,300000
+,4,worldboss,4,0,3,8,0,8,4,15000

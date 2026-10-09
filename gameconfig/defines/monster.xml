@@ -10,6 +10,7 @@
 		<var name="attack_interval_ms" type="int" comment="攻击间隔毫秒"/>
 		<var name="aggro_range" type="float" comment="仇恨距离"/>
 		<var name="leash_range" type="float" comment="回家距离"/>
+		<var name="kind" type="string" comment="boss 或 mob，其它值不生成"/>
 	</bean>
 	<table name="TbMonster" value="Monster" input="monster.csv" comment="怪物表"/>
 </module>
