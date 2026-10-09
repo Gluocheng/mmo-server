@@ -84,7 +84,7 @@ func TestPartyStorageDoesNotReturnNotEntered(t *testing.T) {
 		t.Fatalf("online=%q ok=%v", node, ok)
 	}
 
-	_, c = Invite(ctx, 1, 2, 900, now+30_000, now)
+	_, _, c = Invite(ctx, 1, 2, 900, now+30_000, now)
 	wantNoCode(t, c)
 	wantCode(t, c, code.PartyTargetOffline)
 }
@@ -128,10 +128,10 @@ func TestPartyInviteRules(t *testing.T) {
 	putPartyOnline(t, ctx, 2, "10001")
 	putPartyOnline(t, ctx, 3, "10001")
 
-	if _, c := Invite(ctx, 1, 1, 1, now+30_000, now); c != code.PartyInviteInvalid {
+	if _, _, c := Invite(ctx, 1, 1, 1, now+30_000, now); c != code.PartyInviteInvalid {
 		t.Fatalf("invite self %d", c)
 	}
-	if _, c := Invite(ctx, 1, 2, 2, now+30_000, now); c != code.OK {
+	if _, _, c := Invite(ctx, 1, 2, 2, now+30_000, now); c != code.OK {
 		t.Fatalf("invite %d", c)
 	}
 	if _, c, _ := Answer(ctx, 2, 2, true, now); c != code.OK {
@@ -139,14 +139,14 @@ func TestPartyInviteRules(t *testing.T) {
 	}
 
 	putPartyOnline(t, ctx, 4, "10001")
-	if _, c := Invite(ctx, 2, 4, 3, now+30_000, now); c != code.PartyNotLeader {
+	if _, _, c := Invite(ctx, 2, 4, 3, now+30_000, now); c != code.PartyNotLeader {
 		t.Fatalf("member invite %d", c)
 	}
 
 	if _, c := CreateParty(ctx, 3, 20, "10001", now); c != code.OK {
 		t.Fatalf("create other %d", c)
 	}
-	if _, c := Invite(ctx, 1, 3, 4, now+30_000, now); c != code.PartyAlreadyIn {
+	if _, _, c := Invite(ctx, 1, 3, 4, now+30_000, now); c != code.PartyAlreadyIn {
 		t.Fatalf("target in party %d", c)
 	}
 
@@ -156,7 +156,7 @@ func TestPartyInviteRules(t *testing.T) {
 	if _, ok := partyOnlineValue(t, ctx, 2); ok {
 		t.Fatal("grace member still online")
 	}
-	if _, c := Invite(ctx, 1, 2, 5, now+1_000, now+1); c != code.PartyAlreadyIn {
+	if _, _, c := Invite(ctx, 1, 2, 5, now+1_000, now+1); c != code.PartyAlreadyIn {
 		t.Fatalf("grace target %d want 40060", c)
 	}
 }
@@ -171,13 +171,13 @@ func TestPartyAnswer(t *testing.T) {
 		}
 		putPartyOnline(t, ctx, 2, "10001")
 		putPartyOnline(t, ctx, 3, "10001")
-		if _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
+		if _, _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
 			t.Fatal(c)
 		}
 		st, c, _ := Answer(ctx, 2, 21, true, now)
 		wantCode(t, c, code.OK)
 		wantMembers(t, st, 1, 2)
-		if _, c := Invite(ctx, 1, 3, 22, now+30_000, now); c != code.OK {
+		if _, _, c := Invite(ctx, 1, 3, 22, now+30_000, now); c != code.OK {
 			t.Fatal(c)
 		}
 		st, c, _ = Answer(ctx, 3, 22, true, now)
@@ -194,7 +194,7 @@ func TestPartyAnswer(t *testing.T) {
 			t.Fatal(c)
 		}
 		putPartyOnline(t, ctx, 2, "10001")
-		if _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
+		if _, _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
 			t.Fatal(c)
 		}
 		st, c, _ := Answer(ctx, 2, 21, false, now)
@@ -214,7 +214,7 @@ func TestPartyAnswer(t *testing.T) {
 		}
 		putPartyOnline(t, ctx, 2, "10001")
 		expireAt := now + 1_000
-		if _, c := Invite(ctx, 1, 2, 21, expireAt, now); c != code.OK {
+		if _, _, c := Invite(ctx, 1, 2, 21, expireAt, now); c != code.OK {
 			t.Fatal(c)
 		}
 		key := fmt.Sprintf("%s:party:invite:%d", KeyPrefix(), 2)
@@ -236,7 +236,7 @@ func TestPartyAnswer(t *testing.T) {
 			t.Fatal(c)
 		}
 		putPartyOnline(t, ctx, 4, "10001")
-		if _, c := Invite(ctx, 3, 4, 31, now+1_000, now); c != code.OK {
+		if _, _, c := Invite(ctx, 3, 4, 31, now+1_000, now); c != code.OK {
 			t.Fatal(c)
 		}
 		st, c, _ = Answer(ctx, 4, 31, true, now+1_001)
@@ -252,10 +252,10 @@ func TestPartyAnswer(t *testing.T) {
 			t.Fatal(c)
 		}
 		putPartyOnline(t, ctx, 2, "10001")
-		if _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
+		if _, _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
 			t.Fatal(c)
 		}
-		if _, c := Invite(ctx, 1, 2, 22, now+30_000, now+1); c != code.OK {
+		if _, _, c := Invite(ctx, 1, 2, 22, now+30_000, now+1); c != code.OK {
 			t.Fatal(c)
 		}
 		if _, c, _ := Answer(ctx, 2, 21, true, now+1); c != code.PartyInviteInvalid {
@@ -277,7 +277,7 @@ func TestPartyFull(t *testing.T) {
 	for i, uid := range []int64{2, 3, 4} {
 		putPartyOnline(t, ctx, uid, "10001")
 		inv := int64(100 + i)
-		if _, c := Invite(ctx, 1, uid, inv, now+30_000, now); c != code.OK {
+		if _, _, c := Invite(ctx, 1, uid, inv, now+30_000, now); c != code.OK {
 			t.Fatal(c)
 		}
 		st, c, _ := Answer(ctx, uid, inv, true, now)
@@ -294,7 +294,7 @@ func TestPartyFull(t *testing.T) {
 	wantMembers(t, st, 1, 2, 3, 4)
 
 	putPartyOnline(t, ctx, 5, "10001")
-	if _, c := Invite(ctx, 1, 5, 200, now+30_000, now); c != code.OK {
+	if _, _, c := Invite(ctx, 1, 5, 200, now+30_000, now); c != code.OK {
 		t.Fatal(c)
 	}
 	st, c, _ = Answer(ctx, 5, 200, true, now)
@@ -318,7 +318,7 @@ func TestPartyLeave(t *testing.T) {
 	t.Run("leader hands off to earliest remaining", func(t *testing.T) {
 		ctx := newPartyTest(t)
 		mustPartyOf(t, ctx, []int64{1, 2, 3}, 10, now)
-		left, rest, c := Leave(ctx, 1, now)
+		left, rest, _, c := Leave(ctx, 1, now)
 		wantCode(t, c, code.OK)
 		if left.PartyID != 0 || len(left.Members) != 0 {
 			t.Fatalf("left=%+v", left)
@@ -343,7 +343,7 @@ func TestPartyLeave(t *testing.T) {
 		if _, c := CreateParty(ctx, 1, 10, "10001", now); c != code.OK {
 			t.Fatal(c)
 		}
-		left, rest, c := Leave(ctx, 1, now)
+		left, rest, _, c := Leave(ctx, 1, now)
 		wantCode(t, c, code.OK)
 		if left.PartyID != 0 || rest.PartyID != 0 {
 			t.Fatalf("left=%+v rest=%+v", left, rest)
@@ -360,7 +360,7 @@ func TestPartyLeave(t *testing.T) {
 	t.Run("two members leave dissolves", func(t *testing.T) {
 		ctx := newPartyTest(t)
 		mustPartyOf(t, ctx, []int64{1, 2}, 10, now)
-		_, rest, c := Leave(ctx, 1, now)
+		_, rest, _, c := Leave(ctx, 1, now)
 		wantCode(t, c, code.OK)
 		if rest.PartyID != 0 {
 			t.Fatalf("rest=%+v", rest)
@@ -375,9 +375,50 @@ func TestPartyLeave(t *testing.T) {
 
 	t.Run("not in party", func(t *testing.T) {
 		ctx := newPartyTest(t)
-		_, _, c := Leave(ctx, 9, now)
+		_, _, _, c := Leave(ctx, 9, now)
 		wantCode(t, c, code.PartyNotIn)
 	})
+}
+
+func TestPartyLeaveExpiredPartnerNotifiesBoth(t *testing.T) {
+	ctx := newPartyTest(t)
+	const now int64 = 1_700_000_000_000
+	mustPartyOf(t, ctx, []int64{1, 2}, 10, now)
+	if err := BeginGrace(ctx, 2, now); err != nil {
+		t.Fatal(err)
+	}
+	_, rest, notify, c := Leave(ctx, 1, now+60_001)
+	wantCode(t, c, code.OK)
+	if rest.PartyID != 0 || len(rest.Members) != 0 {
+		t.Fatalf("rest=%+v", rest)
+	}
+	if len(notify) != 2 || !containsUID(notify, 1) || !containsUID(notify, 2) {
+		t.Fatalf("notify=%v", notify)
+	}
+	for _, uid := range []int64{1, 2} {
+		st, sc := PartyStateOf(ctx, uid, now+60_001)
+		wantCode(t, sc, code.OK)
+		if st.PartyID != 0 {
+			t.Fatalf("uid %d still in %+v", uid, st)
+		}
+	}
+}
+
+func TestPartyKickExpiredPartnerDissolvesAsSuccess(t *testing.T) {
+	ctx := newPartyTest(t)
+	const now int64 = 1_700_000_000_000
+	mustPartyOf(t, ctx, []int64{1, 2}, 10, now)
+	if err := BeginGrace(ctx, 2, now); err != nil {
+		t.Fatal(err)
+	}
+	_, rest, notify, c := Kick(ctx, 1, 2, now+60_001)
+	wantCode(t, c, code.OK)
+	if rest.PartyID != 0 || len(rest.Members) != 0 {
+		t.Fatalf("rest=%+v", rest)
+	}
+	if len(notify) != 2 || !containsUID(notify, 1) || !containsUID(notify, 2) {
+		t.Fatalf("notify=%v", notify)
+	}
 }
 
 func TestPartyKick(t *testing.T) {
@@ -386,7 +427,7 @@ func TestPartyKick(t *testing.T) {
 	t.Run("kick self", func(t *testing.T) {
 		ctx := newPartyTest(t)
 		mustPartyOf(t, ctx, []int64{1, 2, 3}, 10, now)
-		_, _, c := Kick(ctx, 1, 1, now)
+		_, _, _, c := Kick(ctx, 1, 1, now)
 		wantCode(t, c, code.PartyInviteInvalid)
 		got, _ := PartyStateOf(ctx, 1, now)
 		wantMembers(t, got, 1, 2, 3)
@@ -395,7 +436,7 @@ func TestPartyKick(t *testing.T) {
 	t.Run("kick member", func(t *testing.T) {
 		ctx := newPartyTest(t)
 		mustPartyOf(t, ctx, []int64{1, 2, 3}, 10, now)
-		left, rest, c := Kick(ctx, 1, 3, now)
+		left, rest, _, c := Kick(ctx, 1, 3, now)
 		wantCode(t, c, code.OK)
 		if left.PartyID != 0 {
 			t.Fatalf("left=%+v", left)
@@ -417,7 +458,7 @@ func TestPartyKick(t *testing.T) {
 		if err := BeginGrace(ctx, 2, now); err != nil {
 			t.Fatal(err)
 		}
-		_, rest, c := Kick(ctx, 1, 2, now+1)
+		_, rest, _, c := Kick(ctx, 1, 2, now+1)
 		wantCode(t, c, code.OK)
 		wantMembers(t, rest, 1, 3)
 		gone, _ := PartyStateOf(ctx, 2, now+1)
@@ -436,7 +477,7 @@ func TestPartyKick(t *testing.T) {
 	t.Run("member cannot kick", func(t *testing.T) {
 		ctx := newPartyTest(t)
 		mustPartyOf(t, ctx, []int64{1, 2, 3}, 10, now)
-		_, _, c := Kick(ctx, 2, 3, now)
+		_, _, _, c := Kick(ctx, 2, 3, now)
 		wantCode(t, c, code.PartyNotLeader)
 	})
 }
@@ -454,7 +495,7 @@ func TestPartyBeginGraceDeletesOnlineOffRoster(t *testing.T) {
 		if _, ok := partyOnlineValue(t, ctx, 2); ok {
 			t.Fatal("online key remains")
 		}
-		if _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.PartyTargetOffline {
+		if _, _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.PartyTargetOffline {
 			t.Fatalf("invite %d", c)
 		}
 	})
@@ -475,7 +516,7 @@ func TestPartyBeginGraceDeletesOnlineOffRoster(t *testing.T) {
 		if _, err := rdb.Get(ctx, fmt.Sprintf("%s:party:%d", KeyPrefix(), 10)).Result(); !errors.Is(err, redis.Nil) {
 			t.Fatalf("party key err=%v", err)
 		}
-		if _, c := Invite(ctx, 3, 1, 31, now+60_001+30_000, now+60_001); c != code.PartyTargetOffline {
+		if _, _, c := Invite(ctx, 3, 1, 31, now+60_001+30_000, now+60_001); c != code.PartyTargetOffline {
 			t.Fatalf("invite %d", c)
 		}
 	})
@@ -706,7 +747,7 @@ func TestPartyCrossNodeRoster(t *testing.T) {
 		t.Fatal(c)
 	}
 	putPartyOnline(t, ctx, 2, "10002")
-	if _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
+	if _, _, c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.OK {
 		t.Fatalf("invite %d", c)
 	}
 	if _, c, _ := Answer(ctx, 2, 21, true, now); c != code.OK {
@@ -743,7 +784,7 @@ func mustPartyOf(t *testing.T, ctx context.Context, uids []int64, partyID, now i
 	for i, uid := range uids[1:] {
 		putPartyOnline(t, ctx, uid, "10001")
 		inv := partyID*100 + int64(i) + 1
-		if _, c := Invite(ctx, uids[0], uid, inv, now+30_000, now); c != code.OK {
+		if _, _, c := Invite(ctx, uids[0], uid, inv, now+30_000, now); c != code.OK {
 			t.Fatalf("invite %d: %d", uid, c)
 		}
 		if _, c, _ := Answer(ctx, uid, inv, true, now); c != code.OK {
@@ -759,12 +800,12 @@ func TestPartyInviteReplaceAndAnswerClear(t *testing.T) {
 		t.Fatalf("create %d", c)
 	}
 	putPartyOnline(t, ctx, 2, "10002")
-	replaced, c := Invite(ctx, 1, 2, 21, now+30_000, now)
+	replaced, _, c := Invite(ctx, 1, 2, 21, now+30_000, now)
 	wantCode(t, c, code.OK)
 	if replaced {
 		t.Fatal("first invite is not a replace")
 	}
-	replaced, c = Invite(ctx, 1, 2, 22, now+30_000, now+1)
+	replaced, _, c = Invite(ctx, 1, 2, 22, now+30_000, now+1)
 	wantCode(t, c, code.OK)
 	if !replaced {
 		t.Fatal("second invite should replace")

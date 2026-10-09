@@ -79,17 +79,10 @@ func (p *actorParty) invite(session *cproto.Session, req *protocol.PartyInviteRe
 	now := gtime.Now().UnixMilli()
 	inviteID := cherrySnowflake.NextID()
 	expireAt := now + inviteValidMS
-	replaced, c := persistence.Invite(context.Background(), session.Uid, req.TargetUid, inviteID, expireAt, now)
+	replaced, partyID, c := persistence.Invite(context.Background(), session.Uid, req.TargetUid, inviteID, expireAt, now)
 	if c != code.OK {
 		p.reject(session, "invite", c)
 		return
-	}
-	roster, sc := persistence.PartyStateOf(context.Background(), session.Uid, now)
-	partyID := int64(0)
-	if sc == code.OK {
-		partyID = roster.PartyID
-	} else {
-		clog.Warnf("party invite state uid=%d code=%d", session.Uid, sc)
 	}
 	if replaced {
 		publish(p, &protocol.PartyDeliver{
@@ -139,19 +132,11 @@ func (p *actorParty) leave(session *cproto.Session, _ *protocol.None) {
 		return
 	}
 	now := gtime.Now().UnixMilli()
-	ctx := context.Background()
-	// 只剩一人导致解散时，Leave 的 rest 是空名单，不含留下的那个人。先记下离开前的成员。
-	before, _ := persistence.PartyStateOf(ctx, session.Uid, now)
-	_, rest, c := persistence.Leave(ctx, session.Uid, now)
+	_, rest, notify, c := persistence.Leave(context.Background(), session.Uid, now)
+	pushChange(p, rest, notify)
 	if c != code.OK {
 		p.reject(session, "leave", c)
 		return
-	}
-	if rest.PartyID != 0 {
-		pushEmpty(p, []int64{session.Uid})
-		PushRoster(p, rest)
-	} else {
-		pushEmpty(p, withUID(before.Members, session.Uid))
 	}
 	p.Response(session, &emptypb.Empty{})
 }
@@ -165,18 +150,11 @@ func (p *actorParty) kick(session *cproto.Session, req *protocol.PartyKickReques
 		return
 	}
 	now := gtime.Now().UnixMilli()
-	ctx := context.Background()
-	before, _ := persistence.PartyStateOf(ctx, session.Uid, now)
-	_, rest, c := persistence.Kick(ctx, session.Uid, req.MemberUid, now)
+	_, rest, notify, c := persistence.Kick(context.Background(), session.Uid, req.MemberUid, now)
+	pushChange(p, rest, notify)
 	if c != code.OK {
 		p.reject(session, "kick", c)
 		return
-	}
-	if rest.PartyID != 0 {
-		pushEmpty(p, []int64{req.MemberUid})
-		PushRoster(p, rest)
-	} else {
-		pushEmpty(p, withUID(withUID(before.Members, req.MemberUid), session.Uid))
 	}
 	p.Response(session, &emptypb.Empty{})
 }
@@ -229,6 +207,29 @@ func pushEmpty(sender cfacade.IActor, uids []int64) {
 	publish(sender, &protocol.PartyDeliver{Uids: uids, State: &protocol.PartyState{}})
 }
 
+// pushChange 给留下的人推新名单，给离开的人推空名单。解散时 notify 里的人全部收到空名单。
+func pushChange(sender cfacade.IActor, rest persistence.PartyState, notify []int64) {
+	if len(notify) == 0 {
+		return
+	}
+	if rest.PartyID != 0 {
+		PushRoster(sender, rest)
+		pushEmpty(sender, absent(notify, rest.Members))
+		return
+	}
+	pushEmpty(sender, notify)
+}
+
+func absent(all, keep []int64) []int64 {
+	out := make([]int64, 0)
+	for _, uid := range all {
+		if !containsUID(keep, uid) {
+			out = append(out, uid)
+		}
+	}
+	return out
+}
+
 func protoState(st persistence.PartyState) *protocol.PartyState {
 	return &protocol.PartyState{
 		PartyId:   st.PartyID,
@@ -239,14 +240,6 @@ func protoState(st persistence.PartyState) *protocol.PartyState {
 
 func memberUIDs(st persistence.PartyState) []int64 {
 	return append([]int64(nil), st.Members...)
-}
-
-func withUID(members []int64, uid int64) []int64 {
-	out := append([]int64(nil), members...)
-	if uid > 0 && !containsUID(out, uid) {
-		out = append(out, uid)
-	}
-	return out
 }
 
 func containsUID(uids []int64, uid int64) bool {

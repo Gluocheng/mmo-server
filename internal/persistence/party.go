@@ -683,14 +683,15 @@ func CreateParty(ctx context.Context, uid, partyID int64, nodeID string, now int
 // Invite 由队长邀请目标。新邀请覆盖同一目标的旧邀请。
 // 先判断目标是否已在队（含宽限未过期，返回 40060），再判断有没有在线节点（没有则 40065）。
 // 邀请自己返回 40063，非队长返回 40062。存储层不返回 40009。
-// replaced 仅在写入成功且该目标原来已有邀请时为 true。
-func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) (bool, int32) {
+// replaced 仅在写入成功且该目标原来已有邀请时为 true。partyID 是这次写入的队伍 id，失败时为 0。
+func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) (bool, int64, int32) {
 	ctx = ctxOrBG(ctx)
 	if rdb == nil || leader < 1 || target < 1 || inviteID < 1 {
-		return false, code.LoginFail
+		return false, 0, code.LoginFail
 	}
 	var outCode int32
 	var replaced bool
+	var outParty int64
 	err := commitWatched(ctx, func() (*partySnap, error) {
 		snap := newPartySnap()
 		if err := snap.trackUser(ctx, leader); err != nil {
@@ -709,6 +710,7 @@ func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) 
 	}, func(tx *redis.Tx) error {
 		outCode = code.OK
 		replaced = false
+		outParty = 0
 		w := newPartyWrite()
 		pid, rec, err := loadUserParty(ctx, tx, leader)
 		if err != nil {
@@ -761,6 +763,7 @@ func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) 
 		if old != nil {
 			replaced = true
 		}
+		outParty = pid
 		w.inviteSet[target] = partyInviteRecord{
 			InviteID: inviteID,
 			PartyID:  pid,
@@ -770,12 +773,12 @@ func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) 
 		return execPartyWrite(ctx, tx, w)
 	})
 	if err != nil {
-		return false, code.LoginFail
+		return false, 0, code.LoginFail
 	}
 	if outCode != code.OK {
-		return false, outCode
+		return false, 0, outCode
 	}
-	return replaced, outCode
+	return replaced, outParty, outCode
 }
 
 // Answer 应答邀请。接受时加到队尾；拒绝、邀请 id 不匹配，或 now 超过 expireAt，成员不变并返回 40063。
@@ -926,14 +929,17 @@ func userStillInParty(ctx context.Context, tx redisGetter, w *partyWrite, uid, i
 }
 
 // Leave 使 uid 离队。left 是离队者的空名单，rest 是留下的队伍。
-// 队长离开后最早剩余成员接任；剩下不足 2 人则解散，两边 PartyID 都是 0。
-// 不在队伍中返回 40061。不删除在线节点。
-func Leave(ctx context.Context, uid, now int64) (PartyState, PartyState, int32) {
+// notify 是这次应收到 onParty 的 uid：留下的人、离队者，以及同一次调用里被摘掉的人。
+// 队长离开后最早剩余成员接任；剩下不足 2 人则解散，rest 的 PartyID 为 0。
+// 宽限到期把队伍解散，或离队者自己的宽限在这次调用里到期，返回成功而不是 40061。
+// 本来就不在队伍中返回 40061。不删除在线节点。
+func Leave(ctx context.Context, uid, now int64) (PartyState, PartyState, []int64, int32) {
 	ctx = ctxOrBG(ctx)
 	if rdb == nil || uid < 1 {
-		return PartyState{}, PartyState{}, code.LoginFail
+		return PartyState{}, PartyState{}, nil, code.LoginFail
 	}
 	var outLeft, outRest PartyState
+	var notify []int64
 	var outCode int32
 	err := commitWatched(ctx, func() (*partySnap, error) {
 		snap := newPartySnap()
@@ -944,59 +950,65 @@ func Leave(ctx context.Context, uid, now int64) (PartyState, PartyState, int32) 
 	}, func(tx *redis.Tx) error {
 		outLeft = PartyState{}
 		outRest = PartyState{}
+		notify = nil
 		outCode = code.OK
-		return leaveOrRemove(ctx, tx, uid, now, &outLeft, &outRest, &outCode)
+		return leaveOrRemove(ctx, tx, uid, now, &outLeft, &outRest, &notify, &outCode)
 	})
 	if err != nil {
-		return PartyState{}, PartyState{}, code.LoginFail
+		return PartyState{}, PartyState{}, nil, code.LoginFail
 	}
-	return outLeft, outRest, outCode
+	return outLeft, outRest, notify, outCode
 }
 
-func leaveOrRemove(ctx context.Context, tx *redis.Tx, uid, now int64, left, rest *PartyState, outCode *int32) error {
+func leaveOrRemove(ctx context.Context, tx *redis.Tx, uid, now int64, left, rest *PartyState, notify *[]int64, outCode *int32) error {
 	w := newPartyWrite()
+	*left = PartyState{}
+	*rest = PartyState{}
+	*notify = nil
 	pid, rec, err := loadUserParty(ctx, tx, uid)
 	if err != nil {
 		return err
 	}
-	if pid == 0 || rec == nil {
+	if pid == 0 || rec == nil || !rec.has(uid) {
 		if pid > 0 {
 			w.unbind = append(w.unbind, uid)
 		}
 		*outCode = code.PartyNotIn
 		return execPartyWrite(ctx, tx, w)
 	}
-	base, _ := activeAfterPrune(w, pid, rec, now)
+	base, drops, _ := pruneInto(w, pid, rec, now)
 	if base == nil || !base.has(uid) {
-		// 宽限在这次调用里到期，按离队成功处理；索引指向别人的队伍则视为本来就不在队。
-		if rec.has(uid) {
-			if base != nil {
-				*rest = base.view(pid)
-			}
-			*outCode = code.OK
-		} else {
-			w.unbind = append(w.unbind, uid)
-			*outCode = code.PartyNotIn
+		// 宽限在这次调用里到期。队伍解散时 drops 含全体原成员；还留有队伍时 rest 是新名单。
+		if base != nil {
+			*rest = base.view(pid)
 		}
+		*notify = notifyUIDs(*rest, drops)
+		*outCode = code.OK
 		return execPartyWrite(ctx, tx, w)
 	}
 	updated := w.removeMember(pid, base, uid)
 	if updated != nil {
 		*rest = updated.view(pid)
+		*notify = notifyUIDs(*rest, append(append([]int64{}, drops...), uid))
+	} else {
+		*notify = notifyUIDs(PartyState{}, append(append([]int64{}, drops...), seatUIDs(base.Members)...))
 	}
 	*outCode = code.OK
 	return execPartyWrite(ctx, tx, w)
 }
 
 // Kick 由队长把目标移出队伍。left 是被踢者的空名单，rest 是留下的队伍。
+// notify 是这次应收到 onParty 的 uid：留下的人、被踢者、操作者，以及同一次调用里被摘掉的人。
 // 踢自己或目标不是本队成员返回 40063；调用者不是队长返回 40062。
 // 宽限中的成员可以被踢，踢掉后宽限一并清除。
-func Kick(ctx context.Context, leader, target, now int64) (PartyState, PartyState, int32) {
+// 这次调用里宽限到期导致队伍解散，或操作者自己被摘掉，返回成功而不是 40062。
+func Kick(ctx context.Context, leader, target, now int64) (PartyState, PartyState, []int64, int32) {
 	ctx = ctxOrBG(ctx)
 	if rdb == nil || leader < 1 || target < 1 {
-		return PartyState{}, PartyState{}, code.LoginFail
+		return PartyState{}, PartyState{}, nil, code.LoginFail
 	}
 	var outLeft, outRest PartyState
+	var notify []int64
 	var outCode int32
 	err := commitWatched(ctx, func() (*partySnap, error) {
 		snap := newPartySnap()
@@ -1010,36 +1022,89 @@ func Kick(ctx context.Context, leader, target, now int64) (PartyState, PartyStat
 	}, func(tx *redis.Tx) error {
 		outLeft = PartyState{}
 		outRest = PartyState{}
+		notify = nil
 		outCode = code.OK
 		w := newPartyWrite()
 		pid, rec, err := loadUserParty(ctx, tx, leader)
 		if err != nil {
 			return err
 		}
-		var base *partyRecord
-		if rec != nil {
-			base, _ = activeAfterPrune(w, pid, rec, now)
-		}
-		if base == nil || !base.has(leader) || base.Leader != leader {
+		if pid == 0 || rec == nil || !rec.has(leader) {
+			if pid > 0 {
+				w.unbind = append(w.unbind, leader)
+			}
 			outCode = code.PartyNotLeader
 			return execPartyWrite(ctx, tx, w)
 		}
+		base, drops, _ := pruneInto(w, pid, rec, now)
+		if base == nil || !base.has(leader) {
+			if base != nil {
+				outRest = base.view(pid)
+			}
+			notify = notifyUIDs(outRest, drops)
+			outCode = code.OK
+			return execPartyWrite(ctx, tx, w)
+		}
+		if base.Leader != leader {
+			outCode = code.PartyNotLeader
+			if len(drops) > 0 {
+				outRest = base.view(pid)
+				notify = notifyUIDs(outRest, drops)
+			}
+			return execPartyWrite(ctx, tx, w)
+		}
 		if target == leader || !base.has(target) {
-			outRest = base.view(pid)
 			outCode = code.PartyInviteInvalid
+			if len(drops) > 0 {
+				outRest = base.view(pid)
+				notify = notifyUIDs(outRest, drops)
+			}
 			return execPartyWrite(ctx, tx, w)
 		}
 		updated := w.removeMember(pid, base, target)
 		if updated != nil {
 			outRest = updated.view(pid)
+			notify = notifyUIDs(outRest, append(append([]int64{}, drops...), target))
+		} else {
+			notify = notifyUIDs(PartyState{}, append(append([]int64{}, drops...), seatUIDs(base.Members)...))
 		}
 		outCode = code.OK
 		return execPartyWrite(ctx, tx, w)
 	})
 	if err != nil {
-		return PartyState{}, PartyState{}, code.LoginFail
+		return PartyState{}, PartyState{}, nil, code.LoginFail
 	}
-	return outLeft, outRest, outCode
+	return outLeft, outRest, notify, outCode
+}
+
+func notifyUIDs(rest PartyState, extra []int64) []int64 {
+	return unionUIDs(rest.Members, extra)
+}
+
+func unionUIDs(parts ...[]int64) []int64 {
+	seen := map[int64]struct{}{}
+	out := make([]int64, 0)
+	for _, part := range parts {
+		for _, uid := range part {
+			if uid < 1 {
+				continue
+			}
+			if _, ok := seen[uid]; ok {
+				continue
+			}
+			seen[uid] = struct{}{}
+			out = append(out, uid)
+		}
+	}
+	return out
+}
+
+func seatUIDs(seats []partySeat) []int64 {
+	out := make([]int64, 0, len(seats))
+	for _, m := range seats {
+		out = append(out, m.UID)
+	}
+	return out
 }
 
 // PartyStateOf 返回 uid 当前队伍。不在队时 PartyID 为 0、code 为 0。
