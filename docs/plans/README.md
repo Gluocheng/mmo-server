@@ -47,6 +47,8 @@
 | done | GM 上线鉴权与 Naive UI | [2026-09-14-gm-prod-console-design.md](2026-09-14-gm-prod-console-design.md) | 实施 [2026-09-14-gm-prod-console.md](2026-09-14-gm-prod-console.md) |
 | done | GM 运营后台 P1 | [2026-09-21-gm-ops-p1-design.md](2026-09-21-gm-ops-p1-design.md) | 实施 [2026-09-21-gm-ops-p1.md](2026-09-21-gm-ops-p1.md)；扣道具/封号/在线/公告/调时间 |
 | done | GM 运营后台 P2 管控核 | [2026-09-21-gm-ops-p2-design.md](2026-09-21-gm-ops-p2-design.md) | 实施 [2026-09-21-gm-ops-p2.md](2026-09-21-gm-ops-p2.md)；禁言/限时封号/吊销 token/强制维护 |
+| planned | 组队 | [2026-10-09-party-design.md](2026-10-09-party-design.md) | 实施 [2026-10-09-party.md](2026-10-09-party.md)；上限 4 人；断线保留席位 60 秒；名单在 Redis，可跨游戏节点 |
+| planned | 世界 BOSS | [2026-10-09-world-boss-design.md](2026-10-09-world-boss-design.md) | 依赖组队。分线地图、单独/组队奖励、伤害前三和最后一击 |
 | planned | GM 运营后台其余 P2 | [backlog-gm-ops.md](backlog-gm-ops.md) | 清背包、改名、邮件/礼包码、细权限等 |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 
