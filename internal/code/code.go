@@ -52,6 +52,12 @@ const (
 	SceneSwitchCooldown int32 = 40053 // 切图冷却未到
 	ItemNotUsable       int32 = 40054 // 道具 use_buff_id 为 0，不能使用
 	CombatStunned       int32 = 40055 // 身上有未到期的禁手，不能出手或喝药
+	PartyAlreadyIn      int32 = 40060 // 自己或邀请目标已在队伍中（含断线宽限仍占名额）
+	PartyNotIn          int32 = 40061 // 自己不在队伍中
+	PartyNotLeader      int32 = 40062 // 不是队长，不能邀请或踢人
+	PartyInviteInvalid  int32 = 40063 // 邀请无效、已处理或过期，或踢人目标不是本队成员
+	PartyFull           int32 = 40064 // 接受邀请时队伍已满（4 人）
+	PartyTargetOffline  int32 = 40065 // 邀请目标未进场（无 party:online）
 )
 
 func IsFail(c int32) bool {

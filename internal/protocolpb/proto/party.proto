@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+// PartyInviteRequest 队长邀请目标 uid 入队。
+message PartyInviteRequest {
+  int64 target_uid = 1 [json_name = "targetUid"];
+}
+
+// PartyAnswerRequest 被邀请者应答；invite_id 与是否接受。
+message PartyAnswerRequest {
+  int64 invite_id = 1 [json_name = "inviteId"];
+  bool accept = 2 [json_name = "accept"];
+}
+
+// PartyKickRequest 队长踢出指定成员 uid。
+message PartyKickRequest {
+  int64 member_uid = 1 [json_name = "memberUid"];
+}
+
+// PartyState 当前队伍快照；无队伍时 party_id 为 0 且 members 为空。
+message PartyState {
+  int64 party_id = 1 [json_name = "partyId"];
+  int64 leader_uid = 2 [json_name = "leaderUid"];
+  repeated int64 members = 3 [json_name = "members"];
+}
+
+// PartyInvite 待处理邀请；作废或覆盖时 invite_id 为 0。
+message PartyInvite {
+  int64 invite_id = 1 [json_name = "inviteId"];
+  int64 party_id = 2 [json_name = "partyId"];
+  int64 leader_uid = 3 [json_name = "leaderUid"];
+  int64 expire_at = 4 [json_name = "expireAt"];
+}
+
+// PartyDeliver 跨节点投递：目标 uid 列表及要推送的状态或邀请（未使用时为零值）。
+message PartyDeliver {
+  repeated int64 uids = 1 [json_name = "uids"];
+  PartyState state = 2 [json_name = "state"];
+  PartyInvite invite = 3 [json_name = "invite"];
+}

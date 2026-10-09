@@ -75,6 +75,12 @@ type (
 	CombatCastRequest     = pb.CombatCastRequest
 	CombatHit             = pb.CombatHit
 	CombatFrame           = pb.CombatFrame
+	PartyInviteRequest    = pb.PartyInviteRequest
+	PartyAnswerRequest    = pb.PartyAnswerRequest
+	PartyKickRequest      = pb.PartyKickRequest
+	PartyState            = pb.PartyState
+	PartyInvite           = pb.PartyInvite
+	PartyDeliver          = pb.PartyDeliver
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。
