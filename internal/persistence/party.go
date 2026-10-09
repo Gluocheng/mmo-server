@@ -34,6 +34,17 @@ type PartyState struct {
 	Members   []int64
 }
 
+// PartyEnter 是进场时队伍名单的变化。
+// Restored 为 true 时 Self 是回到原位后的名单。
+// Dropped 是这次被按离队摘掉的 uid；队伍解散时也包括因此离开的其余成员。
+// Rest 是留下的名单，解散或本来就不在队时 PartyID 为 0。
+type PartyEnter struct {
+	Self     PartyState
+	Rest     PartyState
+	Restored bool
+	Dropped  []int64
+}
+
 // partySeat 是队伍键里的一个席位。GraceUntil 为 0 表示没有宽限。
 type partySeat struct {
 	UID        int64 `json:"uid"`
@@ -567,6 +578,36 @@ func loadUserParty(ctx context.Context, cmd redisGetter, uid int64) (int64, *par
 }
 
 // activeAfterPrune 先摘过期成员。changed 时把结果写入 w，返回调用方还能看到的名单。
+// pruneInto 摘掉过期宽限并写入本次事务。
+// 解散时 Dropped 含全体原成员，next 为 nil。
+func pruneInto(w *partyWrite, partyID int64, rec *partyRecord, now int64) (next *partyRecord, drops []int64, dissolved bool) {
+	next, drops, dissolved, changed := applyPrune(rec, now)
+	if !changed {
+		return rec, nil, false
+	}
+	if dissolved {
+		for _, m := range rec.Members {
+			if !containsUID(drops, m.UID) {
+				drops = append(drops, m.UID)
+			}
+		}
+	}
+	w.putPrune(partyID, rec, next, dissolved)
+	if dissolved {
+		return nil, drops, true
+	}
+	return next, drops, false
+}
+
+func containsUID(uids []int64, uid int64) bool {
+	for _, id := range uids {
+		if id == uid {
+			return true
+		}
+	}
+	return false
+}
+
 func activeAfterPrune(w *partyWrite, partyID int64, rec *partyRecord, now int64) (*partyRecord, bool) {
 	next, _, dissolved, changed := applyPrune(rec, now)
 	if !changed {
@@ -642,12 +683,14 @@ func CreateParty(ctx context.Context, uid, partyID int64, nodeID string, now int
 // Invite 由队长邀请目标。新邀请覆盖同一目标的旧邀请。
 // 先判断目标是否已在队（含宽限未过期，返回 40060），再判断有没有在线节点（没有则 40065）。
 // 邀请自己返回 40063，非队长返回 40062。存储层不返回 40009。
-func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) int32 {
+// replaced 仅在写入成功且该目标原来已有邀请时为 true。
+func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) (bool, int32) {
 	ctx = ctxOrBG(ctx)
 	if rdb == nil || leader < 1 || target < 1 || inviteID < 1 {
-		return code.LoginFail
+		return false, code.LoginFail
 	}
 	var outCode int32
+	var replaced bool
 	err := commitWatched(ctx, func() (*partySnap, error) {
 		snap := newPartySnap()
 		if err := snap.trackUser(ctx, leader); err != nil {
@@ -665,6 +708,7 @@ func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) 
 		return snap, nil
 	}, func(tx *redis.Tx) error {
 		outCode = code.OK
+		replaced = false
 		w := newPartyWrite()
 		pid, rec, err := loadUserParty(ctx, tx, leader)
 		if err != nil {
@@ -706,6 +750,17 @@ func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) 
 			outCode = code.PartyTargetOffline
 			return execPartyWrite(ctx, tx, w)
 		}
+		raw, err := readInviteRaw(ctx, tx, target)
+		if err != nil {
+			return err
+		}
+		old, err := parseInvite(raw)
+		if err != nil {
+			return err
+		}
+		if old != nil {
+			replaced = true
+		}
 		w.inviteSet[target] = partyInviteRecord{
 			InviteID: inviteID,
 			PartyID:  pid,
@@ -715,20 +770,25 @@ func Invite(ctx context.Context, leader, target, inviteID, expireAt, now int64) 
 		return execPartyWrite(ctx, tx, w)
 	})
 	if err != nil {
-		return code.LoginFail
+		return false, code.LoginFail
 	}
-	return outCode
+	if outCode != code.OK {
+		return false, outCode
+	}
+	return replaced, outCode
 }
 
 // Answer 应答邀请。接受时加到队尾；拒绝、邀请 id 不匹配，或 now 超过 expireAt，成员不变并返回 40063。
 // 接受时队伍已有 4 人（含宽限未过期）返回 40064，并作废这条邀请。
-func Answer(ctx context.Context, uid, inviteID int64, accept bool, now int64) (PartyState, int32) {
+// cleared 表示当前这条邀请已被删掉。邀请 id 对不上时不删、cleared 为 false。
+func Answer(ctx context.Context, uid, inviteID int64, accept bool, now int64) (PartyState, int32, bool) {
 	ctx = ctxOrBG(ctx)
 	if rdb == nil || uid < 1 || inviteID < 1 {
-		return PartyState{}, code.LoginFail
+		return PartyState{}, code.LoginFail, false
 	}
 	var out PartyState
 	var outCode int32
+	var cleared bool
 	err := commitWatched(ctx, func() (*partySnap, error) {
 		snap := newPartySnap()
 		if err := snap.trackInvite(ctx, uid); err != nil {
@@ -753,6 +813,7 @@ func Answer(ctx context.Context, uid, inviteID int64, accept bool, now int64) (P
 	}, func(tx *redis.Tx) error {
 		out = PartyState{}
 		outCode = code.PartyInviteInvalid
+		cleared = false
 		w := newPartyWrite()
 		raw, err := readInviteRaw(ctx, tx, uid)
 		if err != nil {
@@ -788,11 +849,13 @@ func Answer(ctx context.Context, uid, inviteID int64, accept bool, now int64) (P
 			// 旧 inviteID 不能清掉覆盖后的新邀请。
 			if inv.InviteID == inviteID {
 				w.inviteDel = append(w.inviteDel, uid)
+				cleared = true
 			}
 			return execPartyWrite(ctx, tx, w)
 		}
 		if base == nil {
 			w.inviteDel = append(w.inviteDel, uid)
+			cleared = true
 			outCode = code.PartyInviteInvalid
 			return execPartyWrite(ctx, tx, w)
 		}
@@ -816,6 +879,7 @@ func Answer(ctx context.Context, uid, inviteID int64, accept bool, now int64) (P
 		}
 		if len(base.Members) >= partyMaxMembers {
 			w.inviteDel = append(w.inviteDel, uid)
+			cleared = true
 			out = view
 			outCode = code.PartyFull
 			return execPartyWrite(ctx, tx, w)
@@ -827,14 +891,15 @@ func Answer(ctx context.Context, uid, inviteID int64, accept bool, now int64) (P
 		w.set[pid] = updated
 		w.bind[uid] = pid
 		w.inviteDel = append(w.inviteDel, uid)
+		cleared = true
 		out = updated.view(pid)
 		outCode = code.OK
 		return execPartyWrite(ctx, tx, w)
 	})
 	if err != nil {
-		return PartyState{}, code.LoginFail
+		return PartyState{}, code.LoginFail, false
 	}
-	return out, outCode
+	return out, outCode, cleared
 }
 
 // userStillInParty 判断 uid 在摘掉过期宽限之后是否还占着某个队伍的名额。
@@ -1073,16 +1138,24 @@ func BeginGrace(ctx context.Context, uid, now int64) error {
 	return outErr
 }
 
-// OnEnter 在进场时写回在线节点。
-// 人还在名单里（宽限未过，或根本没有 graceUntil）则清掉宽限、回到原下标，bool 为 true。
-// 宽限已过则按离队处理，bool 为 false，返回的名单为空。
-func OnEnter(ctx context.Context, uid int64, nodeID string, now int64) (PartyState, bool, error) {
+// OnlineNode 返回 uid 的 party:online 节点 id。没有键时节点 id 为空。
+func OnlineNode(ctx context.Context, uid int64) (string, error) {
 	ctx = ctxOrBG(ctx)
 	if rdb == nil || uid < 1 {
-		return PartyState{}, false, fmt.Errorf("redis 不可用")
+		return "", fmt.Errorf("redis 不可用")
 	}
-	var out PartyState
-	var back bool
+	return readOnline(ctx, rdb, uid)
+}
+
+// OnEnter 在进场时写回在线节点。
+// 人还在名单里（宽限未过，或根本没有 graceUntil）则清掉宽限、回到原下标，Restored 为 true。
+// 宽限已过则按离队处理，Restored 为 false，Self 为空；留下的人在 Rest，被摘掉的人在 Dropped。
+func OnEnter(ctx context.Context, uid int64, nodeID string, now int64) (PartyEnter, error) {
+	ctx = ctxOrBG(ctx)
+	if rdb == nil || uid < 1 {
+		return PartyEnter{}, fmt.Errorf("redis 不可用")
+	}
+	var out PartyEnter
 	err := commitWatched(ctx, func() (*partySnap, error) {
 		snap := newPartySnap()
 		if err := snap.trackUser(ctx, uid); err != nil {
@@ -1093,8 +1166,7 @@ func OnEnter(ctx context.Context, uid int64, nodeID string, now int64) (PartySta
 		}
 		return snap, nil
 	}, func(tx *redis.Tx) error {
-		out = PartyState{}
-		back = false
+		out = PartyEnter{}
 		w := newPartyWrite()
 		w.onlineSet[uid] = nodeID
 		pid, rec, err := loadUserParty(ctx, tx, uid)
@@ -1107,8 +1179,12 @@ func OnEnter(ctx context.Context, uid int64, nodeID string, now int64) (PartySta
 			}
 			return execPartyWrite(ctx, tx, w)
 		}
-		base, _ := activeAfterPrune(w, pid, rec, now)
+		base, drops, _ := pruneInto(w, pid, rec, now)
+		out.Dropped = append([]int64(nil), drops...)
 		if base == nil || !base.has(uid) {
+			if base != nil {
+				out.Rest = base.view(pid)
+			}
 			return execPartyWrite(ctx, tx, w)
 		}
 		members := append([]partySeat{}, base.Members...)
@@ -1119,12 +1195,13 @@ func OnEnter(ctx context.Context, uid int64, nodeID string, now int64) (PartySta
 		}
 		updated := &partyRecord{Leader: base.Leader, Members: members}
 		w.set[pid] = updated
-		out = updated.view(pid)
-		back = true
+		out.Self = updated.view(pid)
+		out.Rest = out.Self
+		out.Restored = true
 		return execPartyWrite(ctx, tx, w)
 	})
 	if err != nil {
-		return PartyState{}, false, err
+		return PartyEnter{}, err
 	}
-	return out, back, nil
+	return out, nil
 }

@@ -1,6 +1,7 @@
 package party
 
 import (
+	"context"
 	"testing"
 
 	cfacade "github.com/cherry-game/cherry/facade"
@@ -81,5 +82,68 @@ func TestDeliverPushesOnlyBoundUIDs(t *testing.T) {
 	(&ActorParties{}).deliver(&protocol.PartyDeliver{Uids: []int64{boundUID}, State: state})
 	if len(got) != 0 {
 		t.Fatalf("unbound uid still pushed %+v", got)
+	}
+}
+
+func TestDispatchInviteGoesToOtherNode(t *testing.T) {
+	prevOnline := onlineNode
+	onlineNode = func(_ context.Context, uid int64) (string, error) {
+		switch uid {
+		case 2:
+			return "10002", nil
+		case 4:
+			return "10001", nil
+		default:
+			return "", nil
+		}
+	}
+	t.Cleanup(func() { onlineNode = prevOnline })
+
+	var calls []string
+	prevCall := callRemote
+	callRemote = func(targetPath, funcName string, _, _ any) int32 {
+		calls = append(calls, targetPath+" "+funcName)
+		return 0
+	}
+	t.Cleanup(func() { callRemote = prevCall })
+
+	var pushed []int64
+	prevPush := pushWithUID
+	pushWithUID = func(_ cfacade.IActor, _ string, uid int64, _ string, _ any) {
+		pushed = append(pushed, uid)
+	}
+	t.Cleanup(func() { pushWithUID = prevPush })
+
+	Dispatch(nil, "10001", &protocol.PartyDeliver{
+		Uids:   []int64{2},
+		Invite: &protocol.PartyInvite{InviteId: 7, PartyId: 10, LeaderUid: 1},
+	})
+	if len(pushed) != 0 {
+		t.Fatalf("local push %v", pushed)
+	}
+	if len(calls) != 1 || calls[0] != "10002.party deliver" {
+		t.Fatalf("calls %v", calls)
+	}
+
+	calls = nil
+	pushed = nil
+	Dispatch(nil, "10001", &protocol.PartyDeliver{
+		Uids:  []int64{3},
+		State: &protocol.PartyState{},
+	})
+	if len(calls) != 0 || len(pushed) != 0 {
+		t.Fatalf("offline uid delivered calls=%v pushed=%v", calls, pushed)
+	}
+
+	Bind(4, "gate-1.user")
+	t.Cleanup(func() { Unbind(4) })
+	calls = nil
+	pushed = nil
+	Dispatch(nil, "10001", &protocol.PartyDeliver{
+		Uids:  []int64{4},
+		State: &protocol.PartyState{PartyId: 40, LeaderUid: 4, Members: []int64{4}},
+	})
+	if len(calls) != 0 || len(pushed) != 1 || pushed[0] != 4 {
+		t.Fatalf("local deliver calls=%v pushed=%v", calls, pushed)
 	}
 }

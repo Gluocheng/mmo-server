@@ -301,6 +301,12 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 背包移动 | `game.bag.move`         | `BagMoveRequest`（`bagType`/`fromSlot`/`toSlot`） | `BagListResponse` + Push `onBagChange`           |
 | 背包拆分 | `game.bag.split`        | `BagSplitRequest`（`bagType`/`fromSlot`/`count`） | `BagListResponse` + Push `onBagChange`           |
 | 使用道具 | `game.bag.use`          | `BagUseRequest`（`bagType`/`slot`）            | `BagListResponse` + Push `onBagChange`；治疗在后续 `onCombatFrame` |
+| 创建队伍 | `game.party.create` | `google.protobuf.Empty` | `PartyState`；本队 Push `onParty` |
+| 邀请入队 | `game.party.invite` | `PartyInviteRequest`（`targetUid`） | `Empty`；目标 Push `onPartyInvite`。覆盖旧邀请时先推 `inviteId=0` |
+| 应答邀请 | `game.party.answer` | `PartyAnswerRequest`（`inviteId`、`accept`） | `PartyState`。拒绝或邀请作废时给应答者 Push `onPartyInvite`（`inviteId=0`） |
+| 离开队伍 | `game.party.leave` | `google.protobuf.Empty` | `Empty`；离开的人 Push 空 `onParty`，留下的人 Push 新 `onParty` |
+| 踢出队伍 | `game.party.kick` | `PartyKickRequest`（`memberUid`） | `Empty`；被踢的人 Push 空 `onParty`，留下的人 Push 新 `onParty` |
+| 队伍状态 | `game.party.state` | `google.protobuf.Empty` | `PartyState`（没有队伍时 `partyId=0`） |
 | 配置热更 | `POST /gm/config/reload` | JSON `{tableName}` | `{code,version,tables}` | 需 GM token；内部 `GmReloadRequest` |
 
 
@@ -313,6 +319,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 战斗须已 `enter`。技能与 Buff 读配表 `cfg_skill` / `cfg_buff` / `cfg_combat_const`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活玩家。每人每拍最多一条 `onCombatFrame`
 - `game.bag.use` 按道具 `use_buff_id` 调用 `ApplyBuff`，成功才扣 1 个。`0` 返回 `40054`。死亡不扣。禁战地图仍可使用。治疗在下一心跳，不是当场加血
 - 禁手是 Buff 效果 `stun`。效果还在时放技能和喝药返回 `40055`，不入队也不进冷却。已经进下一拍的技能若结算时施法者已禁手，这一拍不造成伤害，冷却不退回。移动不拦
+- 组队按账号 uid，最多 4 人。邀请 30 秒。断线后席位保留 60 秒，时限内重新进场回到原位；切图不离队。推送按 `party:online` 所在游戏节点投递
 - 怪物模板在 `cfg_monster`，刷在哪张图由 `cfg_spawn` 的怪物 id 决定。实例不占分线人数。附近单位带 `actorType`（0 玩家，1 怪物）和 `configId`。打到怪物时技能伤害减去防御，至少为 1；伤害为 0 时仍是 0。狼出手记在 `onCombatFrame` 里，`skill_id=0`。禁手时它不追也不打。种子是荒野 `(18,0,10)` 的野狼，会追击、按攻击距离出手，死亡后按刷怪点时间回出生点复活
 - 进场忽略请求里的 `sceneId`，出生在配表主城。`max_lines >= 2` 的图才会在满员后进入下一条线。切图成功会满血，并按离开的那张图的 `switch_cd_ms` 冷却。主城默认不能放技能，以地图表 `allow_combat` 为准
 - 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
@@ -323,7 +330,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40055`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40065`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -377,6 +384,12 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40053 | `SceneSwitchCooldown` | 切图冷却未到 |
 | 40054 | `ItemNotUsable`       | 道具不能使用（`use_buff_id` 为 0） |
 | 40055 | `CombatStunned`       | 禁手中，不能出手或喝药 |
+| 40060 | `PartyAlreadyIn`      | 已经在队伍里（含 60 秒断线宽限未过） |
+| 40061 | `PartyNotIn`          | 不在队伍中 |
+| 40062 | `PartyNotLeader`      | 不是队长 |
+| 40063 | `PartyInviteInvalid`  | 邀请无效、过期、拒绝，或邀请自己 |
+| 40064 | `PartyFull`           | 队伍已满（最多 4 人，宽限中的人占名额） |
+| 40065 | `PartyTargetOffline`  | 邀请目标未进场，或没有在线节点 |
 
 
 ### 重新生成 Protobuf Go 代码

@@ -136,11 +136,11 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 	})
 	// 写完 session 再登记本机路径。回到队伍时只给本机已 Bind 的成员推 onParty。
 	party.Bind(session.Uid, session.AgentPath)
-	roster, back, err := persistence.OnEnter(context.Background(), session.Uid, p.Path().NodeID, gtime.Now().UnixMilli())
+	entered, err := persistence.OnEnter(context.Background(), session.Uid, p.Path().NodeID, gtime.Now().UnixMilli())
 	if err != nil {
 		clog.Warnf("party on enter uid=%d err=%v", session.Uid, err)
-	} else if back {
-		party.PushRoster(p, roster)
+	} else {
+		party.NotifyEnter(p, entered)
 	}
 	combat.Enter(session.Uid)
 	nearby, ids := nearbyProto(view.Nearby)

@@ -79,7 +79,7 @@ func (p *actorParty) invite(session *cproto.Session, req *protocol.PartyInviteRe
 	now := gtime.Now().UnixMilli()
 	inviteID := cherrySnowflake.NextID()
 	expireAt := now + inviteValidMS
-	c := persistence.Invite(context.Background(), session.Uid, req.TargetUid, inviteID, expireAt, now)
+	replaced, c := persistence.Invite(context.Background(), session.Uid, req.TargetUid, inviteID, expireAt, now)
 	if c != code.OK {
 		p.reject(session, "invite", c)
 		return
@@ -90,6 +90,12 @@ func (p *actorParty) invite(session *cproto.Session, req *protocol.PartyInviteRe
 		partyID = roster.PartyID
 	} else {
 		clog.Warnf("party invite state uid=%d code=%d", session.Uid, sc)
+	}
+	if replaced {
+		publish(p, &protocol.PartyDeliver{
+			Uids:   []int64{req.TargetUid},
+			Invite: &protocol.PartyInvite{InviteId: 0},
+		})
 	}
 	publish(p, &protocol.PartyDeliver{
 		Uids: []int64{req.TargetUid},
@@ -112,7 +118,13 @@ func (p *actorParty) answer(session *cproto.Session, req *protocol.PartyAnswerRe
 		return
 	}
 	now := gtime.Now().UnixMilli()
-	st, c := persistence.Answer(context.Background(), session.Uid, req.InviteId, req.Accept, now)
+	st, c, cleared := persistence.Answer(context.Background(), session.Uid, req.InviteId, req.Accept, now)
+	if cleared {
+		publish(p, &protocol.PartyDeliver{
+			Uids:   []int64{session.Uid},
+			Invite: &protocol.PartyInvite{InviteId: 0},
+		})
+	}
 	if c != code.OK {
 		p.reject(session, "answer", c)
 		return
@@ -181,12 +193,28 @@ func (p *actorParty) state(session *cproto.Session, _ *protocol.None) {
 	p.Response(session, protoState(st))
 }
 
-// publish 只把变化推给本机已 Bind 的 uid。不按在线节点分组，也不调用其他游戏节点。
+// publish 按在线节点投递。本节点走 Deliver，其他节点 CallWait。
 func publish(sender cfacade.IActor, req *protocol.PartyDeliver) {
-	Deliver(sender, req)
+	node := ""
+	if sender != nil {
+		node = sender.Path().NodeID
+	}
+	Dispatch(sender, node, req)
 }
 
-// PushRoster 把当前名单推给仍在队里且本机 Bind 过的 uid。
+// NotifyEnter 在进场写完在线节点后推送。
+// 宽限到期离队时，被摘掉的人收到空名单，留下的人收到新名单。
+// 回到原位时只推当前名单。BeginGrace 不走这里。
+func NotifyEnter(sender cfacade.IActor, entered persistence.PartyEnter) {
+	if len(entered.Dropped) > 0 {
+		pushEmpty(sender, entered.Dropped)
+	}
+	if entered.Rest.PartyID != 0 {
+		PushRoster(sender, entered.Rest)
+	}
+}
+
+// PushRoster 把当前名单按在线节点投递。没有在线键的成员会被跳过。
 func PushRoster(sender cfacade.IActor, st persistence.PartyState) {
 	if st.PartyID == 0 || len(st.Members) == 0 {
 		return
