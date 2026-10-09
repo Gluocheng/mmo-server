@@ -1020,8 +1020,8 @@ func PartyStateOf(ctx context.Context, uid, now int64) (PartyState, int32) {
 	return out, outCode
 }
 
-// BeginGrace 给 uid 写下 graceUntil=now+60 秒，并删除在线节点。人还留在原下标。
-// 不在队伍中返回错误。
+// BeginGrace 删除 uid 的在线节点。人还在队里时写下 graceUntil=now+60 秒，并留在原下标。
+// 不在任何队伍，或摘掉过期成员后队伍已解散，仍删除在线节点，避免离线玩家被邀请；此时返回错误。
 func BeginGrace(ctx context.Context, uid, now int64) error {
 	ctx = ctxOrBG(ctx)
 	if rdb == nil || uid < 1 {
@@ -1040,6 +1040,8 @@ func BeginGrace(ctx context.Context, uid, now int64) error {
 	}, func(tx *redis.Tx) error {
 		outErr = nil
 		w := newPartyWrite()
+		// 断线一律删在线键，包括不在队，以及过期摘人导致队伍先解散。
+		w.onlineDel = append(w.onlineDel, uid)
 		pid, rec, err := loadUserParty(ctx, tx, uid)
 		if err != nil {
 			return err
@@ -1063,7 +1065,6 @@ func BeginGrace(ctx context.Context, uid, now int64) error {
 			}
 		}
 		w.set[pid] = &partyRecord{Leader: base.Leader, Members: members}
-		w.onlineDel = append(w.onlineDel, uid)
 		return execPartyWrite(ctx, tx, w)
 	})
 	if err != nil {

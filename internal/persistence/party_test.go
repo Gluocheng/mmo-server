@@ -441,6 +441,46 @@ func TestPartyKick(t *testing.T) {
 	})
 }
 
+func TestPartyBeginGraceDeletesOnlineOffRoster(t *testing.T) {
+	const now int64 = 1_700_000_000_000
+
+	t.Run("not in a party", func(t *testing.T) {
+		ctx := newPartyTest(t)
+		if _, c := CreateParty(ctx, 1, 10, "10001", now); c != code.OK {
+			t.Fatal(c)
+		}
+		putPartyOnline(t, ctx, 2, "10002")
+		_ = BeginGrace(ctx, 2, now)
+		if _, ok := partyOnlineValue(t, ctx, 2); ok {
+			t.Fatal("online key remains")
+		}
+		if c := Invite(ctx, 1, 2, 21, now+30_000, now); c != code.PartyTargetOffline {
+			t.Fatalf("invite %d", c)
+		}
+	})
+
+	t.Run("party dissolved before grace", func(t *testing.T) {
+		ctx := newPartyTest(t)
+		mustPartyOf(t, ctx, []int64{1, 2}, 10, now)
+		if err := BeginGrace(ctx, 2, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, c := CreateParty(ctx, 3, 20, "10002", now); c != code.OK {
+			t.Fatal(c)
+		}
+		_ = BeginGrace(ctx, 1, now+60_001)
+		if _, ok := partyOnlineValue(t, ctx, 1); ok {
+			t.Fatal("online key remains")
+		}
+		if _, err := rdb.Get(ctx, fmt.Sprintf("%s:party:%d", KeyPrefix(), 10)).Result(); !errors.Is(err, redis.Nil) {
+			t.Fatalf("party key err=%v", err)
+		}
+		if c := Invite(ctx, 3, 1, 31, now+60_001+30_000, now+60_001); c != code.PartyTargetOffline {
+			t.Fatalf("invite %d", c)
+		}
+	})
+}
+
 func TestPartyGrace(t *testing.T) {
 	const now int64 = 1_700_000_000_000
 
