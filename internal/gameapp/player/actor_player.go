@@ -205,7 +205,10 @@ func nearbyProto(in []world.Nearby) ([]*protocol.SceneActor, []int64) {
 			Uid: n.UID, X: n.X, Y: n.Y, Z: n.Z,
 			ActorType: n.ActorType, ConfigId: n.ConfigID,
 		})
-		ids = append(ids, n.UID)
+		// 进场响应的 players 只含玩家。怪物留在 nearby。
+		if n.ActorType == world.ActorPlayer {
+			ids = append(ids, n.UID)
+		}
 	}
 	return actors, ids
 }
