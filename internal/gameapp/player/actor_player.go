@@ -1,6 +1,7 @@
 package player
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/gameapp/combat"
+	"github.com/example/mmo-server/internal/gameapp/party"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/gtime"
 	"github.com/example/mmo-server/internal/persistence"
@@ -36,8 +38,18 @@ func (p *actorPlayer) OnInit() {
 	p.Local().Register("move", p.move)
 }
 
+// sessionClose 断线时先写 60 秒宽限并卸下本机进场表，再离开场景。切图不走这里。
 func (p *actorPlayer) sessionClose() {
 	uid, _ := strconv.ParseInt(p.ActorID(), 10, 64)
+	if err := persistence.BeginGrace(context.Background(), uid, gtime.Now().UnixMilli()); err != nil {
+		// 不在队是断线常态，在线键已经删掉。其余错误（例如 Redis 不可用）单独警告。
+		if err.Error() == "不在队伍中" {
+			clog.Debugf("party begin grace uid=%d err=%v", uid, err)
+		} else {
+			clog.Warnf("party begin grace uid=%d err=%v", uid, err)
+		}
+	}
+	party.Unbind(uid)
 	world.Leave(uid)
 	combat.Leave(uid)
 	p.Exit()
@@ -122,6 +134,14 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		Key:   sessionkey.PlayerID,
 		Value: cstring.ToString(info.PlayerId),
 	})
+	// 写完 session 再登记本机路径。回到队伍时只给本机已 Bind 的成员推 onParty。
+	party.Bind(session.Uid, session.AgentPath)
+	roster, back, err := persistence.OnEnter(context.Background(), session.Uid, p.Path().NodeID, gtime.Now().UnixMilli())
+	if err != nil {
+		clog.Warnf("party on enter uid=%d err=%v", session.Uid, err)
+	} else if back {
+		party.PushRoster(p, roster)
+	}
 	combat.Enter(session.Uid)
 	nearby, ids := nearbyProto(view.Nearby)
 	p.Response(session, &protocol.EnterGameResponse{
@@ -130,7 +150,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 	})
 }
 
-// switchScene 换到另一张地图。当前图留在当前线，不重置战斗。
+// switchScene 换到另一张地图。当前图留在当前线，不重置战斗，也不改组队在线状态。
 func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSwitchRequest) {
 	if !session.Contains(sessionkey.PlayerID) {
 		p.ResponseCode(session, code.PlayerNotEntered)
