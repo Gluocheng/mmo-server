@@ -6,6 +6,7 @@ import "github.com/example/mmo-server/gameconfig/pkg/schema"
 type StatDef struct {
 	ID           int32
 	Name         string
+	Desc         string
 	AllowFlat    bool
 	AllowPercent bool
 	Settle       bool
@@ -52,7 +53,7 @@ func statsFromSchema(rows []schema.CfgStat) map[string]StatDef {
 			continue
 		}
 		m[r.Name] = StatDef{
-			ID: r.ID, Name: r.Name, AllowFlat: r.AllowFlat, AllowPercent: r.AllowPercent, Settle: r.Settle,
+			ID: r.ID, Name: r.Name, Desc: r.Desc, AllowFlat: r.AllowFlat, AllowPercent: r.AllowPercent, Settle: r.Settle,
 		}
 	}
 	return m

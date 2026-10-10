@@ -112,6 +112,7 @@ const StatTableFile = "stat_tbstat.json"
 type statJSON struct {
 	ID           int32  `json:"id"`
 	Name         string `json:"name"`
+	Desc         string `json:"desc"`
 	AllowFlat    bool   `json:"allow_flat"`
 	AllowPercent bool   `json:"allow_percent"`
 	Settle       bool   `json:"settle"`
@@ -129,7 +130,7 @@ func LoadStatsFromJSONFile(path string) ([]schema.CfgStat, error) {
 			return nil, fmt.Errorf("invalid stat row in %s", path)
 		}
 		out = append(out, schema.CfgStat{
-			ID: r.ID, Name: r.Name, AllowFlat: r.AllowFlat, AllowPercent: r.AllowPercent, Settle: r.Settle,
+			ID: r.ID, Name: r.Name, Desc: r.Desc, AllowFlat: r.AllowFlat, AllowPercent: r.AllowPercent, Settle: r.Settle,
 		})
 	}
 	return out, nil

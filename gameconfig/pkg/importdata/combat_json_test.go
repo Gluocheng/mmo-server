@@ -18,7 +18,7 @@ func TestLoadCombatSeedJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(buffs) != 4 || buffs[0].Effect != "dot" || buffs[0].Value != 4 || buffs[1].Effect != "hot" || buffs[2].Effect != "stun" || buffs[3].Effect != "attr" || buffs[3].Stat != "攻击" || buffs[3].Mode != "flat" || buffs[3].Value != 5 {
+	if len(buffs) != 4 || buffs[0].Effect != "dot" || buffs[0].Value != 4 || buffs[1].Effect != "hot" || buffs[2].Effect != "stun" || buffs[3].Effect != "attr" || buffs[3].Stat != "attack" || buffs[3].Mode != "flat" || buffs[3].Value != 5 {
 		t.Fatalf("buffs %+v", buffs)
 	}
 	row, err := LoadCombatConstFromJSONFile(filepath.Join(dir, CombatConstTableFile))
@@ -32,7 +32,7 @@ func TestLoadCombatSeedJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stats) != 33 || !stats[1].Settle || stats[1].Name != "攻击" || stats[3].Settle {
+	if len(stats) != 33 || !stats[1].Settle || stats[1].Name != "attack" || stats[1].Desc != "攻击" || stats[3].Settle {
 		t.Fatalf("stats %+v", stats[:4])
 	}
 }

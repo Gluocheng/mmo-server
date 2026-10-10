@@ -2,6 +2,34 @@ package combat
 
 import "math"
 
+// statKind 是本期参与公式的属性，取值与 cfg_stat.name 相同。
+// 后面要结算新属性时在这里加一项，并在 refreshAttrs 里补分支。
+type statKind string
+
+const (
+	statHP      statKind = "hp"
+	statAttack  statKind = "attack"
+	statDefense statKind = "defense"
+)
+
+// buffEffect 与 cfg_buff.effect 相同。
+type buffEffect string
+
+const (
+	effectDot  buffEffect = "dot"
+	effectHot  buffEffect = "hot"
+	effectStun buffEffect = "stun"
+	effectAttr buffEffect = "attr"
+)
+
+// attrMode 与 cfg_buff.mode 相同。flat 是固定值，percent 是百分比。
+type attrMode string
+
+const (
+	modeFlat    attrMode = "flat"
+	modePercent attrMode = "percent"
+)
+
 // refreshAttrs 用还没到期的属性 Buff 重算生命上限、攻击和防御。
 // 生命上限升高时当前生命加上差额；降低时把当前生命压到新上限。死亡单位不在这里改。
 func refreshAttrs(u *unit, now int64) {
@@ -11,7 +39,7 @@ func refreshAttrs(u *unit, now int64) {
 	var hpFlat, atkFlat, defFlat int32
 	var hpPct, atkPct, defPct int32
 	for _, b := range u.buffs {
-		if b == nil || b.effect != "attr" || now >= b.expireAt {
+		if b == nil || b.effect != effectAttr || now >= b.expireAt {
 			continue
 		}
 		add := b.value
@@ -19,20 +47,20 @@ func refreshAttrs(u *unit, now int64) {
 			add *= b.stacks
 		}
 		switch b.stat {
-		case "生命":
-			if b.mode == "percent" {
+		case statHP:
+			if b.mode == modePercent {
 				hpPct += add
 			} else {
 				hpFlat += add
 			}
-		case "攻击":
-			if b.mode == "percent" {
+		case statAttack:
+			if b.mode == modePercent {
 				atkPct += add
 			} else {
 				atkFlat += add
 			}
-		case "防御":
-			if b.mode == "percent" {
+		case statDefense:
+			if b.mode == modePercent {
 				defPct += add
 			} else {
 				defFlat += add

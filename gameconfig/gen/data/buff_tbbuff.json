@@ -40,7 +40,7 @@
     "effect": "attr",
     "value": 5,
     "max_stack": 1,
-    "stat": "攻击",
+    "stat": "attack",
     "mode": "flat"
   }
 ]

@@ -13,110 +13,115 @@ import (
 
 // Hit 是一拍内的一次伤害、治疗或复活。
 type Hit struct {
-	SourceUID int64
-	TargetUID int64
-	SkillID   int32
-	BuffID    int32
-	Amount    int32
-	Heal      bool
-	TargetHP  int32
-	Dead      bool
+	SourceUID int64 // 造成这次变化的单位
+	TargetUID int64 // 被命中的单位
+	SkillID   int32 // 技能 id，怪物出手为 0
+	BuffID    int32 // 持续效果 id，普通技能命中为 0
+	Amount    int32 // 实际扣血或治疗量
+	Heal      bool  // true 表示治疗或复活回血
+	TargetHP  int32 // 结算后目标当前生命
+	Dead      bool  // 这次结算后目标是否死亡
 }
 
 // Frame 是一名观众这一拍要收到的合并包。
 type Frame struct {
-	ViewerUID int64
-	AgentPath string
-	Hits      []Hit
-	Truncated bool
+	ViewerUID int64  // 接收这条战斗帧的玩家
+	AgentPath string // 该玩家的网关连接路径
+	Hits      []Hit  // 这一拍合并后的命中
+	Truncated bool   // 超过单包上限，后面的命中被丢掉
 }
 
+// skillSnap 是入队时拷下的技能数值，热更不会改已经排队的这一下。
 type skillSnap struct {
-	id        int32
-	target    string
-	castRange int32
-	radius    int32
-	damage    int32
-	factor    int32
-	buffID    int32
+	id        int32  // 技能 id
+	target    string // single 点名，aoe_self 自身圆心
+	castRange int32  // 点名距离
+	radius    int32  // 范围斩半径
+	damage    int32  // 附加伤害，与攻击力系数相加
+	factor    int32  // 攻击力百分比
+	buffID    int32  // 命中后要挂的 Buff，0 表示不挂
 }
 
+// intent 是已经通过校验、等下一拍结算的一次出手。
 type intent struct {
-	uid    int64
-	skill  skillSnap
-	target int64
+	uid    int64     // 施法者
+	skill  skillSnap // 入队时的技能拷贝
+	target int64     // 点名目标，范围技能不用
 }
 
+// buffInst 是单位身上的一条 Buff，数值在挂上时拷贝。
 type buffInst struct {
-	id         int32
-	source     int64
-	effect     string
-	value      int32
-	intervalMs int64
-	expireAt   int64
-	nextTick   int64
-	stacks     int32
-	maxStack   int32
-	stat       string
-	mode       string
+	id         int32      // 配表 Buff id
+	source     int64      // 施加者，持续伤害记在这个人头上
+	effect     buffEffect // dot、hot、stun 或 attr
+	value      int32      // 一层的跳伤、治疗或属性加成
+	intervalMs int64      // 跳伤或治疗间隔
+	expireAt   int64      // 到期毫秒，到点不再计入
+	nextTick   int64      // 下一跳的毫秒时间
+	stacks     int32      // 当前层数
+	maxStack   int32      // 层数上限
+	stat       statKind   // attr 加成的属性
+	mode       attrMode   // flat 固定值，percent 百分比
 }
 
+// unit 是战斗里的一名玩家或一只怪物。离场即删，不落库。
 type unit struct {
-	hp, maxHP   int32
-	attack      int32
-	defense     int32
-	baseMaxHP   int32
-	baseAttack  int32
-	baseDefense int32
-	dead        bool
-	deadAt      int64
-	buffs       []*buffInst
+	hp          int32       // 当前生命
+	maxHP       int32       // 最终生命上限，含属性 Buff
+	attack      int32       // 最终攻击
+	defense     int32       // 最终防御
+	baseMaxHP   int32       // 进场或刷出时拷下的生命上限
+	baseAttack  int32       // 进场或刷出时拷下的攻击
+	baseDefense int32       // 进场或刷出时拷下的防御
+	dead        bool        // 是否已死亡
+	deadAt      int64       // 死亡时的毫秒时间
+	buffs       []*buffInst // 身上还没到期的 Buff
 
-	monster        bool
-	templateID     int32
-	spawnID        int32
-	slot           int32
-	moveSpeed      float32
-	attackRange    float32
-	attackInterval int64
-	aggroRange     float32
-	leashRange     float32
-	respawnMs      int64
-	homeX          float32
-	homeY          float32
-	homeZ          float32
-	sceneID        int32
-	line           int32
-	target         int64
-	nextAttack     int64
-	playerID       int64
-	lastHit        int64
-	damage         map[int64]*hurtRec
+	monster        bool               // true 表示怪物，不走玩家进场
+	templateID     int32              // 怪物模板 id
+	spawnID        int32              // 刷怪点 id
+	slot           int32              // 同一刷怪点上的第几只
+	moveSpeed      float32            // 每秒位移
+	attackRange    float32            // 可以出手的距离
+	attackInterval int64              // 怪物出手间隔毫秒
+	aggroRange     float32            // 开始追击的距离
+	leashRange     float32            // 超过则回家的距离
+	respawnMs      int64              // 死亡后复活毫秒
+	homeX          float32            // 出生点 X
+	homeY          float32            // 出生点 Y
+	homeZ          float32            // 出生点 Z
+	sceneID        int32              // 所在地图
+	line           int32              // 所在分线
+	target         int64              // 怪物当前追击的玩家
+	nextAttack     int64              // 怪物下一击的毫秒时间
+	playerID       int64              // 玩家角色 id，击杀奖励发给这个角色
+	lastHit        int64              // 把这只怪物打到 0 的单位
+	damage         map[int64]*hurtRec // 这一条命里每个玩家的实际扣血
 }
 
 // hurtRec 是一名玩家对这只怪物这一条命造成的实际扣血。
 type hurtRec struct {
-	total    int32
-	at       int64
-	playerID int64
+	total    int32 // 这一条命的伤害合计
+	at       int64 // 达到当前合计的毫秒时间
+	playerID int64 // 出手时的角色 id
 }
 
 // Hurt 是结算时抄出来的一条伤害。
 type Hurt struct {
-	UID      int64
-	PlayerID int64
-	Damage   int32
-	At       int64
+	UID      int64 // 造成伤害的玩家
+	PlayerID int64 // 发奖用的角色 id
+	Damage   int32 // 实际扣血合计
+	At       int64 // 达到该伤害的毫秒时间
 }
 
 // KillSnap 是一只怪物死亡时的伤害榜。复活前已经从单位上清掉。
 type KillSnap struct {
-	MonsterUID int64
-	TemplateID int32
-	SceneID    int32
-	Line       int32
-	LastHit    int64
-	Hits       []Hurt
+	MonsterUID int64  // 死亡的怪物实例
+	TemplateID int32  // 怪物模板，用来查击杀奖励
+	SceneID    int32  // 死亡时所在地图
+	Line       int32  // 死亡时所在分线
+	LastHit    int64  // 最后一击的单位
+	Hits       []Hurt // 这一条命的伤害榜
 }
 
 var (
@@ -323,23 +328,24 @@ func validBuff(def gcruntime.BuffDef) bool {
 	if def.DurationMs < 1 {
 		return false
 	}
-	switch def.Effect {
-	case "dot", "hot":
+	switch buffEffect(def.Effect) {
+	case effectDot, effectHot:
 		return def.Value > 0
-	case "stun":
+	case effectStun:
 		return true
-	case "attr":
+	case effectAttr:
 		st, ok := gcruntime.StatByName(def.Stat)
 		if !ok || !st.Settle {
 			return false
 		}
-		if def.Mode == "flat" {
+		switch attrMode(def.Mode) {
+		case modeFlat:
 			return st.AllowFlat
-		}
-		if def.Mode == "percent" {
+		case modePercent:
 			return st.AllowPercent
+		default:
+			return false
 		}
-		return false
 	default:
 		return false
 	}
@@ -351,7 +357,7 @@ func stunned(u *unit, now int64) bool {
 		return false
 	}
 	for _, b := range u.buffs {
-		if b != nil && b.effect == "stun" && now < b.expireAt {
+		if b != nil && b.effect == effectStun && now < b.expireAt {
 			return true
 		}
 	}
@@ -444,21 +450,21 @@ func applyBuff(u *unit, source int64, def gcruntime.BuffDef, now int64) {
 			b.stacks++
 		}
 		b.source = source
-		b.effect = def.Effect
+		b.effect = buffEffect(def.Effect)
 		b.value = def.Value
 		b.intervalMs = interval
 		b.maxStack = maxStack
 		b.expireAt = now + int64(def.DurationMs)
-		b.stat = def.Stat
-		b.mode = def.Mode
+		b.stat = statKind(def.Stat)
+		b.mode = attrMode(def.Mode)
 		refreshAttrs(u, now)
 		return
 	}
 	u.buffs = append(u.buffs, &buffInst{
-		id: def.ID, source: source, effect: def.Effect, value: def.Value,
+		id: def.ID, source: source, effect: buffEffect(def.Effect), value: def.Value,
 		intervalMs: interval, expireAt: now + int64(def.DurationMs),
 		nextTick: now + interval, stacks: 1, maxStack: maxStack,
-		stat: def.Stat, mode: def.Mode,
+		stat: statKind(def.Stat), mode: attrMode(def.Mode),
 	})
 	refreshAttrs(u, now)
 }
@@ -564,12 +570,12 @@ func tickBuffs(now int64) []Hit {
 			if u.dead || now >= b.expireAt {
 				continue
 			}
-			if now >= b.nextTick && b.effect != "stun" {
+			if now >= b.nextTick && b.effect != effectStun {
 				amt := b.value * b.stacks
 				if amt < 1 {
 					amt = b.value
 				}
-				if b.effect == "hot" {
+				if b.effect == effectHot {
 					before := u.hp
 					applyHeal(u, amt)
 					got := u.hp - before

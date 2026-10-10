@@ -152,6 +152,7 @@ func (CfgKillReward) TableName() string { return "cfg_kill_reward" }
 type CfgStat struct {
 	ID           int32  `gorm:"primaryKey"`
 	Name         string `gorm:"size:32;not null;uniqueIndex"`
+	Desc         string `gorm:"size:64;not null;default:''"`
 	AllowFlat    bool   `gorm:"not null"`
 	AllowPercent bool   `gorm:"not null"`
 	Settle       bool   `gorm:"not null"`

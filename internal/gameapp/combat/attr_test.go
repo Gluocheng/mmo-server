@@ -20,18 +20,18 @@ func seedAttr(t *testing.T) {
 		[]gcruntime.BuffDef{
 			{ID: 1, Name: "撕裂", DurationMs: 3000, IntervalMs: 1000, Effect: "dot", Value: 4, MaxStack: 1},
 			{ID: 3, Name: "禁手", DurationMs: 2000, Effect: "stun", MaxStack: 1},
-			{ID: 5, Name: "战意", DurationMs: 5000, Effect: "attr", Value: 5, MaxStack: 1, Stat: "攻击", Mode: "flat"},
-			{ID: 6, Name: "怒意", DurationMs: 5000, Effect: "attr", Value: 20, MaxStack: 1, Stat: "攻击", Mode: "percent"},
-			{ID: 7, Name: "强壮", DurationMs: 5000, Effect: "attr", Value: 50, MaxStack: 1, Stat: "生命", Mode: "flat"},
-			{ID: 9, Name: "会心", DurationMs: 5000, Effect: "attr", Value: 10, MaxStack: 1, Stat: "暴击率", Mode: "percent"},
+			{ID: 5, Name: "战意", DurationMs: 5000, Effect: "attr", Value: 5, MaxStack: 1, Stat: "attack", Mode: "flat"},
+			{ID: 6, Name: "怒意", DurationMs: 5000, Effect: "attr", Value: 20, MaxStack: 1, Stat: "attack", Mode: "percent"},
+			{ID: 7, Name: "强壮", DurationMs: 5000, Effect: "attr", Value: 50, MaxStack: 1, Stat: "hp", Mode: "flat"},
+			{ID: 9, Name: "会心", DurationMs: 5000, Effect: "attr", Value: 10, MaxStack: 1, Stat: "crit_rate", Mode: "percent"},
 		},
 		gcruntime.CombatConst{MaxHP: 100, TickMs: 100, RespawnMs: 5000, FrameEventCap: 64, Attack: 10, Defense: 0},
 	)
 	gcruntime.BuildStats([]gcruntime.StatDef{
-		{ID: 1, Name: "生命", AllowFlat: true, AllowPercent: true, Settle: true},
-		{ID: 2, Name: "攻击", AllowFlat: true, AllowPercent: true, Settle: true},
-		{ID: 3, Name: "防御", AllowFlat: true, AllowPercent: true, Settle: true},
-		{ID: 4, Name: "暴击率", AllowPercent: true},
+		{ID: 1, Name: "hp", Desc: "生命", AllowFlat: true, AllowPercent: true, Settle: true},
+		{ID: 2, Name: "attack", Desc: "攻击", AllowFlat: true, AllowPercent: true, Settle: true},
+		{ID: 3, Name: "defense", Desc: "防御", AllowFlat: true, AllowPercent: true, Settle: true},
+		{ID: 4, Name: "crit_rate", Desc: "暴击率", AllowPercent: true},
 	})
 }
 

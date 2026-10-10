@@ -13,30 +13,36 @@ import (
 
 // MonsterStep 是这一拍怪物要落到的新坐标。战斗锁放开后才写入房间。
 type MonsterStep struct {
-	UID     int64
-	X, Y, Z float32
+	UID int64   // 怪物实例
+	X   float32 // 新坐标 X
+	Y   float32 // 新坐标 Y
+	Z   float32 // 新坐标 Z
 }
 
+// slotKey 标识一个刷怪点在某条线上的一个槽位。
 type slotKey struct {
-	spawnID int32
-	line    int32
-	slot    int32
+	spawnID int32 // 刷怪点 id
+	line    int32 // 分线
+	slot    int32 // 该点上的第几只，从 0 起
 }
 
+// slotSpec 是这个槽位应刷出的怪物。已在场且这些值没变就保留原实例。
 type slotSpec struct {
-	spawnID   int32
-	slot      int32
-	monsterID int32
-	sceneID   int32
-	line      int32
-	x, y, z   float32
-	respawnMs int32
-	def       gcruntime.MonsterDef
+	spawnID   int32                // 刷怪点 id
+	slot      int32                // 槽位序号
+	monsterID int32                // 怪物模板 id
+	sceneID   int32                // 地图 id
+	line      int32                // 分线。配表 line=0 时已展开成具体线
+	x         float32              // 出生点 X，同点多只沿 X 每隔 2 格
+	y         float32              // 出生点 Y
+	z         float32              // 出生点 Z
+	respawnMs int32                // 死亡后复活毫秒
+	def       gcruntime.MonsterDef // 刷出时拷贝的模板
 }
 
 var (
 	stepMu       sync.Mutex
-	monsterSteps []MonsterStep
+	monsterSteps []MonsterStep // 上一拍算出、等战斗锁放开后写入房间的位移
 )
 
 func storeMonsterSteps(steps []MonsterStep) {
