@@ -149,6 +149,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		SceneId: view.SceneID, Line: view.Line, X: view.X, Y: view.Y, Z: view.Z,
 		Players: ids, Nearby: nearby,
 	})
+	combat.PublishEnter(p, session.Uid)
 }
 
 // switchScene 换到另一张地图。当前图留在当前线，不重置战斗，也不改组队在线状态。
@@ -172,6 +173,7 @@ func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSw
 			leftCd = cur.SwitchCdMs
 		}
 	}
+	before := world.NearbyUIDs(session.Uid)
 	view, c := world.SwitchMap(p, session.Uid, lineRule(target), leftCd, gtime.Now().UnixMilli())
 	if c != code.OK {
 		p.ResponseCode(session, c)
@@ -188,6 +190,10 @@ func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSw
 	p.Response(session, &protocol.SceneSwitchResponse{
 		SceneId: view.SceneID, Line: view.Line, X: view.X, Y: view.Y, Z: view.Z, Nearby: nearby,
 	})
+	if view.Changed {
+		combat.PublishLeft(p, session.Uid, before)
+		combat.PublishEnter(p, session.Uid)
+	}
 }
 
 // scenes 返回配表里的地图和每一条线的当前人数。
@@ -274,6 +280,8 @@ func (p *actorPlayer) move(session *cproto.Session, req *protocol.MoveRequest) {
 		Y:   req.Y,
 		Z:   req.Z,
 	}
+	before := world.NearbyUIDs(session.Uid)
 	world.BroadcastMove(p, session.Uid, b)
+	combat.PublishMove(p, session.Uid, before)
 	p.Response(session, &emptypb.Empty{})
 }

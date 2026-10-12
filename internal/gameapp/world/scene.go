@@ -2,6 +2,7 @@ package world
 
 import (
 	"math"
+	"sort"
 	"sync"
 
 	cfacade "github.com/cherry-game/cherry/facade"
@@ -149,6 +150,39 @@ type Pose struct {
 	Line      int32
 	X, Y, Z   float32
 	AgentPath string
+}
+
+// NearbyUIDs 返回同图同线、距离不超过 AOI 的其他单位。不含自己。
+func NearbyUIDs(uid int64) []int64 {
+	mu.RLock()
+	defer mu.RUnlock()
+	from, ok := inRoom[uid]
+	if !ok {
+		return nil
+	}
+	out := make([]int64, 0)
+	for other, st := range inRoom {
+		if other == uid || st.sceneID != from.sceneID || st.line != from.line {
+			continue
+		}
+		if !withinAOI(from.x, from.z, st.x, st.z) {
+			continue
+		}
+		out = append(out, other)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// ActorTypeOf 返回单位类型。玩家是 0，怪物是 1。
+func ActorTypeOf(uid int64) (int32, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
+	st, ok := inRoom[uid]
+	if !ok {
+		return 0, false
+	}
+	return st.actorType, true
 }
 
 // PoseOf 返回已进场玩家坐标。

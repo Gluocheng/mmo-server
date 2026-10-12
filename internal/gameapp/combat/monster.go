@@ -101,6 +101,7 @@ func SyncSpawns(sender cfacade.IActor) {
 		world.PlaceMonster(uid, spec.sceneID, spec.line, spec.x, spec.y, spec.z, spec.monsterID)
 		mu.Lock()
 		units[uid] = unitFromSpec(spec)
+		commitAppearance(uid)
 		mu.Unlock()
 		world.AnnounceMonster(sender, uid)
 	}

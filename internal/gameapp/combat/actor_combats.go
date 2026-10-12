@@ -8,7 +8,6 @@ import (
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/gameapp/reward"
-	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/protocol"
 )
 
@@ -39,17 +38,15 @@ func (p *ActorCombats) schedule() {
 	})
 }
 
+// broadcast 同一拍先推怪物移动和新视野，再推战斗帧，最后结算击杀奖励。
 func (p *ActorCombats) broadcast() {
-	for _, f := range Tick() {
-		if f.AgentPath == "" || len(f.Hits) == 0 {
+	frames := Tick()
+	PublishMonsterMoves(p, TakeMonsterSteps())
+	for _, f := range frames {
+		if f.AgentPath == "" {
 			continue
 		}
 		pomelo.PushWithUID(p, f.AgentPath, f.ViewerUID, "onCombatFrame", toProto(f))
-	}
-	for _, step := range TakeMonsterSteps() {
-		world.BroadcastMove(p, step.UID, &protocol.MoveBroadcast{
-			Uid: step.UID, X: step.X, Y: step.Y, Z: step.Z,
-		})
 	}
 	for _, kill := range TakeKills() {
 		hits := make([]reward.Hurt, 0, len(kill.Hits))
@@ -63,8 +60,15 @@ func (p *ActorCombats) broadcast() {
 	}
 }
 
+// toProto 把这一拍的命中、Buff 变化、属性变化和截断时的自己转成协议包。
 func toProto(f Frame) *protocol.CombatFrame {
-	msg := &protocol.CombatFrame{Truncated: f.Truncated, Hits: make([]*protocol.CombatHit, 0, len(f.Hits))}
+	msg := &protocol.CombatFrame{
+		Truncated: f.Truncated,
+		Tick:      f.Tick,
+		Hits:      make([]*protocol.CombatHit, 0, len(f.Hits)),
+		Buffs:     make([]*protocol.CombatBuffChange, 0, len(f.Buffs)),
+		Stats:     make([]*protocol.CombatStat, 0, len(f.Stats)),
+	}
 	for _, h := range f.Hits {
 		msg.Hits = append(msg.Hits, &protocol.CombatHit{
 			SourceUid: h.SourceUID,
@@ -76,6 +80,23 @@ func toProto(f Frame) *protocol.CombatFrame {
 			TargetHp:  h.TargetHP,
 			Dead:      h.Dead,
 		})
+	}
+	for _, b := range f.Buffs {
+		msg.Buffs = append(msg.Buffs, &protocol.CombatBuffChange{
+			Uid: b.UID, Id: b.ID, Stacks: b.Stacks, ExpireAt: b.ExpireAt,
+		})
+	}
+	for _, s := range f.Stats {
+		msg.Stats = append(msg.Stats, &protocol.CombatStat{
+			Uid: s.UID, Hp: s.HP, MaxHp: s.MaxHP, Attack: s.Attack, Defense: s.Defense,
+		})
+	}
+	if f.Self != nil {
+		self := &protocol.CombatSelf{Hp: f.Self.HP, MaxHp: f.Self.MaxHP, Attack: f.Self.Attack, Defense: f.Self.Defense}
+		for _, b := range f.Self.Buffs {
+			self.Buffs = append(self.Buffs, &protocol.CombatBuff{Id: b.ID, Stacks: b.Stacks, ExpireAt: b.ExpireAt})
+		}
+		msg.Self = self
 	}
 	return msg
 }

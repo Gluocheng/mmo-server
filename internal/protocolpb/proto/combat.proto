@@ -22,8 +22,61 @@ message CombatHit {
   bool dead = 8 [json_name = "dead"];
 }
 
-// CombatFrame 一名观众这一拍要看到的战斗事件，每拍最多一条。
+// CombatBuff 身上的一条 Buff。层数为 0 表示卸下。
+message CombatBuff {
+  int32 id = 1 [json_name = "id"];
+  int32 stacks = 2 [json_name = "stacks"];
+  int64 expire_at = 3 [json_name = "expireAt"];
+}
+
+// CombatSnapshot 一个单位的完整战斗外观。进视野时发一次。
+message CombatSnapshot {
+  int64 uid = 1 [json_name = "uid"];
+  int32 hp = 2 [json_name = "hp"];
+  int32 max_hp = 3 [json_name = "maxHp"];
+  int32 attack = 4 [json_name = "attack"];
+  int32 defense = 5 [json_name = "defense"];
+  bool dead = 6 [json_name = "dead"];
+  repeated CombatBuff buffs = 7 [json_name = "buffs"];
+}
+
+// CombatBuffChange 这一拍某个单位的 Buff 变化。
+message CombatBuffChange {
+  int64 uid = 1 [json_name = "uid"];
+  int32 id = 2 [json_name = "id"];
+  int32 stacks = 3 [json_name = "stacks"];
+  int64 expire_at = 4 [json_name = "expireAt"];
+}
+
+// CombatStat 生命上限、攻击或防御变了的单位。带三项最终值和当前生命。
+message CombatStat {
+  int64 uid = 1 [json_name = "uid"];
+  int32 hp = 2 [json_name = "hp"];
+  int32 max_hp = 3 [json_name = "maxHp"];
+  int32 attack = 4 [json_name = "attack"];
+  int32 defense = 5 [json_name = "defense"];
+}
+
+// CombatSelf 合包截断时单独留下的自己的生命、属性和 Buff。
+message CombatSelf {
+  int32 hp = 1 [json_name = "hp"];
+  int32 max_hp = 2 [json_name = "maxHp"];
+  int32 attack = 3 [json_name = "attack"];
+  int32 defense = 4 [json_name = "defense"];
+  repeated CombatBuff buffs = 5 [json_name = "buffs"];
+}
+
+// CombatGone 离开视野。客户端丢掉该 uid 的生命和 Buff。
+message CombatGone {
+  int64 uid = 1 [json_name = "uid"];
+}
+
+// CombatFrame 一名观众这一拍要看到的战斗事件，每拍最多一条。没有变化不发。
 message CombatFrame {
   repeated CombatHit hits = 1 [json_name = "hits"];
   bool truncated = 2 [json_name = "truncated"];
+  int64 tick = 3 [json_name = "tick"];
+  repeated CombatBuffChange buffs = 4 [json_name = "buffs"];
+  repeated CombatStat stats = 5 [json_name = "stats"];
+  CombatSelf self = 6 [json_name = "self"];
 }

@@ -75,6 +75,12 @@ type (
 	CombatCastRequest     = pb.CombatCastRequest
 	CombatHit             = pb.CombatHit
 	CombatFrame           = pb.CombatFrame
+	CombatBuff            = pb.CombatBuff
+	CombatSnapshot        = pb.CombatSnapshot
+	CombatBuffChange      = pb.CombatBuffChange
+	CombatStat            = pb.CombatStat
+	CombatSelf            = pb.CombatSelf
+	CombatGone            = pb.CombatGone
 	PartyInviteRequest    = pb.PartyInviteRequest
 	PartyAnswerRequest    = pb.PartyAnswerRequest
 	PartyKickRequest      = pb.PartyKickRequest

@@ -180,20 +180,464 @@ func (x *CombatHit) GetDead() bool {
 	return false
 }
 
-// CombatFrame 一名观众这一拍要看到的战斗事件，每拍最多一条。
+// CombatBuff 身上的一条 Buff。层数为 0 表示卸下。
+type CombatBuff struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id       int32 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Stacks   int32 `protobuf:"varint,2,opt,name=stacks,proto3" json:"stacks,omitempty"`
+	ExpireAt int64 `protobuf:"varint,3,opt,name=expire_at,json=expireAt,proto3" json:"expire_at,omitempty"`
+}
+
+func (x *CombatBuff) Reset() {
+	*x = CombatBuff{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_combat_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CombatBuff) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CombatBuff) ProtoMessage() {}
+
+func (x *CombatBuff) ProtoReflect() protoreflect.Message {
+	mi := &file_combat_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CombatBuff.ProtoReflect.Descriptor instead.
+func (*CombatBuff) Descriptor() ([]byte, []int) {
+	return file_combat_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CombatBuff) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *CombatBuff) GetStacks() int32 {
+	if x != nil {
+		return x.Stacks
+	}
+	return 0
+}
+
+func (x *CombatBuff) GetExpireAt() int64 {
+	if x != nil {
+		return x.ExpireAt
+	}
+	return 0
+}
+
+// CombatSnapshot 一个单位的完整战斗外观。进视野时发一次。
+type CombatSnapshot struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Uid     int64         `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Hp      int32         `protobuf:"varint,2,opt,name=hp,proto3" json:"hp,omitempty"`
+	MaxHp   int32         `protobuf:"varint,3,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
+	Attack  int32         `protobuf:"varint,4,opt,name=attack,proto3" json:"attack,omitempty"`
+	Defense int32         `protobuf:"varint,5,opt,name=defense,proto3" json:"defense,omitempty"`
+	Dead    bool          `protobuf:"varint,6,opt,name=dead,proto3" json:"dead,omitempty"`
+	Buffs   []*CombatBuff `protobuf:"bytes,7,rep,name=buffs,proto3" json:"buffs,omitempty"`
+}
+
+func (x *CombatSnapshot) Reset() {
+	*x = CombatSnapshot{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_combat_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CombatSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CombatSnapshot) ProtoMessage() {}
+
+func (x *CombatSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_combat_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CombatSnapshot.ProtoReflect.Descriptor instead.
+func (*CombatSnapshot) Descriptor() ([]byte, []int) {
+	return file_combat_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CombatSnapshot) GetUid() int64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *CombatSnapshot) GetHp() int32 {
+	if x != nil {
+		return x.Hp
+	}
+	return 0
+}
+
+func (x *CombatSnapshot) GetMaxHp() int32 {
+	if x != nil {
+		return x.MaxHp
+	}
+	return 0
+}
+
+func (x *CombatSnapshot) GetAttack() int32 {
+	if x != nil {
+		return x.Attack
+	}
+	return 0
+}
+
+func (x *CombatSnapshot) GetDefense() int32 {
+	if x != nil {
+		return x.Defense
+	}
+	return 0
+}
+
+func (x *CombatSnapshot) GetDead() bool {
+	if x != nil {
+		return x.Dead
+	}
+	return false
+}
+
+func (x *CombatSnapshot) GetBuffs() []*CombatBuff {
+	if x != nil {
+		return x.Buffs
+	}
+	return nil
+}
+
+// CombatBuffChange 这一拍某个单位的 Buff 变化。
+type CombatBuffChange struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Uid      int64 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Id       int32 `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
+	Stacks   int32 `protobuf:"varint,3,opt,name=stacks,proto3" json:"stacks,omitempty"`
+	ExpireAt int64 `protobuf:"varint,4,opt,name=expire_at,json=expireAt,proto3" json:"expire_at,omitempty"`
+}
+
+func (x *CombatBuffChange) Reset() {
+	*x = CombatBuffChange{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_combat_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CombatBuffChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CombatBuffChange) ProtoMessage() {}
+
+func (x *CombatBuffChange) ProtoReflect() protoreflect.Message {
+	mi := &file_combat_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CombatBuffChange.ProtoReflect.Descriptor instead.
+func (*CombatBuffChange) Descriptor() ([]byte, []int) {
+	return file_combat_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CombatBuffChange) GetUid() int64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *CombatBuffChange) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *CombatBuffChange) GetStacks() int32 {
+	if x != nil {
+		return x.Stacks
+	}
+	return 0
+}
+
+func (x *CombatBuffChange) GetExpireAt() int64 {
+	if x != nil {
+		return x.ExpireAt
+	}
+	return 0
+}
+
+// CombatStat 生命上限、攻击或防御变了的单位。带三项最终值和当前生命。
+type CombatStat struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Uid     int64 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Hp      int32 `protobuf:"varint,2,opt,name=hp,proto3" json:"hp,omitempty"`
+	MaxHp   int32 `protobuf:"varint,3,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
+	Attack  int32 `protobuf:"varint,4,opt,name=attack,proto3" json:"attack,omitempty"`
+	Defense int32 `protobuf:"varint,5,opt,name=defense,proto3" json:"defense,omitempty"`
+}
+
+func (x *CombatStat) Reset() {
+	*x = CombatStat{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_combat_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CombatStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CombatStat) ProtoMessage() {}
+
+func (x *CombatStat) ProtoReflect() protoreflect.Message {
+	mi := &file_combat_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CombatStat.ProtoReflect.Descriptor instead.
+func (*CombatStat) Descriptor() ([]byte, []int) {
+	return file_combat_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CombatStat) GetUid() int64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *CombatStat) GetHp() int32 {
+	if x != nil {
+		return x.Hp
+	}
+	return 0
+}
+
+func (x *CombatStat) GetMaxHp() int32 {
+	if x != nil {
+		return x.MaxHp
+	}
+	return 0
+}
+
+func (x *CombatStat) GetAttack() int32 {
+	if x != nil {
+		return x.Attack
+	}
+	return 0
+}
+
+func (x *CombatStat) GetDefense() int32 {
+	if x != nil {
+		return x.Defense
+	}
+	return 0
+}
+
+// CombatSelf 合包截断时单独留下的自己的生命、属性和 Buff。
+type CombatSelf struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Hp      int32         `protobuf:"varint,1,opt,name=hp,proto3" json:"hp,omitempty"`
+	MaxHp   int32         `protobuf:"varint,2,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
+	Attack  int32         `protobuf:"varint,3,opt,name=attack,proto3" json:"attack,omitempty"`
+	Defense int32         `protobuf:"varint,4,opt,name=defense,proto3" json:"defense,omitempty"`
+	Buffs   []*CombatBuff `protobuf:"bytes,5,rep,name=buffs,proto3" json:"buffs,omitempty"`
+}
+
+func (x *CombatSelf) Reset() {
+	*x = CombatSelf{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_combat_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CombatSelf) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CombatSelf) ProtoMessage() {}
+
+func (x *CombatSelf) ProtoReflect() protoreflect.Message {
+	mi := &file_combat_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CombatSelf.ProtoReflect.Descriptor instead.
+func (*CombatSelf) Descriptor() ([]byte, []int) {
+	return file_combat_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CombatSelf) GetHp() int32 {
+	if x != nil {
+		return x.Hp
+	}
+	return 0
+}
+
+func (x *CombatSelf) GetMaxHp() int32 {
+	if x != nil {
+		return x.MaxHp
+	}
+	return 0
+}
+
+func (x *CombatSelf) GetAttack() int32 {
+	if x != nil {
+		return x.Attack
+	}
+	return 0
+}
+
+func (x *CombatSelf) GetDefense() int32 {
+	if x != nil {
+		return x.Defense
+	}
+	return 0
+}
+
+func (x *CombatSelf) GetBuffs() []*CombatBuff {
+	if x != nil {
+		return x.Buffs
+	}
+	return nil
+}
+
+// CombatGone 离开视野。客户端丢掉该 uid 的生命和 Buff。
+type CombatGone struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Uid int64 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+}
+
+func (x *CombatGone) Reset() {
+	*x = CombatGone{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_combat_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CombatGone) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CombatGone) ProtoMessage() {}
+
+func (x *CombatGone) ProtoReflect() protoreflect.Message {
+	mi := &file_combat_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CombatGone.ProtoReflect.Descriptor instead.
+func (*CombatGone) Descriptor() ([]byte, []int) {
+	return file_combat_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CombatGone) GetUid() int64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+// CombatFrame 一名观众这一拍要看到的战斗事件，每拍最多一条。没有变化不发。
 type CombatFrame struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Hits      []*CombatHit `protobuf:"bytes,1,rep,name=hits,proto3" json:"hits,omitempty"`
-	Truncated bool         `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	Hits      []*CombatHit        `protobuf:"bytes,1,rep,name=hits,proto3" json:"hits,omitempty"`
+	Truncated bool                `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	Tick      int64               `protobuf:"varint,3,opt,name=tick,proto3" json:"tick,omitempty"`
+	Buffs     []*CombatBuffChange `protobuf:"bytes,4,rep,name=buffs,proto3" json:"buffs,omitempty"`
+	Stats     []*CombatStat       `protobuf:"bytes,5,rep,name=stats,proto3" json:"stats,omitempty"`
+	Self      *CombatSelf         `protobuf:"bytes,6,opt,name=self,proto3" json:"self,omitempty"`
 }
 
 func (x *CombatFrame) Reset() {
 	*x = CombatFrame{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_combat_proto_msgTypes[2]
+		mi := &file_combat_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -206,7 +650,7 @@ func (x *CombatFrame) String() string {
 func (*CombatFrame) ProtoMessage() {}
 
 func (x *CombatFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_combat_proto_msgTypes[2]
+	mi := &file_combat_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -219,7 +663,7 @@ func (x *CombatFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CombatFrame.ProtoReflect.Descriptor instead.
 func (*CombatFrame) Descriptor() ([]byte, []int) {
-	return file_combat_proto_rawDescGZIP(), []int{2}
+	return file_combat_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CombatFrame) GetHits() []*CombatHit {
@@ -234,6 +678,34 @@ func (x *CombatFrame) GetTruncated() bool {
 		return x.Truncated
 	}
 	return false
+}
+
+func (x *CombatFrame) GetTick() int64 {
+	if x != nil {
+		return x.Tick
+	}
+	return 0
+}
+
+func (x *CombatFrame) GetBuffs() []*CombatBuffChange {
+	if x != nil {
+		return x.Buffs
+	}
+	return nil
+}
+
+func (x *CombatFrame) GetStats() []*CombatStat {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+func (x *CombatFrame) GetSelf() *CombatSelf {
+	if x != nil {
+		return x.Self
+	}
+	return nil
 }
 
 var File_combat_proto protoreflect.FileDescriptor
@@ -259,18 +731,72 @@ var file_combat_proto_rawDesc = []byte{
 	0x20, 0x01, 0x28, 0x08, 0x52, 0x04, 0x68, 0x65, 0x61, 0x6c, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x61,
 	0x72, 0x67, 0x65, 0x74, 0x5f, 0x68, 0x70, 0x18, 0x07, 0x20, 0x01, 0x28, 0x05, 0x52, 0x08, 0x74,
 	0x61, 0x72, 0x67, 0x65, 0x74, 0x48, 0x70, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x65, 0x61, 0x64, 0x18,
-	0x08, 0x20, 0x01, 0x28, 0x08, 0x52, 0x04, 0x64, 0x65, 0x61, 0x64, 0x22, 0x5b, 0x0a, 0x0b, 0x43,
-	0x6f, 0x6d, 0x62, 0x61, 0x74, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x12, 0x2e, 0x0a, 0x04, 0x68, 0x69,
-	0x74, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x6d, 0x6d, 0x6f, 0x2e, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x62, 0x61,
-	0x74, 0x48, 0x69, 0x74, 0x52, 0x04, 0x68, 0x69, 0x74, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x74, 0x72,
-	0x75, 0x6e, 0x63, 0x61, 0x74, 0x65, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x74,
-	0x72, 0x75, 0x6e, 0x63, 0x61, 0x74, 0x65, 0x64, 0x42, 0x42, 0x5a, 0x40, 0x67, 0x69, 0x74, 0x68,
-	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x6d,
-	0x6d, 0x6f, 0x2d, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e,
-	0x61, 0x6c, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x70, 0x62, 0x2f, 0x67, 0x65,
-	0x6e, 0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x08, 0x20, 0x01, 0x28, 0x08, 0x52, 0x04, 0x64, 0x65, 0x61, 0x64, 0x22, 0x51, 0x0a, 0x0a, 0x43,
+	0x6f, 0x6d, 0x62, 0x61, 0x74, 0x42, 0x75, 0x66, 0x66, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x02, 0x69, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x73, 0x74, 0x61,
+	0x63, 0x6b, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x73, 0x74, 0x61, 0x63, 0x6b,
+	0x73, 0x12, 0x1b, 0x0a, 0x09, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x5f, 0x61, 0x74, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x41, 0x74, 0x22, 0xc2,
+	0x01, 0x0a, 0x0e, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x53, 0x6e, 0x61, 0x70, 0x73, 0x68, 0x6f,
+	0x74, 0x12, 0x10, 0x0a, 0x03, 0x75, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x03,
+	0x75, 0x69, 0x64, 0x12, 0x0e, 0x0a, 0x02, 0x68, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52,
+	0x02, 0x68, 0x70, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x61, 0x78, 0x5f, 0x68, 0x70, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x05, 0x52, 0x05, 0x6d, 0x61, 0x78, 0x48, 0x70, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x74,
+	0x74, 0x61, 0x63, 0x6b, 0x18, 0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x61, 0x74, 0x74, 0x61,
+	0x63, 0x6b, 0x12, 0x18, 0x0a, 0x07, 0x64, 0x65, 0x66, 0x65, 0x6e, 0x73, 0x65, 0x18, 0x05, 0x20,
+	0x01, 0x28, 0x05, 0x52, 0x07, 0x64, 0x65, 0x66, 0x65, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04,
+	0x64, 0x65, 0x61, 0x64, 0x18, 0x06, 0x20, 0x01, 0x28, 0x08, 0x52, 0x04, 0x64, 0x65, 0x61, 0x64,
+	0x12, 0x31, 0x0a, 0x05, 0x62, 0x75, 0x66, 0x66, 0x73, 0x18, 0x07, 0x20, 0x03, 0x28, 0x0b, 0x32,
+	0x1b, 0x2e, 0x6d, 0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x76,
+	0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x42, 0x75, 0x66, 0x66, 0x52, 0x05, 0x62, 0x75,
+	0x66, 0x66, 0x73, 0x22, 0x69, 0x0a, 0x10, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x42, 0x75, 0x66,
+	0x66, 0x43, 0x68, 0x61, 0x6e, 0x67, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x75, 0x69, 0x64, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x03, 0x75, 0x69, 0x64, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x02, 0x69, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x73, 0x74, 0x61,
+	0x63, 0x6b, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x73, 0x74, 0x61, 0x63, 0x6b,
+	0x73, 0x12, 0x1b, 0x0a, 0x09, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x5f, 0x61, 0x74, 0x18, 0x04,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x65, 0x78, 0x70, 0x69, 0x72, 0x65, 0x41, 0x74, 0x22, 0x77,
+	0x0a, 0x0a, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x53, 0x74, 0x61, 0x74, 0x12, 0x10, 0x0a, 0x03,
+	0x75, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x03, 0x75, 0x69, 0x64, 0x12, 0x0e,
+	0x0a, 0x02, 0x68, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x02, 0x68, 0x70, 0x12, 0x15,
+	0x0a, 0x06, 0x6d, 0x61, 0x78, 0x5f, 0x68, 0x70, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x05,
+	0x6d, 0x61, 0x78, 0x48, 0x70, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x74, 0x74, 0x61, 0x63, 0x6b, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x61, 0x74, 0x74, 0x61, 0x63, 0x6b, 0x12, 0x18, 0x0a,
+	0x07, 0x64, 0x65, 0x66, 0x65, 0x6e, 0x73, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07,
+	0x64, 0x65, 0x66, 0x65, 0x6e, 0x73, 0x65, 0x22, 0x98, 0x01, 0x0a, 0x0a, 0x43, 0x6f, 0x6d, 0x62,
+	0x61, 0x74, 0x53, 0x65, 0x6c, 0x66, 0x12, 0x0e, 0x0a, 0x02, 0x68, 0x70, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x05, 0x52, 0x02, 0x68, 0x70, 0x12, 0x15, 0x0a, 0x06, 0x6d, 0x61, 0x78, 0x5f, 0x68, 0x70,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x05, 0x6d, 0x61, 0x78, 0x48, 0x70, 0x12, 0x16, 0x0a,
+	0x06, 0x61, 0x74, 0x74, 0x61, 0x63, 0x6b, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x61,
+	0x74, 0x74, 0x61, 0x63, 0x6b, 0x12, 0x18, 0x0a, 0x07, 0x64, 0x65, 0x66, 0x65, 0x6e, 0x73, 0x65,
+	0x18, 0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07, 0x64, 0x65, 0x66, 0x65, 0x6e, 0x73, 0x65, 0x12,
+	0x31, 0x0a, 0x05, 0x62, 0x75, 0x66, 0x66, 0x73, 0x18, 0x05, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1b,
+	0x2e, 0x6d, 0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x76, 0x31,
+	0x2e, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x42, 0x75, 0x66, 0x66, 0x52, 0x05, 0x62, 0x75, 0x66,
+	0x66, 0x73, 0x22, 0x1e, 0x0a, 0x0a, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x47, 0x6f, 0x6e, 0x65,
+	0x12, 0x10, 0x0a, 0x03, 0x75, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x03, 0x75,
+	0x69, 0x64, 0x22, 0x8c, 0x02, 0x0a, 0x0b, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x46, 0x72, 0x61,
+	0x6d, 0x65, 0x12, 0x2e, 0x0a, 0x04, 0x68, 0x69, 0x74, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x1a, 0x2e, 0x6d, 0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e,
+	0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x48, 0x69, 0x74, 0x52, 0x04, 0x68, 0x69,
+	0x74, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x74, 0x72, 0x75, 0x6e, 0x63, 0x61, 0x74, 0x65, 0x64, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x74, 0x72, 0x75, 0x6e, 0x63, 0x61, 0x74, 0x65, 0x64,
+	0x12, 0x12, 0x0a, 0x04, 0x74, 0x69, 0x63, 0x6b, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04,
+	0x74, 0x69, 0x63, 0x6b, 0x12, 0x37, 0x0a, 0x05, 0x62, 0x75, 0x66, 0x66, 0x73, 0x18, 0x04, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x21, 0x2e, 0x6d, 0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63,
+	0x6f, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x42, 0x75, 0x66, 0x66,
+	0x43, 0x68, 0x61, 0x6e, 0x67, 0x65, 0x52, 0x05, 0x62, 0x75, 0x66, 0x66, 0x73, 0x12, 0x31, 0x0a,
+	0x05, 0x73, 0x74, 0x61, 0x74, 0x73, 0x18, 0x05, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x6d,
+	0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x43,
+	0x6f, 0x6d, 0x62, 0x61, 0x74, 0x53, 0x74, 0x61, 0x74, 0x52, 0x05, 0x73, 0x74, 0x61, 0x74, 0x73,
+	0x12, 0x2f, 0x0a, 0x04, 0x73, 0x65, 0x6c, 0x66, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b,
+	0x2e, 0x6d, 0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x76, 0x31,
+	0x2e, 0x43, 0x6f, 0x6d, 0x62, 0x61, 0x74, 0x53, 0x65, 0x6c, 0x66, 0x52, 0x04, 0x73, 0x65, 0x6c,
+	0x66, 0x42, 0x42, 0x5a, 0x40, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
+	0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x6d, 0x6d, 0x6f, 0x2d, 0x73, 0x65, 0x72, 0x76,
+	0x65, 0x72, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x63, 0x6f, 0x6c, 0x70, 0x62, 0x2f, 0x67, 0x65, 0x6e, 0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x63, 0x6f, 0x6c, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -285,19 +811,30 @@ func file_combat_proto_rawDescGZIP() []byte {
 	return file_combat_proto_rawDescData
 }
 
-var file_combat_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_combat_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_combat_proto_goTypes = []interface{}{
 	(*CombatCastRequest)(nil), // 0: mmo.protocol.v1.CombatCastRequest
 	(*CombatHit)(nil),         // 1: mmo.protocol.v1.CombatHit
-	(*CombatFrame)(nil),       // 2: mmo.protocol.v1.CombatFrame
+	(*CombatBuff)(nil),        // 2: mmo.protocol.v1.CombatBuff
+	(*CombatSnapshot)(nil),    // 3: mmo.protocol.v1.CombatSnapshot
+	(*CombatBuffChange)(nil),  // 4: mmo.protocol.v1.CombatBuffChange
+	(*CombatStat)(nil),        // 5: mmo.protocol.v1.CombatStat
+	(*CombatSelf)(nil),        // 6: mmo.protocol.v1.CombatSelf
+	(*CombatGone)(nil),        // 7: mmo.protocol.v1.CombatGone
+	(*CombatFrame)(nil),       // 8: mmo.protocol.v1.CombatFrame
 }
 var file_combat_proto_depIdxs = []int32{
-	1, // 0: mmo.protocol.v1.CombatFrame.hits:type_name -> mmo.protocol.v1.CombatHit
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 0: mmo.protocol.v1.CombatSnapshot.buffs:type_name -> mmo.protocol.v1.CombatBuff
+	2, // 1: mmo.protocol.v1.CombatSelf.buffs:type_name -> mmo.protocol.v1.CombatBuff
+	1, // 2: mmo.protocol.v1.CombatFrame.hits:type_name -> mmo.protocol.v1.CombatHit
+	4, // 3: mmo.protocol.v1.CombatFrame.buffs:type_name -> mmo.protocol.v1.CombatBuffChange
+	5, // 4: mmo.protocol.v1.CombatFrame.stats:type_name -> mmo.protocol.v1.CombatStat
+	6, // 5: mmo.protocol.v1.CombatFrame.self:type_name -> mmo.protocol.v1.CombatSelf
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_combat_proto_init() }
@@ -331,6 +868,78 @@ func file_combat_proto_init() {
 			}
 		}
 		file_combat_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CombatBuff); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_combat_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CombatSnapshot); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_combat_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CombatBuffChange); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_combat_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CombatStat); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_combat_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CombatSelf); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_combat_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CombatGone); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_combat_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CombatFrame); i {
 			case 0:
 				return &v.state
@@ -349,7 +958,7 @@ func file_combat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_combat_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

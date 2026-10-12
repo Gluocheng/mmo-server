@@ -50,6 +50,7 @@
 | done | 组队 | [2026-10-09-party-design.md](2026-10-09-party-design.md) | 实施 [2026-10-09-party.md](2026-10-09-party.md)；上限 4 人；断线保留席位 60 秒；名单在 Redis，可跨游戏节点 |
 | done | 世界 BOSS | [2026-10-09-world-boss-design.md](2026-10-09-world-boss-design.md) | 实施 [2026-10-09-world-boss.md](2026-10-09-world-boss.md)。分线地图、单独/组队奖励、伤害前三和最后一击 |
 | done | 战斗属性 | [2026-10-09-combat-attr-design.md](2026-10-09-combat-attr-design.md) | 实施 [2026-10-09-combat-attr.md](2026-10-09-combat-attr.md)。生命、攻击、防御的固定与百分比加成；其余市面属性只登记 |
+| done | 战斗同步 | [2026-10-12-combat-sync-design.md](2026-10-12-combat-sync-design.md) | 实施 [2026-10-12-combat-sync.md](2026-10-12-combat-sync.md)。留在游戏节点内。进视野发快照，心跳只推变化，离开视野发消失 |
 | planned | GM 运营后台其余 P2 | [backlog-gm-ops.md](backlog-gm-ops.md) | 清背包、改名、邮件/礼包码、细权限等 |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 

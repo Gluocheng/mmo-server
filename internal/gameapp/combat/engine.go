@@ -23,12 +23,49 @@ type Hit struct {
 	Dead      bool  // 这次结算后目标是否死亡
 }
 
+// BuffView 是快照里的一条 Buff。
+type BuffView struct {
+	ID       int32 // Buff id
+	Stacks   int32 // 层数
+	ExpireAt int64 // 到期毫秒
+}
+
+// BuffChange 是这一拍某单位的 Buff 变化。层数 0 表示卸下。
+type BuffChange struct {
+	UID      int64 // 单位
+	ID       int32 // Buff id
+	Stacks   int32 // 变化后的层数，0 表示卸下
+	ExpireAt int64 // 到期毫秒，卸下时为 0
+}
+
+// StatChange 是生命上限、攻击或防御相对上一拍变了的单位。
+type StatChange struct {
+	UID     int64 // 单位
+	HP      int32 // 当前生命
+	MaxHP   int32 // 最终生命上限
+	Attack  int32 // 最终攻击
+	Defense int32 // 最终防御
+}
+
+// SelfView 是截断时单独保留的观众自己的战斗外观。
+type SelfView struct {
+	HP      int32      // 当前生命
+	MaxHP   int32      // 最终生命上限
+	Attack  int32      // 最终攻击
+	Defense int32      // 最终防御
+	Buffs   []BuffView // 自己身上的全部 Buff
+}
+
 // Frame 是一名观众这一拍要收到的合并包。
 type Frame struct {
-	ViewerUID int64  // 接收这条战斗帧的玩家
-	AgentPath string // 该玩家的网关连接路径
-	Hits      []Hit  // 这一拍合并后的命中
-	Truncated bool   // 超过单包上限，后面的命中被丢掉
+	ViewerUID int64        // 接收这条战斗帧的玩家
+	AgentPath string       // 该玩家的网关连接路径
+	Tick      int64        // 本进程递增的拍序号，空拍会跳号
+	Hits      []Hit        // 这一拍合并后的命中
+	Buffs     []BuffChange // 这一拍看见的 Buff 变化
+	Stats     []StatChange // 这一拍看见的三项属性变化
+	Truncated bool         // 超过单包上限，多出来的变化被丢掉
+	Self      *SelfView    // 仅截断时带上，自己的生命、属性和 Buff
 }
 
 // skillSnap 是入队时拷下的技能数值，热更不会改已经排队的这一下。
@@ -124,12 +161,22 @@ type KillSnap struct {
 	Hits       []Hurt // 这一条命的伤害榜
 }
 
+// appearance 记下上一拍同步出去的三项属性和 Buff，用来算这一拍的变化。
+type appearance struct {
+	maxHP   int32
+	attack  int32
+	defense int32
+	buffs   map[int32]BuffView
+}
+
 var (
 	mu           sync.Mutex
 	units        = map[int64]*unit{}
 	cds          = map[int64]map[int32]int64{}
 	queue        []intent
 	pendingKills []KillSnap
+	published    = map[int64]appearance{}
+	tickSeq      int64
 	nowFn        = func() int64 { return gtime.Now().UnixMilli() }
 )
 
@@ -141,6 +188,8 @@ func ResetForTest() {
 	cds = map[int64]map[int32]int64{}
 	queue = nil
 	pendingKills = nil
+	published = map[int64]appearance{}
+	tickSeq = 0
 	nowFn = func() int64 { return gtime.Now().UnixMilli() }
 	storeMonsterSteps(nil)
 }
@@ -169,6 +218,7 @@ func Enter(uid int64) {
 		defense: c.Defense, baseDefense: c.Defense,
 	}
 	delete(cds, uid)
+	commitAppearance(uid)
 }
 
 // SetPlayer 记下这个 uid 当前进场的角色。击杀奖励发给这个角色。
@@ -198,6 +248,7 @@ func Leave(uid int64) {
 	defer mu.Unlock()
 	delete(units, uid)
 	delete(cds, uid)
+	delete(published, uid)
 	kept := make([]intent, 0, len(queue))
 	for _, it := range queue {
 		if it.uid != uid {
@@ -315,11 +366,17 @@ func Tick() []Frame {
 	if c, ok := gcruntime.CombatConstRow(); ok && c.FrameEventCap > 0 {
 		capN = int(c.FrameEventCap)
 	}
-	frames := buildFrames(hits, capN)
+	tickSeq++
+	buffs, stats := collectDiffs()
+	frames := buildFrames(hits, buffs, stats, capN, tickSeq)
+	commitAll()
 	mu.Unlock()
+	seen := make([]seenBefore, 0, len(steps))
 	for _, step := range steps {
+		seen = append(seen, seenBefore{UID: step.UID, Before: world.NearbyUIDs(step.UID)})
 		world.SetPosition(step.UID, step.X, step.Y, step.Z)
 	}
+	storeSeen(seen)
 	storeMonsterSteps(steps)
 	return frames
 }
@@ -642,10 +699,8 @@ func distance(x1, z1, x2, z2 float32) float32 {
 	return float32(math.Hypot(float64(x1-x2), float64(z1-z2)))
 }
 
-func buildFrames(hits []Hit, capN int) []Frame {
-	if len(hits) == 0 {
-		return nil
-	}
+// buildFrames 按观众合成这一拍的战斗帧。看不见的变化不放进去，三项都空则不发。
+func buildFrames(hits []Hit, buffs []BuffChange, stats []StatChange, capN int, tick int64) []Frame {
 	if capN < 1 {
 		capN = 64
 	}
@@ -665,32 +720,184 @@ func buildFrames(hits []Hit, capN int) []Frame {
 		}
 		mine := make([]Hit, 0)
 		for _, h := range hits {
-			target, okT := world.PoseOf(h.TargetUID)
-			if !okT || target.SceneID != viewer.SceneID || target.Line != viewer.Line {
-				continue
-			}
-			see := world.InAOI(viewer.X, viewer.Z, target.X, target.Z)
-			if source, okS := world.PoseOf(h.SourceUID); okS && source.SceneID == viewer.SceneID && source.Line == viewer.Line && world.InAOI(viewer.X, viewer.Z, source.X, source.Z) {
-				see = true
-			}
-			if see {
+			if seeHit(viewer, h) {
 				mine = append(mine, h)
 			}
 		}
-		if len(mine) == 0 {
+		mineBuffs := make([]BuffChange, 0)
+		for _, b := range buffs {
+			if visible(viewer, b.UID) {
+				mineBuffs = append(mineBuffs, b)
+			}
+		}
+		mineStats := make([]StatChange, 0)
+		for _, s := range stats {
+			if visible(viewer, s.UID) {
+				mineStats = append(mineStats, s)
+			}
+		}
+		if len(mine) == 0 && len(mineBuffs) == 0 && len(mineStats) == 0 {
 			continue
 		}
 		sort.SliceStable(mine, func(i, j int) bool {
 			return hitRank(uid, mine[i]) < hitRank(uid, mine[j])
 		})
-		truncated := false
-		if len(mine) > capN {
-			mine = mine[:capN]
-			truncated = true
+		sort.SliceStable(mineBuffs, func(i, j int) bool {
+			return changeRank(uid, mineBuffs[i].UID, mineBuffs[i].ID) < changeRank(uid, mineBuffs[j].UID, mineBuffs[j].ID)
+		})
+		sort.SliceStable(mineStats, func(i, j int) bool {
+			if mineStats[i].UID == uid && mineStats[j].UID != uid {
+				return true
+			}
+			return mineStats[i].UID < mineStats[j].UID
+		})
+		truncated := len(mine)+len(mineBuffs)+len(mineStats) > capN
+		if truncated {
+			mine, mineBuffs, mineStats = trimFrame(mine, mineBuffs, mineStats, capN)
 		}
-		frames = append(frames, Frame{ViewerUID: uid, AgentPath: viewer.AgentPath, Hits: mine, Truncated: truncated})
+		frame := Frame{
+			ViewerUID: uid, AgentPath: viewer.AgentPath, Tick: tick,
+			Hits: mine, Buffs: mineBuffs, Stats: mineStats, Truncated: truncated,
+		}
+		if truncated {
+			frame.Self = selfOf(units[uid])
+		}
+		frames = append(frames, frame)
 	}
 	return frames
+}
+
+// seeHit 判断观众能否看见这一下。同图同线，且能看见出手者或受击者。
+func seeHit(viewer world.Pose, h Hit) bool {
+	target, okT := world.PoseOf(h.TargetUID)
+	if !okT || target.SceneID != viewer.SceneID || target.Line != viewer.Line {
+		return false
+	}
+	if h.TargetUID == viewer.UID || h.SourceUID == viewer.UID {
+		return true
+	}
+	see := world.InAOI(viewer.X, viewer.Z, target.X, target.Z)
+	if source, okS := world.PoseOf(h.SourceUID); okS && source.SceneID == viewer.SceneID && source.Line == viewer.Line && world.InAOI(viewer.X, viewer.Z, source.X, source.Z) {
+		see = true
+	}
+	return see
+}
+
+// visible 判断观众能否看见这个单位。自己始终可见，其余要在 15 格内。
+func visible(viewer world.Pose, uid int64) bool {
+	if uid == viewer.UID {
+		return true
+	}
+	p, ok := world.PoseOf(uid)
+	if !ok || p.SceneID != viewer.SceneID || p.Line != viewer.Line {
+		return false
+	}
+	return world.InAOI(viewer.X, viewer.Z, p.X, p.Z)
+}
+
+// changeRank 截断时优先留下观众自己的变化，其余按 uid 和 Buff id 排序。
+func changeRank(viewer, uid int64, id int32) int64 {
+	rank := int64(1)
+	if uid == viewer {
+		rank = 0
+	}
+	return rank<<48 | uid<<16 | int64(id)
+}
+
+// trimFrame 按单包上限截断。先留命中，再留 Buff 变化，最后留属性变化。
+func trimFrame(hits []Hit, buffs []BuffChange, stats []StatChange, capN int) ([]Hit, []BuffChange, []StatChange) {
+	if len(hits) > capN {
+		hits = hits[:capN]
+	}
+	remain := capN - len(hits)
+	if len(buffs) > remain {
+		buffs = buffs[:remain]
+	}
+	remain -= len(buffs)
+	if len(stats) > remain {
+		stats = stats[:remain]
+	}
+	return hits, buffs, stats
+}
+
+// selfOf 抄下截断时要单独保留的自己的生命、三项属性和全部 Buff。
+func selfOf(u *unit) *SelfView {
+	if u == nil {
+		return &SelfView{}
+	}
+	return &SelfView{HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense, Buffs: buffViews(u)}
+}
+
+// buffViews 抄下单位身上还没卸下的 Buff，按 id 排序。
+func buffViews(u *unit) []BuffView {
+	if u == nil || len(u.buffs) == 0 {
+		return nil
+	}
+	out := make([]BuffView, 0, len(u.buffs))
+	for _, b := range u.buffs {
+		if b == nil {
+			continue
+		}
+		out = append(out, BuffView{ID: b.id, Stacks: b.stacks, ExpireAt: b.expireAt})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// collectDiffs 对比上一拍记下的外观。Buff 挂上、叠层、刷新或卸下各一条；三项属性变了才记属性。
+func collectDiffs() (buffs []BuffChange, stats []StatChange) {
+	ids := make([]int64, 0, len(units))
+	for uid := range units {
+		ids = append(ids, uid)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	for _, uid := range ids {
+		u := units[uid]
+		prev, ok := published[uid]
+		if u == nil || !ok {
+			continue
+		}
+		nowBuffs := buffViews(u)
+		have := map[int32]BuffView{}
+		for _, b := range nowBuffs {
+			have[b.ID] = b
+			old, existed := prev.buffs[b.ID]
+			if !existed || old.Stacks != b.Stacks || old.ExpireAt != b.ExpireAt {
+				buffs = append(buffs, BuffChange{UID: uid, ID: b.ID, Stacks: b.Stacks, ExpireAt: b.ExpireAt})
+			}
+		}
+		for id := range prev.buffs {
+			if _, exists := have[id]; !exists {
+				buffs = append(buffs, BuffChange{UID: uid, ID: id, Stacks: 0})
+			}
+		}
+		if prev.maxHP != u.maxHP || prev.attack != u.attack || prev.defense != u.defense {
+			stats = append(stats, StatChange{UID: uid, HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense})
+		}
+	}
+	return buffs, stats
+}
+
+// commitAll 把这一拍结算后的外观记成下一拍的比较基准。
+func commitAll() {
+	for uid := range units {
+		commitAppearance(uid)
+	}
+}
+
+// commitAppearance 记下这个单位当前的生命上限、攻击、防御和 Buff。调用方须已持有战斗锁。
+func commitAppearance(uid int64) {
+	u := units[uid]
+	if u == nil {
+		delete(published, uid)
+		return
+	}
+	views := buffViews(u)
+	buffs := make(map[int32]BuffView, len(views))
+	for _, b := range views {
+		buffs[b.ID] = b
+	}
+	published[uid] = appearance{maxHP: u.maxHP, attack: u.attack, defense: u.defense, buffs: buffs}
 }
 
 func sceneAllowsCombat(uid int64) bool {
