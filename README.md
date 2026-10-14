@@ -6,43 +6,92 @@
 
 ## 架构概览
 
+玩家只连 `gate-entry`。入口按当前连接数把 WebSocket 分到 `gate-1` 或 `gate-2`。网关做 Pomelo 解码和登录态检查，再经 NATS 把请求交给登录节点或游戏节点。推送不另开连接，沿进场时记下的网关路径回到原来的客户端。
+
 ```mermaid
-flowchart LR
-  Client[WebSocket 客户端]
-  Admin[GM 管理端]
-  Gate[gate-1 / gate-2 网关]
-  Login[login-1 / login-2 登录]
-  Game[10001 游戏]
-  GM[gm-1 管理]
-  Master[master-1 发现]
+flowchart TB
+  Player[游戏客户端]
+  Console[GM 控制台]
+
+  Entry["gate-entry :10100"]
+  G1["gate-1 :10110"]
+  G2["gate-2 :10111"]
+  Player -->|WebSocket| Entry
+  Entry -->|连接较少的网关| G1
+  Entry -->|连接较少的网关| G2
+  Console -->|HTTP :9080| GM
+
   NATS[(NATS)]
+  Master[master-1 发现注册]
+  Master --- NATS
+  G1 -->|已登录的玩法请求| NATS
+  G2 -->|已登录的玩法请求| NATS
+
+  L1[login-1 签发与校验]
+  L2[login-2 签发与校验]
+  Game[game 10001]
+  GM[gm-1]
+  NATS -->|gate.user 转发| L1
+  NATS -->|gate.user 转发| L2
+  NATS -->|game.*| Game
+  GM -->|管理指令| NATS
+
   MySQL[(MySQL)]
   Redis[(Redis)]
-
-  Client --> Gate
-  Admin -->|HTTP| GM
-  Gate --> Login
-  Gate --> Game
-  GM -->|NATS| Game
-  Login --> MySQL
-  Login --> Redis
+  L1 --> MySQL
+  L1 --> Redis
+  L2 --> MySQL
+  L2 --> Redis
   Game --> MySQL
   Game --> Redis
-  Gate --> NATS
-  Login --> NATS
-  Game --> NATS
-  Master --> NATS
+  GM --> MySQL
+  GM --> Redis
 ```
 
+游戏节点里战斗和场景都在本进程内存。组队名册在 Redis。角色、背包、待领奖励和配表在 MySQL。
 
+```mermaid
+flowchart TB
+  subgraph gameNode [游戏节点 10001]
+    PlayerActor[player 选角进场移动切图]
+    PartyActor[party 组队]
+    ChatActor[chat 同线聊天]
+    BagActor[bag 背包与喝药]
+    CombatActor[combat 心跳结算]
+    RewardActor[reward 击杀发奖]
+    ConfigActor[config 配表热更]
+    GmActor[gm 管理指令]
+  end
 
+  Scene[本进程场景与 15 格视野]
+  Units[本进程战斗单位]
+  PartyRedis[(Redis 队伍)]
+  DB[(MySQL)]
+
+  PlayerActor --> Scene
+  PlayerActor --> DB
+  ChatActor --> Scene
+  CombatActor --> Scene
+  CombatActor --> Units
+  BagActor -->|喝药挂治疗| CombatActor
+  BagActor --> DB
+  CombatActor -->|死亡结算| RewardActor
+  RewardActor --> DB
+  PartyActor --> PartyRedis
+  PartyActor -->|跨节点投递| NATS2[(NATS)]
+  ConfigActor --> DB
+  GmActor --> DB
+  GmActor --> Scene
+```
+
+同一拍推给视野内玩家的顺序是：`onMove`，新进入视野的 `onCombatSnapshot`，再是有变化才发的 `onCombatFrame`。离开 15 格发 `onCombatGone`。
 
 | 节点        | 进程            | 职责                                          |
 | --------- | ------------- | ------------------------------------------- |
 | `master`  | `cmd/master`  | NATS 模式集群注册发现（无业务路由）                        |
 | `gateway` | `cmd/gateway` | WebSocket + Pomelo 协议、鉴权路由、转发至 login/game。profile 里每个启用的网关各起一个进程，端口用各自的 `address` |
 | `login`   | `cmd/login`   | 帐号密码签发 Token、校验、刷新、登出。profile 里每个启用的登录节点各起一个进程，节点内按 `auth.session_workers` 并行 |
-| `game`    | `cmd/game`    | 选角/创角/进场、场景移动（AOI）、聊天、背包、GM 指令处理            |
+| `game`    | `cmd/game`    | 选角进场、场景、聊天、背包、战斗、组队、击杀奖励、配表热更和 GM 指令。战斗与场景在本进程，组队在 Redis |
 | `gm`      | `cmd/gm`      | **独立管理进程**：HTTP API，通过 NATS 向 game 节点下发管理指令 |
 
 
