@@ -39,6 +39,7 @@ type (
 	BagItem               = pb.BagItem
 	BagListResponse       = pb.BagListResponse
 	BagListRequest        = pb.BagListRequest
+	BagLoadRequest        = pb.BagLoadRequest
 	BagAddRequest         = pb.BagAddRequest
 	BagRemoveRequest      = pb.BagRemoveRequest
 	BagMoveRequest        = pb.BagMoveRequest
@@ -93,6 +94,10 @@ type (
 	RewardListResponse    = pb.RewardListResponse
 	RewardTakeRequest     = pb.RewardTakeRequest
 	RewardTakeResponse    = pb.RewardTakeResponse
+	RewardDeliverRequest  = pb.RewardDeliverRequest
+	RewardDeliverResponse = pb.RewardDeliverResponse
+	RewardClaimRequest    = pb.RewardClaimRequest
+	RewardClaimResponse   = pb.RewardClaimResponse
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

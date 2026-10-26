@@ -19,6 +19,11 @@ message BagListRequest {
   int32 bag_type = 1 [json_name = "bagType"];
 }
 
+// BagLoadRequest 进场预热：把该角色拥有物品的全部背包装进 bag Actor 内存。
+message BagLoadRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+}
+
 message BagAddRequest {
   int32 item_id = 1 [json_name = "itemId"];
   int32 count = 2 [json_name = "count"];

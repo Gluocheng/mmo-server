@@ -10,6 +10,7 @@ import (
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	cproto "github.com/cherry-game/cherry/net/proto"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
 	"github.com/example/mmo-server/internal/sessionkey"
@@ -67,6 +68,7 @@ func (p *actorReward) list(session *cproto.Session, _ *protocol.None) {
 }
 
 // take 领取一条待领取。背包仍满返回 40022，这条继续留着；不存在返回 40023。
+// 在线改经 bag Actor 内存，离线直写 DB。
 func (p *actorReward) take(session *cproto.Session, req *protocol.RewardTakeRequest) {
 	playerID, ok := playerIDFrom(session)
 	if !ok {
@@ -77,17 +79,39 @@ func (p *actorReward) take(session *cproto.Session, req *protocol.RewardTakeRequ
 		p.ResponseCode(session, code.BagItemInvalid)
 		return
 	}
+	// 在线：CallWait 到 bag Actor 领取并同步拿回最新背包。框架码（超时/未找到）降级直写 DB。
+	if _, ok := world.AgentPath(session.Uid); ok {
+		claimReq := &protocol.RewardClaimRequest{PlayerId: playerID, ClaimId: req.ClaimId}
+		var rsp protocol.RewardClaimResponse
+		rc := p.CallWait(p.NewChildPath("bag", session.Uid), "rewardClaim", claimReq, &rsp)
+		if rc == code.OK {
+			p.Response(session, &protocol.RewardTakeResponse{Bag: rsp.Bag})
+			return
+		}
+		if rc >= 40000 {
+			p.ResponseCode(session, rc)
+			return
+		}
+		clog.Warnf("reward take in-memory fail uid=%d rc=%d, fallback to db", session.Uid, rc)
+		bagType, err := persistence.TakeRewardClaim(context.Background(), playerID, req.ClaimId)
+		if err != nil {
+			p.respondTakeErr(session, playerID, req.ClaimId, err)
+			return
+		}
+		// 直写 DB 成功；失效内存让下次操作懒加载重读，避免与 DB 分叉。
+		p.Call(p.NewChildPath("bag", session.Uid), "invalidate", nil)
+		bag, err := persistence.GetBagByPlayerID(playerID, bagType)
+		if err != nil {
+			p.ResponseCode(session, code.BagLoadFail)
+			return
+		}
+		p.Response(session, &protocol.RewardTakeResponse{Bag: bag})
+		p.Push(session, "onBagChange", bag)
+		return
+	}
 	bagType, err := persistence.TakeRewardClaim(context.Background(), playerID, req.ClaimId)
 	if err != nil {
-		switch {
-		case errors.Is(err, persistence.ErrBagFull):
-			p.ResponseCode(session, code.BagFull)
-		case errors.Is(err, persistence.ErrRewardClaimMissing):
-			p.ResponseCode(session, code.ItemNotFound)
-		default:
-			clog.Warnf("reward take player=%d claim=%d err=%v", playerID, req.ClaimId, err)
-			p.ResponseCode(session, code.BagLoadFail)
-		}
+		p.respondTakeErr(session, playerID, req.ClaimId, err)
 		return
 	}
 	bag, err := persistence.GetBagByPlayerID(playerID, bagType)
@@ -97,6 +121,19 @@ func (p *actorReward) take(session *cproto.Session, req *protocol.RewardTakeRequ
 	}
 	p.Response(session, &protocol.RewardTakeResponse{Bag: bag})
 	p.Push(session, "onBagChange", bag)
+}
+
+// respondTakeErr 把领取错误映射为业务码。
+func (p *actorReward) respondTakeErr(session *cproto.Session, playerID, claimID int64, err error) {
+	switch {
+	case errors.Is(err, persistence.ErrBagFull):
+		p.ResponseCode(session, code.BagFull)
+	case errors.Is(err, persistence.ErrRewardClaimMissing):
+		p.ResponseCode(session, code.ItemNotFound)
+	default:
+		clog.Warnf("reward take player=%d claim=%d err=%v", playerID, claimID, err)
+		p.ResponseCode(session, code.BagLoadFail)
+	}
 }
 
 // playerIDFrom 从已进场的 session 取出角色 id。没有 player_id 时 ok 为 false。

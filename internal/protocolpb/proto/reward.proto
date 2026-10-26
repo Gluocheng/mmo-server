@@ -46,3 +46,31 @@ message RewardTakeRequest {
 message RewardTakeResponse {
   BagListResponse bag = 1 [json_name = "bag"];
 }
+
+// RewardDeliverRequest 击杀奖励发放请求（combat/reward → bag 跨 Actor）。
+message RewardDeliverRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+  int32 item_id = 2 [json_name = "itemId"];
+  int32 count = 3 [json_name = "count"];
+  int32 monster_id = 4 [json_name = "monsterId"];
+}
+
+// RewardDeliverResponse 击杀奖励发放结果。placed 为 false 时整份进了待领取。
+message RewardDeliverResponse {
+  bool placed = 1 [json_name = "placed"];
+  int32 bag_type = 2 [json_name = "bagType"];
+  int64 claim_id = 3 [json_name = "claimId"];
+  BagListResponse bag = 4 [json_name = "bag"];
+}
+
+// RewardClaimRequest 领取待领取请求（reward → bag 跨 Actor）。
+message RewardClaimRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+  int64 claim_id = 2 [json_name = "claimId"];
+}
+
+// RewardClaimResponse 领取待领取结果（含最新背包）。
+message RewardClaimResponse {
+  int32 bag_type = 1 [json_name = "bagType"];
+  BagListResponse bag = 2 [json_name = "bag"];
+}

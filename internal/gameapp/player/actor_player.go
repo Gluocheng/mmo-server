@@ -52,6 +52,7 @@ func (p *actorPlayer) sessionClose() {
 	party.Unbind(uid)
 	world.Leave(uid)
 	combat.Leave(uid)
+	p.Call(p.NewChildPath("bag", uid), "offline", nil)
 	p.Exit()
 	clog.Debugf("player actor exit uid=%d path=%s", uid, p.PathString())
 }
@@ -136,6 +137,8 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 	})
 	// 写完 session 再登记本机路径。回到队伍时只给本机已 Bind 的成员推 onParty。
 	party.Bind(session.Uid, session.AgentPath)
+	// 进场预热：fire-and-forget 把全部背包装进 bag Actor 内存，不阻塞 enter 响应。
+	p.Call(p.NewChildPath("bag", session.Uid), "load", &protocol.BagLoadRequest{PlayerId: info.PlayerId})
 	entered, err := persistence.OnEnter(context.Background(), session.Uid, p.Path().NodeID, gtime.Now().UnixMilli())
 	if err != nil {
 		clog.Warnf("party on enter uid=%d err=%v", session.Uid, err)
@@ -185,6 +188,8 @@ func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSw
 		if playerID, err := strconv.ParseInt(session.GetString(sessionkey.PlayerID), 10, 64); err == nil {
 			combat.SetPlayer(session.Uid, playerID)
 		}
+		// 切图关键事件落库：立即 flush 脏包，缩小崩溃丢失窗口。
+		p.Call(p.NewChildPath("bag", session.Uid), "flush", nil)
 	}
 	nearby, _ := nearbyProto(view.Nearby)
 	p.Response(session, &protocol.SceneSwitchResponse{

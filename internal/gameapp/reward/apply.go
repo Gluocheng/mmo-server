@@ -7,6 +7,7 @@ import (
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
+	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/gtime"
 	"github.com/example/mmo-server/internal/persistence"
@@ -63,6 +64,7 @@ func Apply(sender cfacade.IActor, kill Kill) {
 
 // grantKinds 按参与奖、名次和最后一击查奖励表并发放。
 // 配表没有这一行就跳过。进了背包的种类记下来，稍后推 onBagChange；放不下的整份进待领取。
+// 在线改经 bag Actor 内存（含容量判断），离线直写 DB。
 func grantKinds(sender cfacade.IActor, f Fighter, monsterID int32, out Outcome) []*protocol.KillRewardItem {
 	var kinds []string
 	if out.Solo[f.UID] {
@@ -83,13 +85,22 @@ func grantKinds(sender cfacade.IActor, f Fighter, monsterID int32, out Outcome) 
 		kinds = append(kinds, "last")
 	}
 	var items []*protocol.KillRewardItem
-	bags := map[int32]struct{}{}
+	online := sender != nil
+	if _, ok := world.AgentPath(f.UID); !ok {
+		online = false
+	}
 	for _, kind := range kinds {
 		def, ok := gcruntime.KillReward(monsterID, kind)
 		if !ok {
 			continue
 		}
 		if f.PlayerID < 1 {
+			continue
+		}
+		if online {
+			if item := deliverOnline(sender, f, def.ItemID, def.Count, monsterID); item != nil {
+				items = append(items, item)
+			}
 			continue
 		}
 		got, err := persistence.DeliverKillItem(context.Background(), f.PlayerID, def.ItemID, def.Count, monsterID)
@@ -100,12 +111,33 @@ func grantKinds(sender cfacade.IActor, f Fighter, monsterID int32, out Outcome) 
 		items = append(items, &protocol.KillRewardItem{
 			ItemId: def.ItemID, Count: def.Count, Pending: !got.Placed,
 		})
-		if got.Placed {
-			bags[got.BagType] = struct{}{}
-		}
 	}
-	pushBags(sender, f.UID, f.PlayerID, bags)
 	return items
+}
+
+// deliverOnline 在线发放：CallWait 到 bag Actor 改内存并同步拿回结果。框架码（超时/未找到）降级直写 DB。
+func deliverOnline(sender cfacade.IActor, f Fighter, itemID, count, monsterID int32) *protocol.KillRewardItem {
+	req := &protocol.RewardDeliverRequest{
+		PlayerId: f.PlayerID, ItemId: itemID, Count: count, MonsterId: monsterID,
+	}
+	var rsp protocol.RewardDeliverResponse
+	rc := sender.CallWait(cfacade.NewChildPath(sender.App().NodeID(), "bag", f.UID), "rewardDeliver", req, &rsp)
+	if rc == code.OK {
+		return &protocol.KillRewardItem{ItemId: itemID, Count: count, Pending: !rsp.Placed}
+	}
+	if rc >= 40000 {
+		clog.Warnf("kill reward in-memory fail uid=%d player=%d rc=%d", f.UID, f.PlayerID, rc)
+		return nil
+	}
+	clog.Warnf("kill reward in-memory framework fail uid=%d rc=%d, fallback to db", f.UID, rc)
+	got, err := persistence.DeliverKillItem(context.Background(), f.PlayerID, itemID, count, monsterID)
+	if err != nil {
+		clog.Warnf("kill reward fallback uid=%d player=%d err=%v", f.UID, f.PlayerID, err)
+		return nil
+	}
+	// 直写 DB 成功；失效内存让下次操作懒加载重读，避免与 DB 分叉。
+	sender.Call(cfacade.NewChildPath(sender.App().NodeID(), "bag", f.UID), "invalidate", nil)
+	return &protocol.KillRewardItem{ItemId: itemID, Count: count, Pending: !got.Placed}
 }
 
 // pushSettle 把这次击杀的归类、名次和自己拿到的道具推给该玩家。没有网关路径时不推。
@@ -125,22 +157,4 @@ func pushSettle(sender cfacade.IActor, uid int64, kill Kill, out Outcome, items 
 		LastHitUid: kill.LastHit,
 		Items:      items,
 	})
-}
-
-// pushBags 把已经写入背包的种类对应背包再推一次 onBagChange。待领取不走这里。
-func pushBags(sender cfacade.IActor, uid, playerID int64, bags map[int32]struct{}) {
-	if sender == nil || playerID < 1 || len(bags) == 0 {
-		return
-	}
-	path, ok := world.AgentPath(uid)
-	if !ok {
-		return
-	}
-	for bagType := range bags {
-		bag, err := persistence.GetBagByPlayerID(playerID, bagType)
-		if err != nil || bag == nil {
-			continue
-		}
-		pomelo.PushWithUID(sender, path, uid, "onBagChange", bag)
-	}
 }

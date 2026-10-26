@@ -396,6 +396,262 @@ func (x *RewardTakeResponse) GetBag() *BagListResponse {
 	return nil
 }
 
+// RewardDeliverRequest 击杀奖励发放请求（combat/reward → bag 跨 Actor）。
+type RewardDeliverRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	PlayerId  int64 `protobuf:"varint,1,opt,name=player_id,json=playerId,proto3" json:"player_id,omitempty"`
+	ItemId    int32 `protobuf:"varint,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	Count     int32 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+	MonsterId int32 `protobuf:"varint,4,opt,name=monster_id,json=monsterId,proto3" json:"monster_id,omitempty"`
+}
+
+func (x *RewardDeliverRequest) Reset() {
+	*x = RewardDeliverRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_reward_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RewardDeliverRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RewardDeliverRequest) ProtoMessage() {}
+
+func (x *RewardDeliverRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_reward_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RewardDeliverRequest.ProtoReflect.Descriptor instead.
+func (*RewardDeliverRequest) Descriptor() ([]byte, []int) {
+	return file_reward_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RewardDeliverRequest) GetPlayerId() int64 {
+	if x != nil {
+		return x.PlayerId
+	}
+	return 0
+}
+
+func (x *RewardDeliverRequest) GetItemId() int32 {
+	if x != nil {
+		return x.ItemId
+	}
+	return 0
+}
+
+func (x *RewardDeliverRequest) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *RewardDeliverRequest) GetMonsterId() int32 {
+	if x != nil {
+		return x.MonsterId
+	}
+	return 0
+}
+
+// RewardDeliverResponse 击杀奖励发放结果。placed 为 false 时整份进了待领取。
+type RewardDeliverResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Placed  bool             `protobuf:"varint,1,opt,name=placed,proto3" json:"placed,omitempty"`
+	BagType int32            `protobuf:"varint,2,opt,name=bag_type,json=bagType,proto3" json:"bag_type,omitempty"`
+	ClaimId int64            `protobuf:"varint,3,opt,name=claim_id,json=claimId,proto3" json:"claim_id,omitempty"`
+	Bag     *BagListResponse `protobuf:"bytes,4,opt,name=bag,proto3" json:"bag,omitempty"`
+}
+
+func (x *RewardDeliverResponse) Reset() {
+	*x = RewardDeliverResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_reward_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RewardDeliverResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RewardDeliverResponse) ProtoMessage() {}
+
+func (x *RewardDeliverResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_reward_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RewardDeliverResponse.ProtoReflect.Descriptor instead.
+func (*RewardDeliverResponse) Descriptor() ([]byte, []int) {
+	return file_reward_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RewardDeliverResponse) GetPlaced() bool {
+	if x != nil {
+		return x.Placed
+	}
+	return false
+}
+
+func (x *RewardDeliverResponse) GetBagType() int32 {
+	if x != nil {
+		return x.BagType
+	}
+	return 0
+}
+
+func (x *RewardDeliverResponse) GetClaimId() int64 {
+	if x != nil {
+		return x.ClaimId
+	}
+	return 0
+}
+
+func (x *RewardDeliverResponse) GetBag() *BagListResponse {
+	if x != nil {
+		return x.Bag
+	}
+	return nil
+}
+
+// RewardClaimRequest 领取待领取请求（reward → bag 跨 Actor）。
+type RewardClaimRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	PlayerId int64 `protobuf:"varint,1,opt,name=player_id,json=playerId,proto3" json:"player_id,omitempty"`
+	ClaimId  int64 `protobuf:"varint,2,opt,name=claim_id,json=claimId,proto3" json:"claim_id,omitempty"`
+}
+
+func (x *RewardClaimRequest) Reset() {
+	*x = RewardClaimRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_reward_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RewardClaimRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RewardClaimRequest) ProtoMessage() {}
+
+func (x *RewardClaimRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_reward_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RewardClaimRequest.ProtoReflect.Descriptor instead.
+func (*RewardClaimRequest) Descriptor() ([]byte, []int) {
+	return file_reward_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RewardClaimRequest) GetPlayerId() int64 {
+	if x != nil {
+		return x.PlayerId
+	}
+	return 0
+}
+
+func (x *RewardClaimRequest) GetClaimId() int64 {
+	if x != nil {
+		return x.ClaimId
+	}
+	return 0
+}
+
+// RewardClaimResponse 领取待领取结果（含最新背包）。
+type RewardClaimResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	BagType int32            `protobuf:"varint,1,opt,name=bag_type,json=bagType,proto3" json:"bag_type,omitempty"`
+	Bag     *BagListResponse `protobuf:"bytes,2,opt,name=bag,proto3" json:"bag,omitempty"`
+}
+
+func (x *RewardClaimResponse) Reset() {
+	*x = RewardClaimResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_reward_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RewardClaimResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RewardClaimResponse) ProtoMessage() {}
+
+func (x *RewardClaimResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_reward_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RewardClaimResponse.ProtoReflect.Descriptor instead.
+func (*RewardClaimResponse) Descriptor() ([]byte, []int) {
+	return file_reward_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RewardClaimResponse) GetBagType() int32 {
+	if x != nil {
+		return x.BagType
+	}
+	return 0
+}
+
+func (x *RewardClaimResponse) GetBag() *BagListResponse {
+	if x != nil {
+		return x.Bag
+	}
+	return nil
+}
+
 var File_reward_proto protoreflect.FileDescriptor
 
 var file_reward_proto_rawDesc = []byte{
@@ -441,11 +697,41 @@ var file_reward_proto_rawDesc = []byte{
 	0x32, 0x0a, 0x03, 0x62, 0x61, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x6d,
 	0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x42,
 	0x61, 0x67, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x03,
-	0x62, 0x61, 0x67, 0x42, 0x42, 0x5a, 0x40, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
-	0x6d, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x6d, 0x6d, 0x6f, 0x2d, 0x73, 0x65,
-	0x72, 0x76, 0x65, 0x72, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x70, 0x62, 0x2f, 0x67, 0x65, 0x6e, 0x3b, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x62, 0x61, 0x67, 0x22, 0x81, 0x01, 0x0a, 0x14, 0x52, 0x65, 0x77, 0x61, 0x72, 0x64, 0x44, 0x65,
+	0x6c, 0x69, 0x76, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1b, 0x0a, 0x09,
+	0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52,
+	0x08, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x49, 0x64, 0x12, 0x17, 0x0a, 0x07, 0x69, 0x74, 0x65,
+	0x6d, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x69, 0x74, 0x65, 0x6d,
+	0x49, 0x64, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x05, 0x52, 0x05, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x6d, 0x6f, 0x6e, 0x73,
+	0x74, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x6d, 0x6f,
+	0x6e, 0x73, 0x74, 0x65, 0x72, 0x49, 0x64, 0x22, 0x99, 0x01, 0x0a, 0x15, 0x52, 0x65, 0x77, 0x61,
+	0x72, 0x64, 0x44, 0x65, 0x6c, 0x69, 0x76, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x16, 0x0a, 0x06, 0x70, 0x6c, 0x61, 0x63, 0x65, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x08, 0x52, 0x06, 0x70, 0x6c, 0x61, 0x63, 0x65, 0x64, 0x12, 0x19, 0x0a, 0x08, 0x62, 0x61, 0x67,
+	0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07, 0x62, 0x61, 0x67,
+	0x54, 0x79, 0x70, 0x65, 0x12, 0x19, 0x0a, 0x08, 0x63, 0x6c, 0x61, 0x69, 0x6d, 0x5f, 0x69, 0x64,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x63, 0x6c, 0x61, 0x69, 0x6d, 0x49, 0x64, 0x12,
+	0x32, 0x0a, 0x03, 0x62, 0x61, 0x67, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x6d,
+	0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e, 0x76, 0x31, 0x2e, 0x42,
+	0x61, 0x67, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x03,
+	0x62, 0x61, 0x67, 0x22, 0x4c, 0x0a, 0x12, 0x52, 0x65, 0x77, 0x61, 0x72, 0x64, 0x43, 0x6c, 0x61,
+	0x69, 0x6d, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x70, 0x6c, 0x61,
+	0x79, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x70, 0x6c,
+	0x61, 0x79, 0x65, 0x72, 0x49, 0x64, 0x12, 0x19, 0x0a, 0x08, 0x63, 0x6c, 0x61, 0x69, 0x6d, 0x5f,
+	0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x63, 0x6c, 0x61, 0x69, 0x6d, 0x49,
+	0x64, 0x22, 0x64, 0x0a, 0x13, 0x52, 0x65, 0x77, 0x61, 0x72, 0x64, 0x43, 0x6c, 0x61, 0x69, 0x6d,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x19, 0x0a, 0x08, 0x62, 0x61, 0x67, 0x5f,
+	0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07, 0x62, 0x61, 0x67, 0x54,
+	0x79, 0x70, 0x65, 0x12, 0x32, 0x0a, 0x03, 0x62, 0x61, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x20, 0x2e, 0x6d, 0x6d, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2e,
+	0x76, 0x31, 0x2e, 0x42, 0x61, 0x67, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x52, 0x03, 0x62, 0x61, 0x67, 0x42, 0x42, 0x5a, 0x40, 0x67, 0x69, 0x74, 0x68, 0x75,
+	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x6d, 0x6d,
+	0x6f, 0x2d, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61,
+	0x6c, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x70, 0x62, 0x2f, 0x67, 0x65, 0x6e,
+	0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x33,
 }
 
 var (
@@ -460,25 +746,31 @@ func file_reward_proto_rawDescGZIP() []byte {
 	return file_reward_proto_rawDescData
 }
 
-var file_reward_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_reward_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_reward_proto_goTypes = []interface{}{
-	(*KillRewardItem)(nil),     // 0: mmo.protocol.v1.KillRewardItem
-	(*KillSettle)(nil),         // 1: mmo.protocol.v1.KillSettle
-	(*RewardClaim)(nil),        // 2: mmo.protocol.v1.RewardClaim
-	(*RewardListResponse)(nil), // 3: mmo.protocol.v1.RewardListResponse
-	(*RewardTakeRequest)(nil),  // 4: mmo.protocol.v1.RewardTakeRequest
-	(*RewardTakeResponse)(nil), // 5: mmo.protocol.v1.RewardTakeResponse
-	(*BagListResponse)(nil),    // 6: mmo.protocol.v1.BagListResponse
+	(*KillRewardItem)(nil),        // 0: mmo.protocol.v1.KillRewardItem
+	(*KillSettle)(nil),            // 1: mmo.protocol.v1.KillSettle
+	(*RewardClaim)(nil),           // 2: mmo.protocol.v1.RewardClaim
+	(*RewardListResponse)(nil),    // 3: mmo.protocol.v1.RewardListResponse
+	(*RewardTakeRequest)(nil),     // 4: mmo.protocol.v1.RewardTakeRequest
+	(*RewardTakeResponse)(nil),    // 5: mmo.protocol.v1.RewardTakeResponse
+	(*RewardDeliverRequest)(nil),  // 6: mmo.protocol.v1.RewardDeliverRequest
+	(*RewardDeliverResponse)(nil), // 7: mmo.protocol.v1.RewardDeliverResponse
+	(*RewardClaimRequest)(nil),    // 8: mmo.protocol.v1.RewardClaimRequest
+	(*RewardClaimResponse)(nil),   // 9: mmo.protocol.v1.RewardClaimResponse
+	(*BagListResponse)(nil),       // 10: mmo.protocol.v1.BagListResponse
 }
 var file_reward_proto_depIdxs = []int32{
-	0, // 0: mmo.protocol.v1.KillSettle.items:type_name -> mmo.protocol.v1.KillRewardItem
-	2, // 1: mmo.protocol.v1.RewardListResponse.claims:type_name -> mmo.protocol.v1.RewardClaim
-	6, // 2: mmo.protocol.v1.RewardTakeResponse.bag:type_name -> mmo.protocol.v1.BagListResponse
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0,  // 0: mmo.protocol.v1.KillSettle.items:type_name -> mmo.protocol.v1.KillRewardItem
+	2,  // 1: mmo.protocol.v1.RewardListResponse.claims:type_name -> mmo.protocol.v1.RewardClaim
+	10, // 2: mmo.protocol.v1.RewardTakeResponse.bag:type_name -> mmo.protocol.v1.BagListResponse
+	10, // 3: mmo.protocol.v1.RewardDeliverResponse.bag:type_name -> mmo.protocol.v1.BagListResponse
+	10, // 4: mmo.protocol.v1.RewardClaimResponse.bag:type_name -> mmo.protocol.v1.BagListResponse
+	5,  // [5:5] is the sub-list for method output_type
+	5,  // [5:5] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_reward_proto_init() }
@@ -560,6 +852,54 @@ func file_reward_proto_init() {
 				return nil
 			}
 		}
+		file_reward_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RewardDeliverRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_reward_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RewardDeliverResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_reward_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RewardClaimRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_reward_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RewardClaimResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -567,7 +907,7 @@ func file_reward_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_reward_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

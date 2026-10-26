@@ -72,6 +72,65 @@ func ListRewardClaims(ctx context.Context, playerID int64) ([]model.RewardClaim,
 	return rows, err
 }
 
+// CreateKillClaim 写入一条击杀待领取，返回自增 id。供在线发放路径在背包放不下时使用。
+func CreateKillClaim(ctx context.Context, playerID int64, itemID, count, monsterID int32) (int64, error) {
+	if err := ensureDB(); err != nil {
+		return 0, err
+	}
+	if playerID < 1 || itemID < 1 || count < 1 {
+		return 0, ErrBagInvalid
+	}
+	row := model.RewardClaim{
+		PlayerID: playerID, ItemID: itemID, Count: count,
+		Reason: "kill", MonsterID: monsterID,
+	}
+	if err := DBFromContext(ctx).WithContext(ctx).Create(&row).Error; err != nil {
+		return 0, err
+	}
+	return row.ID, nil
+}
+
+// GetRewardClaim 读取一条待领取并校验归属。不存在或不属于该角色返回 ErrRewardClaimMissing。
+func GetRewardClaim(ctx context.Context, playerID, claimID int64) (model.RewardClaim, error) {
+	var row model.RewardClaim
+	if err := ensureDB(); err != nil {
+		return row, err
+	}
+	if playerID < 1 || claimID < 1 {
+		return row, ErrRewardClaimMissing
+	}
+	err := DBFromContext(ctx).WithContext(ctx).
+		Where("id = ? AND player_id = ?", claimID, playerID).
+		First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return row, ErrRewardClaimMissing
+	}
+	if err != nil {
+		return row, err
+	}
+	return row, nil
+}
+
+// DeleteRewardClaim 删除一条待领取并校验归属。不存在或不属于该角色返回 ErrRewardClaimMissing。
+func DeleteRewardClaim(ctx context.Context, playerID, claimID int64) error {
+	if err := ensureDB(); err != nil {
+		return err
+	}
+	if playerID < 1 || claimID < 1 {
+		return ErrRewardClaimMissing
+	}
+	res := DBFromContext(ctx).WithContext(ctx).
+		Where("id = ? AND player_id = ?", claimID, playerID).
+		Delete(&model.RewardClaim{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected < 1 {
+		return ErrRewardClaimMissing
+	}
+	return nil
+}
+
 // TakeRewardClaim 把一条待领取放进背包并删除。背包仍满时保留原行，返回 ErrBagFull。
 func TakeRewardClaim(ctx context.Context, playerID, claimID int64) (int32, error) {
 	if playerID < 1 || claimID < 1 {
