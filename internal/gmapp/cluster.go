@@ -66,12 +66,10 @@ func (a *App) callRemoteAt(subject, source, target, funcName string, req proto.M
 	if err != nil {
 		return nil, fmt.Errorf("marshal req: %w", err)
 	}
-	clusterPacket := &cproto.ClusterPacket{
-		SourcePath: source,
-		TargetPath: target,
-		FuncName:   funcName,
-		ArgBytes:   argBytes,
-	}
+	// 用框架构造器填 BuildTime：框架按 PostTime-BuildTime 算到达耗时，
+	// 手工构造留 0 会让每次远程调用都被判成 Invoke timeout。
+	clusterPacket := cproto.BuildClusterPacket(source, target, funcName)
+	clusterPacket.ArgBytes = argBytes
 	cpBytes, err := proto.Marshal(clusterPacket)
 	if err != nil {
 		return nil, fmt.Errorf("marshal cluster: %w", err)
