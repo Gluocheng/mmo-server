@@ -3,7 +3,7 @@
 > **Status:** draft  
 > **实施计划：** （策划通过后创建）[`2026-10-29-equipment.md`](2026-10-29-equipment.md)
 
-**For agentic workers:** 本期让装备背包里的装备能穿到固定部位，并按战斗属性已有的公式加成生命、攻击、防御。穿脱挂在现有 bag Actor 上，和背包内存一起落库。不改 `Cast` / `ApplyBuff` 签名，不做客户端。
+**For agentic workers:** 本期让装备背包里的装备能穿到固定部位，并按战斗属性已有的公式加成生命、攻击、防御。穿脱放在独立的 `internal/gameapp/equip`，路由是 `game.equip.*`。背包只提供取出和放回，不认识部位。不改 `Cast` / `ApplyBuff` 签名，不做客户端。
 
 ---
 
@@ -32,7 +32,7 @@
 - 装备背包格数从 8 改为 32。穿着不占这 32 格
 - 道具表增加部位组。只有 `type=equipment` 且部位组合法的道具能穿
 - 装备属性表：道具 id、属性名、固定值或百分比、数值。本期只允许 `hp`、`attack`、`defense`
-- `game.bag.wear`、`game.bag.unwear`、`game.bag.equips`
+- 独立模块 `internal/gameapp/equip`，路由 `game.equip.wear`、`game.equip.unwear`、`game.equip.equips`
 - 穿脱后的背包变化走现有 `onBagChange`。自己另收 `onEquip`
 - 穿着状态随背包内存一起脏标记、定时落库和断线落库
 - 换装后立刻重算三项属性，交给现有战斗同步在下一拍推 `stats`
@@ -48,15 +48,25 @@
 
 ---
 
+## 模块边界
+
+`internal/gameapp/equip` 自己管十二个部位、穿着内存、属性汇总和三条路由。游戏节点单独挂一个 equip Actor，按 uid 建子 Actor，和 bag、combat 并列。
+
+背包不出现部位。它只导出两件事：从装备背包的某一格拿走 1 件，或把 1 件放回指定格、第一个空格。装备模块调用这两件事，再改自己的穿着。
+
+战斗不出现道具 id。装备模块把当前穿着收成生命、攻击、防御的固定值和百分比，交给现有属性公式。下一拍仍由战斗同步推 `stats`。
+
+穿脱成功后，背包格子和 `player_equipment` 仍进同一次落库。崩溃发生在这次落库之前时，库里的背包和穿着都还是旧的。
+
 ## 协议设计
 
-路由挂在现有 `game.bag` 上，由该玩家的 bag 子 Actor 串行处理。不放进网关进场前白名单。
+路由在 `game.equip`，由该玩家的 equip 子 Actor 串行处理。不放进网关进场前白名单。
 
 | 类型 | Route / 事件 | 请求 | 响应 / Push | 说明 |
 |------|----------------|------|-------------|------|
-| RPC | `game.bag.wear` | `EquipWearRequest` | `EquipState` | 从背包格穿到该道具配置的部位 |
-| RPC | `game.bag.unwear` | `EquipUnwearRequest` | `EquipState` | 按部位脱下 |
-| RPC | `game.bag.equips` | `Empty` | `EquipState` | 查询当前穿着 |
+| RPC | `game.equip.wear` | `EquipWearRequest` | `EquipState` | 从背包格穿到该道具配置的部位 |
+| RPC | `game.equip.unwear` | `EquipUnwearRequest` | `EquipState` | 按部位脱下 |
+| RPC | `game.equip.equips` | `Empty` | `EquipState` | 查询当前穿着 |
 | Push | `onEquip` | — | `EquipState` | 只推给自己 |
 | Push | `onBagChange` | — | 现有背包包 | 穿脱引起的背包格变化 |
 | Push | `onCombatFrame` | — | 现有帧 | 三项属性变化走已有 `stats` |
