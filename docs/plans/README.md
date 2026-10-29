@@ -53,7 +53,7 @@
 | done | 战斗同步 | [2026-10-12-combat-sync-design.md](2026-10-12-combat-sync-design.md) | 实施 [2026-10-12-combat-sync.md](2026-10-12-combat-sync.md)。留在游戏节点内。进视野发快照，心跳只推变化，离开视野发消失 |
 | planned | GM 运营后台其余 P2 | [backlog-gm-ops.md](backlog-gm-ops.md) | 清背包、改名、邮件/礼包码、细权限等 |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
-| approved | 背包内存化 | [2026-10-26-bag-inmemory-design.md](2026-10-26-bag-inmemory-design.md) | 进场整包加载进 bag Actor，免锁改内存，定时+关键事件整包 diff 落库，离线 5 分钟卸载 |
+| done | 背包内存化 | [2026-10-26-bag-inmemory-design.md](2026-10-26-bag-inmemory-design.md) | 实施 [2026-10-26-bag-inmemory.md](2026-10-26-bag-inmemory.md)。进场加载内存，定时与断线落库，离线卸载秒数读 `bag.offline_unload_seconds`，默认 300 |
 
 > 无 `*-design.md` 的 done 项为历史基线；**新迭代**须策划 + 实施双文件，并更新本表。
 

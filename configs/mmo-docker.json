@@ -178,5 +178,8 @@
   },
   "player": {
     "max_characters": 3
+  },
+  "bag": {
+    "offline_unload_seconds": 300
   }
 }

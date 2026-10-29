@@ -1,7 +1,7 @@
 # 背包内存化 策划文档
 
 > **Status:** approved
-> **实施计划：** （策划通过后创建）
+> **实施计划：** [`2026-10-26-bag-inmemory.md`](2026-10-26-bag-inmemory.md)
 
 **For agentic workers:** 填完整文各章节；`Status: approved` 前不得创建实施计划、不得改业务代码。无把握处写「待定」并列入风险。
 

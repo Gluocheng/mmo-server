@@ -9,6 +9,7 @@ import (
 	clog "github.com/cherry-game/cherry/logger"
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	cproto "github.com/cherry-game/cherry/net/proto"
+	cprofile "github.com/cherry-game/cherry/profile"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/gameapp/world"
@@ -17,8 +18,17 @@ import (
 	"github.com/example/mmo-server/internal/sessionkey"
 )
 
-// offlineUnloadAfter 玩家离线后内存数据保留多久，超时仍未进场则 flush 余量并清空。
-const offlineUnloadAfter = 5 * time.Minute
+// offlineUnloadDefault 是 profile 未配置或配成非正数时的离线卸载秒数。
+const offlineUnloadDefault = 300
+
+// offlineUnloadAfter 读取 bag.offline_unload_seconds。未配置时为 300 秒。
+func offlineUnloadAfter() time.Duration {
+	seconds := cprofile.GetConfig("bag").GetInt("offline_unload_seconds", offlineUnloadDefault)
+	if seconds < 1 {
+		seconds = offlineUnloadDefault
+	}
+	return time.Duration(seconds) * time.Second
+}
 
 // actorBag 背包玩法 Actor：玩家进场（Session 含 PlayerID）后可访问。
 // 内存态是背包唯一权威：玩家操作只改内存，脏包由定时/关键事件整包 diff 落库。
@@ -100,7 +110,7 @@ func (p *actorBag) cancelOffline() {
 func (p *actorBag) offline() {
 	p.flushDirty()
 	p.cancelOffline()
-	p.offlineTimer = p.Timer().AddOnce(offlineUnloadAfter, func() {
+	p.offlineTimer = p.Timer().AddOnce(offlineUnloadAfter(), func() {
 		p.offlineTimer = 0
 		p.flushDirty()
 		p.bags = make(map[int32]*memBag)

@@ -1,6 +1,6 @@
 # 背包内存化 实施计划
 
-> **Status:** in_progress
+> **Status:** done
 > **Design:** [`2026-10-26-bag-inmemory-design.md`](2026-10-26-bag-inmemory-design.md)（已 `approved`）
 > **For agentic workers:** 按任务勾选推进；完成后更新 `docs/plans/README.md` 总览表。
 
@@ -62,7 +62,7 @@
 - [x] 断线时立即 flush + 起 5 分钟 `AddOnce` 倒计时
 - [x] 重新进场（`load`）取消倒计时、复用内存
 - [x] 倒计时到期 flush 余量 + 清空该玩家内存
-- [ ] 5 分钟值走 profile 配置（默认 300s）
+- [x] 5 分钟值走 profile 配置（默认 300s）
 - [x] `go test ./...` 通过
 
 ### Task 5: GM grant/deduct 收编
@@ -111,5 +111,5 @@
 
 ## 备注
 
-- 离线卸载时长（`offlineUnloadAfter = 5 * time.Minute`）与定时 flush 间隔（`flushInterval = 5 * time.Second`）暂为常量，未接 profile 配置。若需可配，参照 `nodecfg.ApplyCallTimeout` 的 `cprofile.GetConfig(...)` 模式加一个 `bag` 段即可。
+- 离线卸载时长读 `bag.offline_unload_seconds`，未配置或非正数为 300 秒。定时 flush 间隔仍是常量 5 秒。
 - 在线外部写（GM/reward）框架码失败降级直写 DB 后，会 fire-and-forget 调 `bag.invalidate` 失效内存，避免内存与 DB 分叉。

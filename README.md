@@ -597,6 +597,7 @@ CI：`.github/workflows/go.yml`（`go test` + 五节点 `go build` + Docker 镜�
 - `auth.session_policy`（`kick_old` / `coexist` / `device_limit`）、`auth.max_devices_per_uid`
 - `redis.`*（TTL、限流、`key_prefix`）
 - `gameconfig.allow_reload`（是否允许热更）、`gameconfig.import_data_dir`
+- `bag.offline_unload_seconds`（断线后背包内存保留秒数，默认 300）
 
 ## 功能计划与进度
 
