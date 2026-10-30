@@ -13,6 +13,7 @@ import (
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
 	"github.com/example/mmo-server/internal/gameapp/combat"
+	"github.com/example/mmo-server/internal/gameapp/equip"
 	"github.com/example/mmo-server/internal/gameapp/party"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/gtime"
@@ -147,6 +148,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 	}
 	combat.Enter(session.Uid)
 	combat.SetPlayer(session.Uid, info.PlayerId)
+	equip.Attach(session.Uid, info.PlayerId)
 	nearby, ids := nearbyProto(view.Nearby)
 	p.Response(session, &protocol.EnterGameResponse{
 		SceneId: view.SceneID, Line: view.Line, X: view.X, Y: view.Y, Z: view.Z,
@@ -187,6 +189,7 @@ func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSw
 		combat.Enter(session.Uid)
 		if playerID, err := strconv.ParseInt(session.GetString(sessionkey.PlayerID), 10, 64); err == nil {
 			combat.SetPlayer(session.Uid, playerID)
+			equip.Attach(session.Uid, playerID)
 		}
 		// 切图关键事件落库：立即 flush 脏包，缩小崩溃丢失窗口。
 		p.Call(p.NewChildPath("bag", session.Uid), "flush", nil)

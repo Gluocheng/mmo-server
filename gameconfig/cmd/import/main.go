@@ -29,12 +29,13 @@ func main() {
 	}
 
 	itemPath := filepath.Join(*dataDir, importdata.ItemTableFile)
-	itemTable, _, err := importdata.LoadItemsFromJSONFile(itemPath)
+	itemTable, rawItems, err := importdata.LoadItemsFromJSONFile(itemPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	schemaRows := importdata.ItemsToSchema(itemTable.GetDataList())
+	importdata.ApplyItemEquipSlot(schemaRows, rawItems)
 
 	bagTypePath := filepath.Join(*dataDir, importdata.BagTypeTableFile)
 	bagTypeTable, _, err := importdata.LoadBagTypesFromJSONFile(bagTypePath)
@@ -169,6 +170,34 @@ func main() {
 		}
 		if len(statRows) > 0 {
 			if err := tx.Create(&statRows).Error; err != nil {
+				return err
+			}
+		}
+		equipSlots, err := importdata.LoadEquipSlotsFromJSONFile(filepath.Join(*dataDir, importdata.EquipSlotTableFile))
+		if err != nil {
+			return err
+		}
+		rules := map[string]importdata.StatRule{}
+		for _, st := range statRows {
+			rules[st.Name] = importdata.StatRule{AllowFlat: st.AllowFlat, AllowPercent: st.AllowPercent, Settle: st.Settle}
+		}
+		equipAttrs, err := importdata.LoadEquipAttrsFromJSONFile(filepath.Join(*dataDir, importdata.EquipAttrTableFile), rules)
+		if err != nil {
+			return err
+		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgEquipSlot{}).Error; err != nil {
+			return err
+		}
+		if len(equipSlots) > 0 {
+			if err := tx.Create(&equipSlots).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("1 = 1").Delete(&schema.CfgEquipAttr{}).Error; err != nil {
+			return err
+		}
+		if len(equipAttrs) > 0 {
+			if err := tx.Create(&equipAttrs).Error; err != nil {
 				return err
 			}
 		}

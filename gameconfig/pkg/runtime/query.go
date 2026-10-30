@@ -15,6 +15,7 @@ type ItemDef struct {
 	BindType    string
 	BagType     int32
 	UseBuffID   int32
+	EquipSlot   int32
 }
 
 func toItemDef(item *cfg.ItemItem) ItemDef {
@@ -54,7 +55,11 @@ func Get(itemID int32) (ItemDef, bool) {
 	if !ok {
 		return ItemDef{}, false
 	}
-	return toItemDef(item), true
+	def := toItemDef(item)
+	if s.tables.itemGroup != nil {
+		def.EquipSlot = s.tables.itemGroup[itemID]
+	}
+	return def, true
 }
 
 // MaxStack 返回道具单槽堆叠上限；不存在返回 0。

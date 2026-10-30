@@ -93,7 +93,7 @@ func seedBagTypesTx(tx *gorm.DB) error {
 		{ID: 1, Name: "通用背包", SlotCount: 32},
 		{ID: 2, Name: "消耗品", SlotCount: 32},
 		{ID: 3, Name: "材料", SlotCount: 32},
-		{ID: 4, Name: "装备", SlotCount: 8},
+		{ID: 4, Name: "装备", SlotCount: 32},
 		{ID: 5, Name: "任务", SlotCount: 32},
 	}
 	if err := tx.Where("1 = 1").Delete(&schema.CfgBagType{}).Error; err != nil {

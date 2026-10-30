@@ -18,6 +18,7 @@ func autoMigrateModels(db *gorm.DB) error {
 		&model.GMOpLog{},
 		&model.GMUser{},
 		&model.RewardClaim{},
+		&model.PlayerEquipment{},
 	); err != nil {
 		return err
 	}

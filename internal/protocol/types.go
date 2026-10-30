@@ -98,6 +98,12 @@ type (
 	RewardDeliverResponse = pb.RewardDeliverResponse
 	RewardClaimRequest    = pb.RewardClaimRequest
 	RewardClaimResponse   = pb.RewardClaimResponse
+	EquipAttr             = pb.EquipAttr
+	EquipSlotState        = pb.EquipSlotState
+	EquipState            = pb.EquipState
+	EquipWearRequest      = pb.EquipWearRequest
+	EquipUnwearRequest    = pb.EquipUnwearRequest
+	EquipApply            = pb.EquipApply
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

@@ -23,7 +23,30 @@ type CfgItem struct {
 	BindType    string `gorm:"size:16;not null;default:none"`
 	BagType     int32  `gorm:"not null;default:1"`
 	UseBuffID   int32  `gorm:"column:use_buff_id;not null;default:0"`
+	EquipSlot   int32  `gorm:"column:equip_slot;not null;default:0"`
 }
+
+// CfgEquipSlot 装备部位。group_id 相同的部位可以穿同一组装备。
+type CfgEquipSlot struct {
+	ID      int32  `gorm:"primaryKey"`
+	Name    string `gorm:"size:32;not null"`
+	GroupID int32  `gorm:"column:group_id;not null"`
+}
+
+// TableName 表名 cfg_equip_slot。
+func (CfgEquipSlot) TableName() string { return "cfg_equip_slot" }
+
+// CfgEquipAttr 一件装备提供的一条属性。
+type CfgEquipAttr struct {
+	ID     int32  `gorm:"primaryKey"`
+	ItemID int32  `gorm:"column:item_id;not null;index"`
+	Stat   string `gorm:"size:32;not null"`
+	Mode   string `gorm:"size:16;not null"`
+	Value  int32  `gorm:"not null"`
+}
+
+// TableName 表名 cfg_equip_attr。
+func (CfgEquipAttr) TableName() string { return "cfg_equip_attr" }
 
 // TableName 表名 cfg_item。
 func (CfgItem) TableName() string { return "cfg_item" }
@@ -163,5 +186,5 @@ func (CfgStat) TableName() string { return "cfg_stat" }
 
 // Models 参与 AutoMigrate 的配置表模型列表。
 func Models() []any {
-	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}, &CfgKillReward{}, &CfgStat{}}
+	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}, &CfgKillReward{}, &CfgStat{}, &CfgEquipSlot{}, &CfgEquipAttr{}}
 }

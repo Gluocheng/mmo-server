@@ -1,0 +1,5 @@
+##,id,item_id,stat,mode,value
+,1,2001,attack,flat,5
+,2,2002,hp,flat,20
+,3,2002,defense,flat,3
+,4,2003,attack,flat,1

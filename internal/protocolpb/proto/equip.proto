@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package mmo.protocol.v1;
+
+option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
+
+// EquipAttr 一件装备上的一条属性加成。
+message EquipAttr {
+  string stat = 1 [json_name = "stat"];
+  string mode = 2 [json_name = "mode"];
+  int32 value = 3 [json_name = "value"];
+}
+
+// EquipSlotState 一个部位的穿着。item_id 为 0 表示空。
+message EquipSlotState {
+  int32 slot_id = 1 [json_name = "slotId"];
+  int32 item_id = 2 [json_name = "itemId"];
+  repeated EquipAttr attrs = 3 [json_name = "attrs"];
+}
+
+// EquipState 十二个部位的当前穿着。
+message EquipState {
+  repeated EquipSlotState slots = 1 [json_name = "slots"];
+}
+
+// EquipWearRequest 从装备背包的一格穿到部位。target_slot 为 0 时按部位组决定。
+message EquipWearRequest {
+  int32 bag_type = 1 [json_name = "bagType"];
+  int32 slot = 2 [json_name = "slot"];
+  int32 target_slot = 3 [json_name = "targetSlot"];
+}
+
+// EquipUnwearRequest 按部位脱下。
+message EquipUnwearRequest {
+  int32 slot_id = 1 [json_name = "slotId"];
+}
+
+// EquipApply 是 equip Actor 交给背包 Actor 的一次穿脱。在背包 Actor 内一次做完格子变更。
+message EquipApply {
+  int64 player_id = 1 [json_name = "playerId"];
+  int64 uid = 2 [json_name = "uid"];
+  int32 op = 3 [json_name = "op"];
+  int32 bag_type = 4 [json_name = "bagType"];
+  int32 bag_slot = 5 [json_name = "bagSlot"];
+  int32 target_slot = 6 [json_name = "targetSlot"];
+}

@@ -107,6 +107,12 @@ type unit struct {
 	maxHP       int32       // 最终生命上限，含属性 Buff
 	attack      int32       // 最终攻击
 	defense     int32       // 最终防御
+	eqHPFlat    int32       // 穿着提供的生命固定值
+	eqAtkFlat   int32       // 穿着提供的攻击固定值
+	eqDefFlat   int32       // 穿着提供的防御固定值
+	eqHPPct     int32       // 穿着提供的生命百分比
+	eqAtkPct    int32       // 穿着提供的攻击百分比
+	eqDefPct    int32       // 穿着提供的防御百分比
 	baseMaxHP   int32       // 进场或刷出时拷下的生命上限
 	baseAttack  int32       // 进场或刷出时拷下的攻击
 	baseDefense int32       // 进场或刷出时拷下的防御
@@ -680,6 +686,7 @@ func tickRespawn(now int64) []Hit {
 		u.dead = false
 		u.buffs = nil
 		resetBaseStats(u)
+		refreshAttrs(u, now)
 		u.hp = u.maxHP
 		hits = append(hits, Hit{SourceUID: uid, TargetUID: uid, Amount: u.maxHP, Heal: true, TargetHP: u.hp})
 	}

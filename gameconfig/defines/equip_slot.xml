@@ -1,0 +1,8 @@
+<module name="equip_slot">
+	<bean name="EquipSlot" comment="装备部位">
+		<var name="id" type="int" comment="部位id"/>
+		<var name="name" type="string" comment="名称"/>
+		<var name="group_id" type="int" comment="部位组"/>
+	</bean>
+	<table name="TbEquipSlot" value="EquipSlot" input="equip_slot.csv" comment="装备部位表"/>
+</module>

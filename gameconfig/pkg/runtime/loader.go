@@ -85,6 +85,14 @@ func Load(ctx context.Context, db *gorm.DB) error {
 	if err := db.WithContext(ctx).Order("id asc").Find(&statRows).Error; err != nil {
 		return fmt.Errorf("load cfg_stat: %w", err)
 	}
+	var equipSlotRows []schema.CfgEquipSlot
+	if err := db.WithContext(ctx).Order("id asc").Find(&equipSlotRows).Error; err != nil {
+		return fmt.Errorf("load cfg_equip_slot: %w", err)
+	}
+	var equipAttrRows []schema.CfgEquipAttr
+	if err := db.WithContext(ctx).Order("id asc").Find(&equipAttrRows).Error; err != nil {
+		return fmt.Errorf("load cfg_equip_attr: %w", err)
+	}
 
 	swapSnapshot(&snapshot{
 		version:    versionRow.Version,
@@ -101,6 +109,9 @@ func Load(ctx context.Context, db *gorm.DB) error {
 			spawns:      spawnsFromSchema(spawnRows),
 			killRewards: killRewardsFromSchema(rewardRows),
 			stats:       statsFromSchema(statRows),
+			equipSlots:  equipSlotsFromSchema(equipSlotRows),
+			equipAttrs:  equipAttrsFromSchema(equipAttrRows),
+			itemGroup:   itemGroupsFromSchema(itemRows),
 		},
 	})
 	return nil

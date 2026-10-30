@@ -1,0 +1,6 @@
+[
+  {"id": 1, "item_id": 2001, "stat": "attack", "mode": "flat", "value": 5},
+  {"id": 2, "item_id": 2002, "stat": "hp", "mode": "flat", "value": 20},
+  {"id": 3, "item_id": 2002, "stat": "defense", "mode": "flat", "value": 3},
+  {"id": 4, "item_id": 2003, "stat": "attack", "mode": "flat", "value": 1}
+]

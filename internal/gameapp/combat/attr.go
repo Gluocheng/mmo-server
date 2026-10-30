@@ -30,14 +30,52 @@ const (
 	modePercent attrMode = "percent"
 )
 
-// refreshAttrs 用还没到期的属性 Buff 重算生命上限、攻击和防御。
+// EquipBonus 是当前穿着折成的三项属性加成。
+type EquipBonus struct {
+	HPFlat  int32
+	AtkFlat int32
+	DefFlat int32
+	HPPct   int32
+	AtkPct  int32
+	DefPct  int32
+}
+
+// SetEquipBonus 记下穿着加成并立刻重算。commit 为真时把这次结果记成下一拍的比较基准。
+// 换装传 false，让下一拍把变化推出去。进场叠穿着传 true，避免进场后再多发一拍。
+func SetEquipBonus(uid int64, b EquipBonus, commit bool) {
+	mu.Lock()
+	defer mu.Unlock()
+	u := units[uid]
+	if u == nil || u.monster {
+		return
+	}
+	u.eqHPFlat, u.eqAtkFlat, u.eqDefFlat = b.HPFlat, b.AtkFlat, b.DefFlat
+	u.eqHPPct, u.eqAtkPct, u.eqDefPct = b.HPPct, b.AtkPct, b.DefPct
+	refreshAttrs(u, nowFn())
+	if commit {
+		commitAppearance(uid)
+	}
+}
+
+// Stats 返回当前生命、生命上限、攻击和防御。
+func Stats(uid int64) (hp, maxHP, attack, defense int32, ok bool) {
+	mu.Lock()
+	defer mu.Unlock()
+	u := units[uid]
+	if u == nil {
+		return 0, 0, 0, 0, false
+	}
+	return u.hp, u.maxHP, u.attack, u.defense, true
+}
+
+// refreshAttrs 用还没到期的属性 Buff 和穿着重算生命上限、攻击和防御。
 // 生命上限升高时当前生命加上差额；降低时把当前生命压到新上限。死亡单位不在这里改。
 func refreshAttrs(u *unit, now int64) {
 	if u == nil || u.dead {
 		return
 	}
-	var hpFlat, atkFlat, defFlat int32
-	var hpPct, atkPct, defPct int32
+	hpFlat, atkFlat, defFlat := u.eqHPFlat, u.eqAtkFlat, u.eqDefFlat
+	hpPct, atkPct, defPct := u.eqHPPct, u.eqAtkPct, u.eqDefPct
 	for _, b := range u.buffs {
 		if b == nil || b.effect != effectAttr || now >= b.expireAt {
 			continue

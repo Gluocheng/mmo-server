@@ -1,0 +1,14 @@
+[
+  {"id": 1, "name": "武器", "group_id": 1},
+  {"id": 2, "name": "副手", "group_id": 2},
+  {"id": 3, "name": "头盔", "group_id": 3},
+  {"id": 4, "name": "衣服", "group_id": 4},
+  {"id": 5, "name": "护腕", "group_id": 5},
+  {"id": 6, "name": "腰带", "group_id": 6},
+  {"id": 7, "name": "裤子", "group_id": 7},
+  {"id": 8, "name": "鞋子", "group_id": 8},
+  {"id": 9, "name": "项链", "group_id": 9},
+  {"id": 10, "name": "左戒指", "group_id": 10},
+  {"id": 11, "name": "右戒指", "group_id": 10},
+  {"id": 12, "name": "饰品", "group_id": 12}
+]

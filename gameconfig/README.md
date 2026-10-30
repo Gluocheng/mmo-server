@@ -57,7 +57,7 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 | 1 | 通用背包 | 32 |
 | 2 | 消耗品 | 32 |
 | 3 | 材料 | 32 |
-| 4 | 装备 | 8 |
+| 4 | 装备 | 32 |
 | 5 | 任务 | 32 |
 
 ## 演示道具

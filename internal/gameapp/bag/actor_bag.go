@@ -12,6 +12,7 @@ import (
 	cprofile "github.com/cherry-game/cherry/profile"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gameapp/equip"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
@@ -56,6 +57,7 @@ func (p *actorBag) OnInit() {
 	p.Remote().Register("deduct", p.deduct)
 	p.Remote().Register("rewardDeliver", p.rewardDeliver)
 	p.Remote().Register("rewardClaim", p.rewardClaim)
+	p.Remote().Register("equipApply", p.equipApply)
 }
 
 // playerIDFromSession 从已进场的 session 取出角色 id。
@@ -113,6 +115,7 @@ func (p *actorBag) offline() {
 	p.offlineTimer = p.Timer().AddOnce(offlineUnloadAfter(), func() {
 		p.offlineTimer = 0
 		p.flushDirty()
+		equip.Unload(p.playerID)
 		p.bags = make(map[int32]*memBag)
 		p.playerID = 0
 	})
@@ -352,31 +355,45 @@ func bagErrorCode(err error) int32 {
 	}
 }
 
-// flushDirty 把当前角色所有带脏标记的包落库。
+// flushDirty 把当前角色的脏背包和脏穿着放进同一次事务。
 func (p *actorBag) flushDirty() {
-	if p.playerID < 1 || p.bags == nil {
+	if p.playerID < 1 {
 		return
 	}
-	for bagType, mb := range p.bags {
-		if !mb.dirty() {
-			continue
+	var diffs []persistence.BagDiff
+	var dirtyBags []*memBag
+	if p.bags != nil {
+		for bagType, mb := range p.bags {
+			if !mb.dirty() {
+				continue
+			}
+			upserts, removes := mb.diff()
+			up := make([]persistence.BagSlotChange, 0, len(upserts))
+			for slot, s := range upserts {
+				up = append(up, persistence.BagSlotChange{Slot: slot, ItemID: s.itemID, Count: s.count})
+			}
+			diffs = append(diffs, persistence.BagDiff{BagType: bagType, Upserts: up, Removes: removes})
+			dirtyBags = append(dirtyBags, mb)
 		}
-		p.flushBag(bagType, mb)
 	}
-}
-
-// flushBag 落一个包：diff 出变更集后单事务写库，成功清变更集。
-func (p *actorBag) flushBag(bagType int32, mb *memBag) {
-	upserts, removes := mb.diff()
-	var up []persistence.BagSlotChange
-	for slot, s := range upserts {
-		up = append(up, persistence.BagSlotChange{Slot: slot, ItemID: s.itemID, Count: s.count})
-	}
-	if err := persistence.FlushBagDiff(context.Background(), p.playerID, bagType, up, removes); err != nil {
-		clog.Warnf("bag flush fail player_id=%d bag_type=%d err=%v", p.playerID, bagType, err)
+	worn, equipDirty := equip.PeekDirty(p.playerID)
+	if len(diffs) == 0 && !equipDirty {
 		return
 	}
-	mb.clearTouched()
+	rows := make([]persistence.EquipRow, 0, len(worn))
+	for _, row := range worn {
+		rows = append(rows, persistence.EquipRow{SlotID: row.SlotID, ItemID: row.ItemID})
+	}
+	if err := persistence.FlushPlayer(context.Background(), p.playerID, diffs, rows, equipDirty); err != nil {
+		clog.Warnf("bag flush fail player_id=%d err=%v", p.playerID, err)
+		return
+	}
+	for _, mb := range dirtyBags {
+		mb.clearTouched()
+	}
+	if equipDirty {
+		equip.AckDirty(p.playerID)
+	}
 }
 
 // list 返回指定背包内容；bag_type 必填。

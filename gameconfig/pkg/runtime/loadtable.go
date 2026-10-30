@@ -35,6 +35,7 @@ func ReloadTable(ctx context.Context, db *gorm.DB, tableName string) error {
 		// 只替换 item 表，其他表保持不变
 		next := s.tables.clone()
 		next.items = items
+		next.itemGroup = itemGroupsFromSchema(itemRows)
 		swapSnapshot(&snapshot{
 			version:    s.version,
 			tableCount: int32(len(itemRows)),
@@ -60,7 +61,7 @@ func ReloadTable(ctx context.Context, db *gorm.DB, tableName string) error {
 			tables:     next,
 		})
 		return nil
-	case "skill", "buff", "combat_const", "scene", "monster", "spawn":
+	case "skill", "buff", "combat_const", "scene", "monster", "spawn", "equip_slot", "equip_attr":
 		return Reload(ctx, db)
 	default:
 		return fmt.Errorf("unknown config table: %s", tableName)

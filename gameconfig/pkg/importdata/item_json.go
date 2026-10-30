@@ -73,6 +73,22 @@ func SchemaToItems(rows []schema.CfgItem) []*cfg.ItemItem {
 	return out
 }
 
+// ApplyItemEquipSlot 把原始 JSON 里的 equip_slot 写进配置行。没有该字段时保持 0。
+func ApplyItemEquipSlot(rows []schema.CfgItem, raw []map[string]interface{}) {
+	groups := map[int32]int32{}
+	for _, row := range raw {
+		id, _ := row["id"].(float64)
+		group, ok := row["equip_slot"].(float64)
+		if !ok || id < 1 {
+			continue
+		}
+		groups[int32(id)] = int32(group)
+	}
+	for i := range rows {
+		rows[i].EquipSlot = groups[rows[i].ID]
+	}
+}
+
 // loadJSONRows 读取 Luban 导出的 JSON 数组为 []map[string]interface{}。
 func loadJSONRows(path string) ([]map[string]interface{}, error) {
 	b, err := os.ReadFile(path)

@@ -1,0 +1,10 @@
+<module name="equip_attr">
+	<bean name="EquipAttr" comment="装备属性">
+		<var name="id" type="int" comment="行id"/>
+		<var name="item_id" type="int" comment="道具id"/>
+		<var name="stat" type="string" comment="属性名"/>
+		<var name="mode" type="string" comment="flat 或 percent"/>
+		<var name="value" type="int" comment="数值"/>
+	</bean>
+	<table name="TbEquipAttr" value="EquipAttr" input="equip_attr.csv" comment="装备属性表"/>
+</module>

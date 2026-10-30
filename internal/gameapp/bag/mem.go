@@ -169,6 +169,18 @@ func (mb *memBag) itemRoom(bagType, itemID int32) int32 {
 	return room
 }
 
+// putOne 把一件不可堆叠道具放进指定空格。格子已有东西时返回满。
+func (mb *memBag) putOne(bagType, slot, itemID int32) error {
+	if err := mb.validateSlot(bagType, slot); err != nil {
+		return err
+	}
+	if _, ok := mb.slots[slot]; ok {
+		return persistence.ErrBagFull
+	}
+	mb.set(slot, memSlot{itemID: itemID, count: 1})
+	return nil
+}
+
 // removeBySlot 从指定槽位扣除 count；扣完则删，否则减数量。
 func (mb *memBag) removeBySlot(bagType, slot, count int32) error {
 	if err := mb.validateSlot(bagType, slot); err != nil {
