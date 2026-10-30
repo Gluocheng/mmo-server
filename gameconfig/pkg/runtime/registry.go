@@ -21,6 +21,7 @@ type tables struct {
 	stats       map[string]StatDef
 	equipSlots  map[int32]EquipSlotDef
 	equipAttrs  map[int32][]EquipAttrDef
+	enhances    map[int32]EnhanceRule
 	itemGroup   map[int32]int32
 }
 
@@ -42,6 +43,7 @@ func (t *tables) clone() *tables {
 		stats:       t.stats,
 		equipSlots:  t.equipSlots,
 		equipAttrs:  t.equipAttrs,
+		enhances:    t.enhances,
 		itemGroup:   t.itemGroup,
 	}
 }

@@ -9,6 +9,7 @@ message BagItem {
   int32 item_id = 2 [json_name = "itemId"];
   int32 count = 3 [json_name = "count"];
   int32 bag_type = 4 [json_name = "bagType"];
+  int32 enhance_level = 5 [json_name = "enhanceLevel"];
 }
 
 message BagListResponse {

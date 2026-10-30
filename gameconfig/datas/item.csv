@@ -1,6 +1,8 @@
 ##,id,name,type,max_stack,stackable,discardable,bind_type,bag_type,use_buff_id,equip_slot
 ,1001,小型生命药水,consumable,99,true,true,none,2,2,0
 ,1002,铜币袋,material,9999,true,true,none,3,0,0
+,1003,强化石,material,9999,true,true,none,3,0,0
+,1004,保护符,material,9999,true,true,none,3,0,0
 ,2001,新手木剑,equipment,1,false,true,none,4,0,1
 ,2002,布衣,equipment,1,false,true,none,4,0,4
 ,2003,铜戒,equipment,1,false,true,none,4,0,10

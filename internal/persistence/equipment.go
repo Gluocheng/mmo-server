@@ -11,6 +11,7 @@ import (
 type EquipRow struct {
 	SlotID int32
 	ItemID int32
+	Level  int32
 }
 
 // LoadEquipment 读取角色当前穿着。没有行表示身上是空的。
@@ -34,7 +35,7 @@ func LoadEquipment(ctx context.Context, playerID int64) ([]EquipRow, error) {
 		if row.ItemID < 1 {
 			continue
 		}
-		out = append(out, EquipRow{SlotID: row.SlotID, ItemID: row.ItemID})
+		out = append(out, EquipRow{SlotID: row.SlotID, ItemID: row.ItemID, Level: row.EnhanceLevel})
 	}
 	return out, nil
 }
@@ -53,13 +54,14 @@ func FlushPlayer(ctx context.Context, playerID int64, diffs []BagDiff, worn []Eq
 			for _, c := range diff.Upserts {
 				if err := txDB.Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "player_id"}, {Name: "bag_type"}, {Name: "slot"}},
-					DoUpdates: clause.AssignmentColumns([]string{"item_id", "count"}),
+					DoUpdates: clause.AssignmentColumns([]string{"item_id", "count", "enhance_level"}),
 				}).Create(&model.InventoryItem{
-					PlayerID: playerID,
-					BagType:  diff.BagType,
-					Slot:     c.Slot,
-					ItemID:   c.ItemID,
-					Count:    c.Count,
+					PlayerID:     playerID,
+					BagType:      diff.BagType,
+					Slot:         c.Slot,
+					ItemID:       c.ItemID,
+					Count:        c.Count,
+					EnhanceLevel: c.Level,
 				}).Error; err != nil {
 					return err
 				}
@@ -82,7 +84,7 @@ func FlushPlayer(ctx context.Context, playerID int64, diffs []BagDiff, worn []Eq
 				continue
 			}
 			if err := txDB.Create(&model.PlayerEquipment{
-				PlayerID: playerID, SlotID: row.SlotID, ItemID: row.ItemID,
+				PlayerID: playerID, SlotID: row.SlotID, ItemID: row.ItemID, EnhanceLevel: row.Level,
 			}).Error; err != nil {
 				return err
 			}

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package mmo.protocol.v1;
 
+import "bag.proto";
+
 option go_package = "github.com/example/mmo-server/internal/protocolpb/gen;protocolpb";
 
 // EquipAttr 一件装备上的一条属性加成。
@@ -16,6 +18,7 @@ message EquipSlotState {
   int32 slot_id = 1 [json_name = "slotId"];
   int32 item_id = 2 [json_name = "itemId"];
   repeated EquipAttr attrs = 3 [json_name = "attrs"];
+  int32 enhance_level = 4 [json_name = "enhanceLevel"];
 }
 
 // EquipState 十二个部位的当前穿着。
@@ -33,6 +36,39 @@ message EquipWearRequest {
 // EquipUnwearRequest 按部位脱下。
 message EquipUnwearRequest {
   int32 slot_id = 1 [json_name = "slotId"];
+}
+
+// EquipEnhanceRequest 强化指定穿着部位。use_protect 为真时，这次失败不掉级。
+message EquipEnhanceRequest {
+  int32 slot_id = 1 [json_name = "slotId"];
+  bool use_protect = 2 [json_name = "useProtect"];
+}
+
+// EquipEnhanceResponse 是这次强化的结果。attrs 是追加等级之后的属性。
+message EquipEnhanceResponse {
+  bool success = 1 [json_name = "success"];
+  bool dropped = 2 [json_name = "dropped"];
+  bool protect_used = 3 [json_name = "protectUsed"];
+  int32 level = 4 [json_name = "level"];
+  repeated EquipAttr attrs = 5 [json_name = "attrs"];
+}
+
+// EquipEnhanceApply 是 equip Actor 交给背包 Actor 的一次强化。材料和等级在背包 Actor 内一次做完。
+message EquipEnhanceApply {
+  int64 player_id = 1 [json_name = "playerId"];
+  int64 uid = 2 [json_name = "uid"];
+  int32 slot_id = 3 [json_name = "slotId"];
+  bool use_protect = 4 [json_name = "useProtect"];
+}
+
+// EquipEnhanceResult 把强化结果和材料背包一起带回 equip Actor，由它再拆成客户端响应和推送。
+message EquipEnhanceResult {
+  bool success = 1 [json_name = "success"];
+  bool dropped = 2 [json_name = "dropped"];
+  bool protect_used = 3 [json_name = "protectUsed"];
+  int32 level = 4 [json_name = "level"];
+  repeated EquipAttr attrs = 5 [json_name = "attrs"];
+  BagListResponse bag = 6 [json_name = "bag"];
 }
 
 // EquipApply 是 equip Actor 交给背包 Actor 的一次穿脱。在背包 Actor 内一次做完格子变更。

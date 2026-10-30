@@ -92,7 +92,7 @@ func TestSwapReturnsOldToFreedSlot(t *testing.T) {
 	if c := Mutate(wearReq(1, 9, 4, 1), bag); c != code.OK {
 		t.Fatal(c)
 	}
-	if bag.slots[4] != 2001 {
+	if bag.slots[4].item != 2001 {
 		t.Fatalf("old sword slot=%v", bag.slots)
 	}
 	_, _, atk, _, _ := combat.Stats(9)
@@ -222,6 +222,16 @@ func seedEquip(t *testing.T) {
 		{ID: 2002, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 4},
 		{ID: 2003, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 10},
 	})
+	rules := make([]gcruntime.EnhanceRule, 0, 10)
+	for lv := int32(1); lv <= 7; lv++ {
+		rules = append(rules, gcruntime.EnhanceRule{Level: lv, StoneCount: lv, SuccessPercent: 100})
+	}
+	rules = append(rules,
+		gcruntime.EnhanceRule{Level: 8, StoneCount: 8, SuccessPercent: 70, DropPercent: 50},
+		gcruntime.EnhanceRule{Level: 9, StoneCount: 9, SuccessPercent: 50, DropPercent: 70},
+		gcruntime.EnhanceRule{Level: 10, StoneCount: 10, SuccessPercent: 30, DropPercent: 100},
+	)
+	gcruntime.BuildEnhance(rules)
 	gcruntime.BuildScenes([]gcruntime.SceneDef{{
 		ID: world.DefaultSceneID, Name: "测试", AllowCombat: true, MaxOnline: 10, MaxLines: 1,
 	}})
@@ -236,49 +246,54 @@ func seedEquip(t *testing.T) {
 	})
 }
 
+type fakeSlot struct {
+	item  int32
+	level int32
+}
+
 type fakeStock struct {
-	slots map[int32]int32
+	slots map[int32]fakeSlot
 	limit int32
 }
 
 func newFake(limit int32) *fakeStock {
-	return &fakeStock{slots: map[int32]int32{}, limit: limit}
+	return &fakeStock{slots: map[int32]fakeSlot{}, limit: limit}
 }
 
-func (f *fakeStock) set(slot, item int32) { f.slots[slot] = item }
+func (f *fakeStock) set(slot, item int32) { f.slots[slot] = fakeSlot{item: item} }
 
-func (f *fakeStock) Peek(slot int32) (int32, int32, bool) {
-	item, ok := f.slots[slot]
+func (f *fakeStock) Peek(slot int32) (int32, int32, int32, bool) {
+	it, ok := f.slots[slot]
 	if !ok {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
-	return item, 1, true
+	return it.item, 1, it.level, true
 }
 
-func (f *fakeStock) Take(slot int32) (int32, error) {
-	item, ok := f.slots[slot]
+func (f *fakeStock) Take(slot int32) (int32, int32, error) {
+	it, ok := f.slots[slot]
 	if !ok {
-		return 0, persistence.ErrBagSlotInvalid
+		return 0, 0, persistence.ErrBagSlotInvalid
 	}
 	delete(f.slots, slot)
-	return item, nil
+	return it.item, it.level, nil
 }
 
-func (f *fakeStock) PutAt(slot, item int32) error {
+func (f *fakeStock) PutAt(slot, item, level int32) error {
 	if slot < 0 || slot >= f.limit {
 		return persistence.ErrBagSlotInvalid
 	}
 	if _, ok := f.slots[slot]; ok {
 		return persistence.ErrBagFull
 	}
-	f.slots[slot] = item
+	f.slots[slot] = fakeSlot{item: item, level: level}
 	return nil
 }
 
-func (f *fakeStock) PutFirst(item int32) (int32, error) {
+func (f *fakeStock) PutFirst(item, level int32) (int32, error) {
 	for slot := int32(0); slot < f.limit; slot++ {
 		if _, ok := f.slots[slot]; !ok {
-			f.slots[slot] = item
+			f.slots[slot] = fakeSlot{item: item, level: level}
 			return slot, nil
 		}
 	}

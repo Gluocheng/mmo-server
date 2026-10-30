@@ -60,6 +60,8 @@ const (
 	PartyTargetOffline  int32 = 40065 // 邀请目标未进场（无 party:online）
 	EquipInvalid        int32 = 40066 // 该格不是装备，或道具没有合法部位
 	EquipSlotInvalid    int32 = 40067 // 部位不存在，或不属于这件道具的部位组
+	EquipLevelMax       int32 = 40068 // 装备已经是 10 级
+	EquipNotWorn        int32 = 40069 // 没有穿在身上，不能强化
 )
 
 func IsFail(c int32) bool {

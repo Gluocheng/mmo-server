@@ -1,0 +1,9 @@
+<module name="enhance">
+	<bean name="Enhance" comment="强化到某一级">
+		<var name="level" type="int" comment="目标等级"/>
+		<var name="stone_count" type="int" comment="强化石数量"/>
+		<var name="success_percent" type="int" comment="成功率"/>
+		<var name="drop_percent" type="int" comment="失败后的掉级率"/>
+	</bean>
+	<table name="TbEnhance" value="Enhance" input="enhance.csv" comment="强化表"/>
+</module>

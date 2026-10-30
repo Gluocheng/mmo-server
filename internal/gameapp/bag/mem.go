@@ -8,10 +8,11 @@ import (
 	"github.com/example/mmo-server/internal/protocol"
 )
 
-// memSlot 是内存背包里的一个槽位堆叠。
+// memSlot 是内存背包里的一个槽位堆叠。level 跟着这件装备走，非装备为 0。
 type memSlot struct {
 	itemID int32
 	count  int32
+	level  int32
 }
 
 // memBag 是一个背包类型的内存态：slots 是权威最终态，touched 是本次未落库的变更集。
@@ -50,10 +51,11 @@ func (mb *memBag) toProto(bagType int32) *protocol.BagListResponse {
 	for _, s := range slots {
 		it := mb.slots[s]
 		rsp.Items = append(rsp.Items, &protocol.BagItem{
-			Slot:    s,
-			ItemId:  it.itemID,
-			Count:   it.count,
-			BagType: bagType,
+			Slot:         s,
+			ItemId:       it.itemID,
+			Count:        it.count,
+			BagType:      bagType,
+			EnhanceLevel: it.level,
 		})
 	}
 	return rsp
@@ -170,14 +172,14 @@ func (mb *memBag) itemRoom(bagType, itemID int32) int32 {
 }
 
 // putOne 把一件不可堆叠道具放进指定空格。格子已有东西时返回满。
-func (mb *memBag) putOne(bagType, slot, itemID int32) error {
+func (mb *memBag) putOne(bagType, slot, itemID, level int32) error {
 	if err := mb.validateSlot(bagType, slot); err != nil {
 		return err
 	}
 	if _, ok := mb.slots[slot]; ok {
 		return persistence.ErrBagFull
 	}
-	mb.set(slot, memSlot{itemID: itemID, count: 1})
+	mb.set(slot, memSlot{itemID: itemID, count: 1, level: level})
 	return nil
 }
 
@@ -293,7 +295,7 @@ func (mb *memBag) split(bagType, fromSlot, count int32) error {
 	if err != nil {
 		return err
 	}
-	mb.set(emptySlot, memSlot{itemID: from.itemID, count: count})
+	mb.set(emptySlot, memSlot{itemID: from.itemID, count: count, level: from.level})
 	from.count -= count
 	mb.set(fromSlot, from)
 	return nil

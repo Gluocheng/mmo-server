@@ -13,6 +13,7 @@ type BagSlotChange struct {
 	Slot   int32
 	ItemID int32
 	Count  int32
+	Level  int32
 }
 
 // LoadBagFromDB 直接从 MySQL 读指定背包，不走 Redis 缓存（内存化加载用）。
@@ -57,13 +58,14 @@ func FlushBagDiff(ctx context.Context, playerID int64, bagType int32, upserts []
 		for _, c := range upserts {
 			if err := txDB.Clauses(clause.OnConflict{
 				Columns:   []clause.Column{{Name: "player_id"}, {Name: "bag_type"}, {Name: "slot"}},
-				DoUpdates: clause.AssignmentColumns([]string{"item_id", "count"}),
+				DoUpdates: clause.AssignmentColumns([]string{"item_id", "count", "enhance_level"}),
 			}).Create(&model.InventoryItem{
-				PlayerID: playerID,
-				BagType:  bagType,
-				Slot:     c.Slot,
-				ItemID:   c.ItemID,
-				Count:    c.Count,
+				PlayerID:     playerID,
+				BagType:      bagType,
+				Slot:         c.Slot,
+				ItemID:       c.ItemID,
+				Count:        c.Count,
+				EnhanceLevel: c.Level,
 			}).Error; err != nil {
 				return err
 			}

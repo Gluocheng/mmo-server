@@ -48,6 +48,17 @@ type CfgEquipAttr struct {
 // TableName 表名 cfg_equip_attr。
 func (CfgEquipAttr) TableName() string { return "cfg_equip_attr" }
 
+// CfgEnhance 强化到某一级的消耗和概率。level 是要升到的等级。
+type CfgEnhance struct {
+	Level          int32 `gorm:"primaryKey"`
+	StoneCount     int32 `gorm:"column:stone_count;not null"`
+	SuccessPercent int32 `gorm:"column:success_percent;not null"`
+	DropPercent    int32 `gorm:"column:drop_percent;not null"`
+}
+
+// TableName 表名 cfg_enhance。
+func (CfgEnhance) TableName() string { return "cfg_enhance" }
+
 // TableName 表名 cfg_item。
 func (CfgItem) TableName() string { return "cfg_item" }
 
@@ -186,5 +197,5 @@ func (CfgStat) TableName() string { return "cfg_stat" }
 
 // Models 参与 AutoMigrate 的配置表模型列表。
 func Models() []any {
-	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}, &CfgKillReward{}, &CfgStat{}, &CfgEquipSlot{}, &CfgEquipAttr{}}
+	return []any{&CfgVersion{}, &CfgItem{}, &CfgBagType{}, &CfgSkill{}, &CfgBuff{}, &CfgCombatConst{}, &CfgScene{}, &CfgMonster{}, &CfgSpawn{}, &CfgKillReward{}, &CfgStat{}, &CfgEquipSlot{}, &CfgEquipAttr{}, &CfgEnhance{}}
 }

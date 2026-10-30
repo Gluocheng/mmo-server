@@ -353,6 +353,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 穿装备 | `game.equip.wear` | `EquipWearRequest`（`bagType`/`slot`/`targetSlot`） | `EquipState`；Push `onEquip` 和 `onBagChange`。属性变化在下一拍 `onCombatFrame` |
 | 脱装备 | `game.equip.unwear` | `EquipUnwearRequest`（`slotId`） | `EquipState`；背包满返回 `40022` |
 | 查看穿着 | `game.equip.equips` | `google.protobuf.Empty` | `EquipState`。十二个部位，空部位道具 id 为 0 |
+| 强化装备 | `game.equip.enhance` | `EquipEnhanceRequest`（`slotId`/`useProtect`） | `EquipEnhanceResponse`。只强化身上的装备。Push `onEquip`、`onBagChange`，属性变化在下一拍 |
 | 创建队伍 | `game.party.create` | `google.protobuf.Empty` | `PartyState`；本队 Push `onParty` |
 | 邀请入队 | `game.party.invite` | `PartyInviteRequest`（`targetUid`） | `Empty`；目标 Push `onPartyInvite`。覆盖旧邀请时先推 `inviteId=0` |
 | 应答邀请 | `game.party.answer` | `PartyAnswerRequest`（`inviteId`、`accept`） | `PartyState`。拒绝或邀请作废时给应答者 Push `onPartyInvite`（`inviteId=0`） |
@@ -372,7 +373,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 聊天为同场景全员广播（无 AOI 裁剪）
 - 战斗须已 `enter`。玩家基础生命、攻击、防御读 `cfg_combat_const`，怪物读模板。最终属性是 `(基础 + 固定加成) × (100 + 百分比) / 100`。技能出手值是附加伤害加攻击乘 `factor`，再减对方最终防御，至少为 1；出手值为 0 时不掉血。`effect=attr` 的 Buff 只允许名单里 `settle=true` 的生命、攻击、防御，其它属性名返回 `40041`。`cast` 只入队，下一心跳结算；范围技能打自身圆心内除自己外的存活单位。进场或走进 15 格时推 `onCombatSnapshot`（当前生命、上限、攻击、防御、Buff），走出视野推 `onCombatGone`。同一拍先 `onMove`，再快照，再 `onCombatFrame`。帧里带拍序号、命中、Buff 变化和三项属性变化；没有变化不发，序号仍递增。合包超限时 `truncated`，自己的生命、属性和 Buff 放在 `self`
 - `game.bag.use` 按道具 `use_buff_id` 调用 `ApplyBuff`，成功才扣 1 个。`0` 返回 `40054`。死亡不扣。禁战地图仍可使用。治疗在下一心跳，不是当场加血
-- 装备在 `game.equip`。十二个部位各穿一件，左戒指和右戒指共用戒指组。穿上后固定值和百分比进入现有属性公式。新手木剑攻击 +5，基础攻击 10 时变成 15。脱掉或换下后加成消失。装备背包满了脱不下，返回 `40022`
+- 装备在 `game.equip`。十二个部位各穿一件，左戒指和右戒指共用戒指组。穿上后固定值和百分比进入现有属性公式。新手木剑攻击 +5，基础攻击 10 时变成 15。脱掉或换下后加成消失。装备背包满了脱不下，返回 `40022`。强化只针对身上的那一件，等级跟着装备走，最高 10 级。每一级追加 `max(1, 原数值 × 等级 / 10)`。升到 1 至 7 级必成。8 级起可能失败掉 1 级，勾选保护符则这次不掉级。强化石是 `1003`，保护符是 `1004`，都在材料背包。已经 10 级返回 `40068`，没穿上返回 `40069`
 - 禁手是 Buff 效果 `stun`。效果还在时放技能和喝药返回 `40055`，不入队也不进冷却。已经进下一拍的技能若结算时施法者已禁手，这一拍不造成伤害，冷却不退回。移动不拦
 - 组队按账号 uid，最多 4 人。邀请 30 秒。断线后席位保留 60 秒，时限内重新进场回到原位；切图不离队。推送按 `party:online` 所在游戏节点投递
 - 地图 4「世界BOSS」可战斗，每线 30 人、3 条线，出生点 `(0,0,0)`。`cfg_spawn.line=0` 会在该图每一条线刷同样的怪；荒野野狼仍只写 1 线。击杀掉血按实际扣血记账，死亡时推 `onKillSettle`。单独击杀、同队至少两人出力、伤害前三和最后一击按 `cfg_kill_reward` 发奖，背包满了进 `player_reward_claims`
@@ -386,7 +387,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 
 ### 业务错误码
 
-定义与注释见 `internal/code/code.go`（`40001`–`40067`，`0` 为成功）：
+定义与注释见 `internal/code/code.go`（`40001`–`40069`，`0` 为成功）：
 
 
 | 码     | 常量                    | 说明           |
@@ -448,6 +449,8 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40065 | `PartyTargetOffline`  | 邀请目标未进场，或没有在线节点 |
 | 40066 | `EquipInvalid`         | 该格不是装备，或道具没有合法部位 |
 | 40067 | `EquipSlotInvalid`     | 部位不存在，或不属于这件道具的部位组 |
+| 40068 | `EquipLevelMax`        | 装备已经是 10 级 |
+| 40069 | `EquipNotWorn`         | 没有穿在身上，不能强化 |
 
 
 ### 重新生成 Protobuf Go 代码
@@ -498,6 +501,8 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 | ---- | ------ | --------- |
 | 1001 | 小型生命药水 | 99        |
 | 1002 | 铜币袋    | 9999      |
+| 1003 | 强化石    | 9999      |
+| 1004 | 保护符    | 9999      |
 | 2001 | 新手木剑   | 1         |
 | 3001 | 任务信件   | 1         |
 

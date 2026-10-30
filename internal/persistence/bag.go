@@ -122,10 +122,11 @@ func bagListFromModels(models []model.InventoryItem) *protocol.BagListResponse {
 			continue
 		}
 		rsp.Items = append(rsp.Items, &protocol.BagItem{
-			Slot:    m.Slot,
-			ItemId:  m.ItemID,
-			Count:   m.Count,
-			BagType: m.BagType,
+			Slot:         m.Slot,
+			ItemId:       m.ItemID,
+			Count:        m.Count,
+			BagType:      m.BagType,
+			EnhanceLevel: m.EnhanceLevel,
 		})
 	}
 	return rsp
@@ -484,17 +485,19 @@ func moveItemInTx(ctx context.Context, playerID int64, bagType, fromSlot, toSlot
 		}
 		return txDB.Model(from).Update("count", from.Count-move).Error
 	}
-	fromItemID, fromCount := from.ItemID, from.Count
-	toItemID, toCount := to.ItemID, to.Count
+	fromItemID, fromCount, fromLevel := from.ItemID, from.Count, from.EnhanceLevel
+	toItemID, toCount, toLevel := to.ItemID, to.Count, to.EnhanceLevel
 	if err := txDB.Model(from).Updates(map[string]interface{}{
-		"item_id": toItemID,
-		"count":   toCount,
+		"item_id":       toItemID,
+		"count":         toCount,
+		"enhance_level": toLevel,
 	}).Error; err != nil {
 		return err
 	}
 	return txDB.Model(to).Updates(map[string]interface{}{
-		"item_id": fromItemID,
-		"count":   fromCount,
+		"item_id":       fromItemID,
+		"count":         fromCount,
+		"enhance_level": fromLevel,
 	}).Error
 }
 

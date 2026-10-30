@@ -36,11 +36,12 @@ type actorEquip struct {
 	pomelo.ActorBase
 }
 
-// OnInit 注册 wear、unwear、equips。
+// OnInit 注册 wear、unwear、equips、enhance。
 func (p *actorEquip) OnInit() {
 	p.Local().Register("wear", p.wear)
 	p.Local().Register("unwear", p.unwear)
 	p.Local().Register("equips", p.equips)
+	p.Local().Register("enhance", p.enhance)
 }
 
 func (p *actorEquip) wear(session *cproto.Session, req *protocol.EquipWearRequest) {
@@ -79,6 +80,36 @@ func (p *actorEquip) unwear(session *cproto.Session, req *protocol.EquipUnwearRe
 		BagType: BagType, TargetSlot: req.SlotId,
 	}
 	p.finish(session, playerID, apply)
+}
+
+func (p *actorEquip) enhance(session *cproto.Session, req *protocol.EquipEnhanceRequest) {
+	playerID, ok := playerID(session)
+	if !ok {
+		p.ResponseCode(session, code.PlayerNotEntered)
+		return
+	}
+	if req == nil || req.SlotId < 1 {
+		p.ResponseCode(session, code.EquipSlotInvalid)
+		return
+	}
+	apply := &protocol.EquipEnhanceApply{
+		PlayerId: playerID, Uid: session.Uid, SlotId: req.SlotId, UseProtect: req.UseProtect,
+	}
+	var result protocol.EquipEnhanceResult
+	rc := p.CallWait(cfacade.NewChildPath(p.App().NodeID(), "bag", session.Uid), "equipEnhance", apply, &result)
+	if rc != code.OK {
+		p.ResponseCode(session, rc)
+		return
+	}
+	p.Response(session, &protocol.EquipEnhanceResponse{
+		Success: result.Success, Dropped: result.Dropped, ProtectUsed: result.ProtectUsed,
+		Level: result.Level, Attrs: result.Attrs,
+	})
+	state, c := State(playerID)
+	if c != code.OK {
+		return
+	}
+	push(p, session.Uid, state, result.Bag)
 }
 
 func (p *actorEquip) equips(session *cproto.Session, _ *protocol.None) {

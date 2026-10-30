@@ -66,6 +66,8 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 |----|------|----------|-----------|
 | 1001 | 小型生命药水 | 2 | 99 |
 | 1002 | 铜币袋 | 3 | 9999 |
+| 1003 | 强化石 | 3 | 9999 |
+| 1004 | 保护符 | 3 | 9999 |
 | 2001 | 新手木剑 | 4 | 1 |
 | 3001 | 任务信件 | 5 | 1 |
 
@@ -80,4 +82,4 @@ go run ./cmd/game -profile configs/mmo-cluster.json -node 10001
 
 ## 热更
 
-profile 中设置 `"gameconfig": { "allow_reload": true }` 后，可调用 GM HTTP `POST /gm/config/reload`（需 token）或 Pomelo `game.config.reload`。支持按表名重载：`item`、`bag_type`。
+profile 中设置 `"gameconfig": { "allow_reload": true }` 后，可调用 GM HTTP `POST /gm/config/reload`（需 token）或 Pomelo `game.config.reload`。支持按表名重载：`item`、`bag_type`，以及 `enhance` 等整包重载的表。

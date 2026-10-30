@@ -11,6 +11,8 @@ const (
 	EquipSlotTableFile = "equip_slot.json"
 	// EquipAttrTableFile 是装备属性 JSON。
 	EquipAttrTableFile = "equip_attr.json"
+	// EnhanceTableFile 是强化 JSON。
+	EnhanceTableFile = "enhance.json"
 )
 
 // LoadEquipSlotsFromJSONFile 读取部位表。
@@ -78,6 +80,34 @@ func LoadEquipAttrsFromJSONFile(path string, stats map[string]StatRule) ([]schem
 		}
 		out = append(out, schema.CfgEquipAttr{
 			ID: int32(id), ItemID: int32(itemID), Stat: stat, Mode: mode, Value: int32(value),
+		})
+	}
+	return out, nil
+}
+
+// LoadEnhanceFromJSONFile 读取强化表。目标等级必须在 1 到 10，概率在 0 到 100。
+func LoadEnhanceFromJSONFile(path string) ([]schema.CfgEnhance, error) {
+	raw, err := loadJSONRows(path)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]schema.CfgEnhance, 0, len(raw))
+	seen := map[int32]struct{}{}
+	for _, row := range raw {
+		level, _ := row["level"].(float64)
+		stones, _ := row["stone_count"].(float64)
+		success, _ := row["success_percent"].(float64)
+		drop, _ := row["drop_percent"].(float64)
+		lv := int32(level)
+		if lv < 1 || lv > 10 || stones < 1 || success < 0 || success > 100 || drop < 0 || drop > 100 {
+			return nil, fmt.Errorf("invalid enhance row in %s", path)
+		}
+		if _, ok := seen[lv]; ok {
+			return nil, fmt.Errorf("duplicate enhance level %d", lv)
+		}
+		seen[lv] = struct{}{}
+		out = append(out, schema.CfgEnhance{
+			Level: lv, StoneCount: int32(stones), SuccessPercent: int32(success), DropPercent: int32(drop),
 		})
 	}
 	return out, nil

@@ -58,6 +58,7 @@ func (p *actorBag) OnInit() {
 	p.Remote().Register("rewardDeliver", p.rewardDeliver)
 	p.Remote().Register("rewardClaim", p.rewardClaim)
 	p.Remote().Register("equipApply", p.equipApply)
+	p.Remote().Register("equipEnhance", p.equipEnhance)
 }
 
 // playerIDFromSession 从已进场的 session 取出角色 id。
@@ -94,7 +95,7 @@ func (p *actorBag) ensureBag(playerID int64, bagType int32) (*memBag, error) {
 		if it == nil {
 			continue
 		}
-		mb.slots[it.Slot] = memSlot{itemID: it.ItemId, count: it.Count}
+		mb.slots[it.Slot] = memSlot{itemID: it.ItemId, count: it.Count, level: it.EnhanceLevel}
 	}
 	p.bags[bagType] = mb
 	return mb, nil
@@ -370,7 +371,7 @@ func (p *actorBag) flushDirty() {
 			upserts, removes := mb.diff()
 			up := make([]persistence.BagSlotChange, 0, len(upserts))
 			for slot, s := range upserts {
-				up = append(up, persistence.BagSlotChange{Slot: slot, ItemID: s.itemID, Count: s.count})
+				up = append(up, persistence.BagSlotChange{Slot: slot, ItemID: s.itemID, Count: s.count, Level: s.level})
 			}
 			diffs = append(diffs, persistence.BagDiff{BagType: bagType, Upserts: up, Removes: removes})
 			dirtyBags = append(dirtyBags, mb)
@@ -382,7 +383,7 @@ func (p *actorBag) flushDirty() {
 	}
 	rows := make([]persistence.EquipRow, 0, len(worn))
 	for _, row := range worn {
-		rows = append(rows, persistence.EquipRow{SlotID: row.SlotID, ItemID: row.ItemID})
+		rows = append(rows, persistence.EquipRow{SlotID: row.SlotID, ItemID: row.ItemID, Level: row.Level})
 	}
 	if err := persistence.FlushPlayer(context.Background(), p.playerID, diffs, rows, equipDirty); err != nil {
 		clog.Warnf("bag flush fail player_id=%d err=%v", p.playerID, err)

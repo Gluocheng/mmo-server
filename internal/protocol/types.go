@@ -103,6 +103,10 @@ type (
 	EquipState            = pb.EquipState
 	EquipWearRequest      = pb.EquipWearRequest
 	EquipUnwearRequest    = pb.EquipUnwearRequest
+	EquipEnhanceRequest   = pb.EquipEnhanceRequest
+	EquipEnhanceResponse  = pb.EquipEnhanceResponse
+	EquipEnhanceApply     = pb.EquipEnhanceApply
+	EquipEnhanceResult    = pb.EquipEnhanceResult
 	EquipApply            = pb.EquipApply
 )
 

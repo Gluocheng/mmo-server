@@ -1,0 +1,12 @@
+[
+  {"level": 1, "stone_count": 1, "success_percent": 100, "drop_percent": 0},
+  {"level": 2, "stone_count": 2, "success_percent": 100, "drop_percent": 0},
+  {"level": 3, "stone_count": 3, "success_percent": 100, "drop_percent": 0},
+  {"level": 4, "stone_count": 4, "success_percent": 100, "drop_percent": 0},
+  {"level": 5, "stone_count": 5, "success_percent": 100, "drop_percent": 0},
+  {"level": 6, "stone_count": 6, "success_percent": 100, "drop_percent": 0},
+  {"level": 7, "stone_count": 7, "success_percent": 100, "drop_percent": 0},
+  {"level": 8, "stone_count": 8, "success_percent": 70, "drop_percent": 50},
+  {"level": 9, "stone_count": 9, "success_percent": 50, "drop_percent": 70},
+  {"level": 10, "stone_count": 10, "success_percent": 30, "drop_percent": 100}
+]

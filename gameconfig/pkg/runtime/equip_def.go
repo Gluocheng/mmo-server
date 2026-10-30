@@ -136,6 +136,56 @@ func itemGroupsFromSchema(rows []schema.CfgItem) map[int32]int32 {
 	return m
 }
 
+// EnhanceRule 是升到某一级的消耗和概率。
+type EnhanceRule struct {
+	Level          int32
+	StoneCount     int32
+	SuccessPercent int32
+	DropPercent    int32
+}
+
+// EnhanceRuleOf 返回升到 level 的规则。没有这一级时 ok 为 false。
+func EnhanceRuleOf(level int32) (EnhanceRule, bool) {
+	s := getSnapshot()
+	if s == nil || s.tables == nil || level < 1 {
+		return EnhanceRule{}, false
+	}
+	rule, ok := s.tables.enhances[level]
+	return rule, ok
+}
+
+// BuildEnhance 用内存行替换强化表。仅测试或启动前灌入。
+func BuildEnhance(rows []EnhanceRule) {
+	s := getSnapshot()
+	var base *tables
+	ver := int64(0)
+	tc := int32(0)
+	if s != nil && s.tables != nil {
+		ver = s.version
+		tc = s.tableCount
+		base = s.tables.clone()
+	} else {
+		base = &tables{}
+	}
+	m := make(map[int32]EnhanceRule, len(rows))
+	for _, row := range rows {
+		m[row.Level] = row
+	}
+	base.enhances = m
+	swapSnapshot(&snapshot{version: ver, tableCount: tc, tables: base})
+}
+
+func enhancesFromSchema(rows []schema.CfgEnhance) map[int32]EnhanceRule {
+	m := make(map[int32]EnhanceRule, len(rows))
+	for _, row := range rows {
+		m[row.Level] = EnhanceRule{
+			Level: row.Level, StoneCount: row.StoneCount,
+			SuccessPercent: row.SuccessPercent, DropPercent: row.DropPercent,
+		}
+	}
+	return m
+}
+
 func sortIDs(ids []int32) {
 	for i := 1; i < len(ids); i++ {
 		j := i
