@@ -54,6 +54,7 @@
 | done | 装备 | [2026-10-29-equipment-design.md](2026-10-29-equipment-design.md) | 实施 [2026-10-29-equipment.md](2026-10-29-equipment.md)。独立 `gameapp/equip`。十二个部位各一件，戒指两格 |
 | done | 装备强化 | [2026-10-30-equip-enhance-design.md](2026-10-30-equip-enhance-design.md) | 实施 [2026-10-30-equip-enhance.md](2026-10-30-equip-enhance.md)。只强化身上的装备，最高 10 级 |
 | done | 装备属性扩充 | [2026-11-03-equip-stats-design.md](2026-11-03-equip-stats-design.md) | 实施 [2026-11-03-equip-stats.md](2026-11-03-equip-stats.md)。结算暴击率、暴击伤害、穿透、伤害加成、受伤减免、吸血 |
+| done | 登录过载与广播回包 | [2026-11-03-auth-shed-broadcast-design.md](2026-11-03-auth-shed-broadcast-design.md) | 实施 [2026-11-03-auth-shed-broadcast.md](2026-11-03-auth-shed-broadcast.md)。签发和刷新拆开。密码队列满了立刻 `40036`。移动、聊天先回包再广播 |
 | planned | GM 运营后台其余 P2 | [backlog-gm-ops.md](backlog-gm-ops.md) | 清背包、改名、邮件/礼包码、细权限等 |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 | done | 背包内存化 | [2026-10-26-bag-inmemory-design.md](2026-10-26-bag-inmemory-design.md) | 实施 [2026-10-26-bag-inmemory.md](2026-10-26-bag-inmemory.md)。进场加载内存，定时与断线落库，离线卸载秒数读 `bag.offline_unload_seconds`，默认 300 |

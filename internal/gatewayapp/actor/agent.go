@@ -40,8 +40,16 @@ var beforeEnterRoutes = map[string]struct{}{
 var notLoginKick = &protocol.CodeOnly{Code: code.PlayerDenyLogin}
 
 func loginTargetPath(app cfacade.IApplication) string {
+	return loginroute.NextSessionPath(loginNodeIDs(app), authcfg.SessionWorkers())
+}
+
+func passwordTargetPath(app cfacade.IApplication) string {
+	return loginroute.NextPasswordPath(loginNodeIDs(app), authcfg.PasswordWorkers())
+}
+
+func loginNodeIDs(app cfacade.IApplication) []string {
 	if app == nil || app.Discovery() == nil {
-		return ""
+		return nil
 	}
 	list := app.Discovery().ListByType("login")
 	ids := make([]string, 0, len(list))
@@ -55,7 +63,7 @@ func loginTargetPath(app cfacade.IApplication) string {
 		}
 	}
 	sortStrings(ids)
-	return loginroute.NextSessionPath(ids, authcfg.SessionWorkers())
+	return ids
 }
 
 func sortStrings(ids []string) {
@@ -91,7 +99,7 @@ func (p *AgentActor) issueToken(session *cproto.Session, req *protocol.IssueToke
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginFail)
 		return
 	}
-	target := loginTargetPath(p.App())
+	target := passwordTargetPath(p.App())
 	if target == "" {
 		pomelo.ResponseCode(p, session.AgentPath, session.Sid, session.GetMID(), code.LoginRPCFail)
 		return

@@ -90,7 +90,7 @@ flowchart TB
 | --------- | ------------- | ------------------------------------------- |
 | `master`  | `cmd/master`  | NATS 模式集群注册发现（无业务路由）                        |
 | `gateway` | `cmd/gateway` | WebSocket + Pomelo 协议、鉴权路由、转发至 login/game。profile 里每个启用的网关各起一个进程，端口用各自的 `address` |
-| `login`   | `cmd/login`   | 帐号密码签发 Token、校验、刷新、登出。profile 里每个启用的登录节点各起一个进程，节点内按 `auth.session_workers` 并行 |
+| `login`   | `cmd/login`   | 帐号密码签发 Token、校验、刷新、登出。签发走 `pwd` 工人，刷新和登出走 `session` 工人。密码队列满了返回 `40036` |
 | `game`    | `cmd/game`    | 选角进场、场景、聊天、背包、战斗、组队、击杀奖励、配表热更和 GM 指令。战斗与场景在本进程，组队在 Redis |
 | `gm`      | `cmd/gm`      | **独立管理进程**：HTTP API，通过 NATS 向 game 节点下发管理指令 |
 
@@ -376,9 +376,9 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 - 装备在 `game.equip`。十二个部位各穿一件，左戒指和右戒指共用戒指组。穿上后固定值和百分比进入现有属性公式。新手木剑攻击 +5，基础攻击 10 时变成 15。脱掉或换下后加成消失。装备背包满了脱不下，返回 `40022`。强化只针对身上的那一件，等级跟着装备走，最高 10 级。每一级追加 `max(1, 原数值 × 等级 / 10)`。升到 1 至 7 级必成。8 级起可能失败掉 1 级，勾选保护符则这次不掉级。强化石是 `1003`，保护符是 `1004`，都在材料背包。已经 10 级返回 `40068`，没穿上返回 `40069`
 - 禁手是 Buff 效果 `stun`。效果还在时放技能和喝药返回 `40055`，不入队也不进冷却。已经进下一拍的技能若结算时施法者已禁手，这一拍不造成伤害，冷却不退回。移动不拦
 - 组队按账号 uid，最多 4 人。邀请 30 秒。断线后席位保留 60 秒，时限内重新进场回到原位；切图不离队。推送按 `party:online` 所在游戏节点投递
-- 地图 4「世界BOSS」可战斗，每线 30 人、3 条线，出生点 `(0,0,0)`。`cfg_spawn.line=0` 会在该图每一条线刷同样的怪；荒野野狼仍只写 1 线。击杀掉血按实际扣血记账，死亡时推 `onKillSettle`。单独击杀、同队至少两人出力、伤害前三和最后一击按 `cfg_kill_reward` 发奖，背包满了进 `player_reward_claims`
+- 地图 4「世界BOSS」可战斗，每线 30 人、5 条线，出生点 `(0,0,0)`。`cfg_spawn.line=0` 会在该图每一条线刷同样的怪；荒野野狼仍只写 1 线。击杀掉血按实际扣血记账，死亡时推 `onKillSettle`。单独击杀、同队至少两人出力、伤害前三和最后一击按 `cfg_kill_reward` 发奖，背包满了进 `player_reward_claims`
 - 怪物模板在 `cfg_monster`，刷在哪张图由 `cfg_spawn` 的怪物 id 决定。实例不占分线人数。附近单位带 `actorType`（0 玩家，1 怪物）和 `configId`。打到怪物时技能伤害减去防御，至少为 1；伤害为 0 时仍是 0。狼出手记在 `onCombatFrame` 里，`skill_id=0`。禁手时它不追也不打。种子是荒野 `(18,0,10)` 的野狼，会追击、按攻击距离出手，死亡后按刷怪点时间回出生点复活
-- 进场忽略请求里的 `sceneId`，出生在配表主城。`max_lines >= 2` 的图才会在满员后进入下一条线。切图成功会满血，并按离开的那张图的 `switch_cd_ms` 冷却。主城默认不能放技能，以地图表 `allow_combat` 为准
+- 进场忽略请求里的 `sceneId`，出生在配表主城。`max_lines >= 2` 的图才会在满员后进入下一条线。主城每线 200 人、10 条线。演武场和荒野每线 50 人、各 4 条线。切图成功会满血，并按离开的那张图的 `switch_cd_ms` 冷却。主城默认不能放技能，以地图表 `allow_combat` 为准
 - 背包须已 `enter`；**多背包**：按 `bag_type` 区分，每背包槽位数由配表 `slot_count` 决定（默认 32）；同 `item_id` 优先堆叠，单格上限由配表 `max_stack` 控制，满则占空槽
 - `remove`：`bySlot=true` 按槽扣减；否则按 `itemId` 从多槽合计扣减
 - `add` 缺省按 `item.bag_type` 自动路由；显式指定 `bag_type`（GM）时严格校验，不符返回 `40028`
@@ -428,6 +428,8 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40033 | `AccountBanned`       | 账号已封禁（登录/刷新/鉴权） |
 | 40034 | `ChatMuted`           | 账号禁言中（发聊天） |
 | 40035 | `ServerMaintenance`   | 服务器维护中（登录/刷新/鉴权） |
+| 40036 | `LoginBusy`           | 签发排队已满，应退避后重试 |
+| 40037 | `ChatBusy`            | 聊天广播队列已满，这次没有发出去 |
 | 40040 | `CombatSkillInvalid`  | 技能不存在或目标方式非法 |
 | 40041 | `CombatBuffInvalid`   | Buff 不存在或效果非法 |
 | 40042 | `CombatTargetInvalid` | 目标不在同场景，或点名打到自己 |

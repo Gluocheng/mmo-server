@@ -18,5 +18,6 @@ func Run(profileFilePath, nodeID string) {
 	nodecfg.ApplyCallTimeout(app)
 	app.SetSerializer(cserializer.NewProtobuf())
 	app.AddActors(&actor.ActorSession{})
+	app.AddActors(&actor.ActorPwd{})
 	app.Startup()
 }

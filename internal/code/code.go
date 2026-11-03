@@ -39,6 +39,8 @@ const (
 	AccountBanned       int32 = 40033 // 账号已封禁（登录/刷新/鉴权）
 	ChatMuted           int32 = 40034 // 账号禁言中（发聊天）
 	ServerMaintenance   int32 = 40035 // 服务器维护中（登录/刷新/鉴权）
+	LoginBusy           int32 = 40036 // 签发排队已满，客户端应退避后再试
+	ChatBusy            int32 = 40037 // 聊天广播队列已满，这次没有发出去
 	CombatSkillInvalid  int32 = 40040 // 技能不存在或目标方式非法
 	CombatBuffInvalid   int32 = 40041 // Buff 不存在或效果非法
 	CombatTargetInvalid int32 = 40042 // 目标不在同场景，或点名打到自己

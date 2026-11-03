@@ -12,6 +12,7 @@ import (
 	cproto "github.com/cherry-game/cherry/net/proto"
 	gcruntime "github.com/example/mmo-server/gameconfig/pkg/runtime"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gameapp/broadcast"
 	"github.com/example/mmo-server/internal/gameapp/combat"
 	"github.com/example/mmo-server/internal/gameapp/equip"
 	"github.com/example/mmo-server/internal/gameapp/party"
@@ -52,6 +53,7 @@ func (p *actorPlayer) sessionClose() {
 	}
 	party.Unbind(uid)
 	world.Leave(uid)
+	broadcast.Forget(uid)
 	combat.Leave(uid)
 	p.Call(p.NewChildPath("bag", uid), "offline", nil)
 	p.Exit()
@@ -155,6 +157,7 @@ func (p *actorPlayer) enter(session *cproto.Session, req *protocol.EnterGameRequ
 		Players: ids, Nearby: nearby,
 	})
 	combat.PublishEnter(p, session.Uid)
+	broadcast.NoteSeen(session.Uid)
 }
 
 // switchScene 换到另一张地图。当前图留在当前线，不重置战斗，也不改组队在线状态。
@@ -201,6 +204,7 @@ func (p *actorPlayer) switchScene(session *cproto.Session, req *protocol.SceneSw
 	if view.Changed {
 		combat.PublishLeft(p, session.Uid, before)
 		combat.PublishEnter(p, session.Uid)
+		broadcast.NoteSeen(session.Uid)
 	}
 }
 
@@ -282,14 +286,11 @@ func (p *actorPlayer) move(session *cproto.Session, req *protocol.MoveRequest) {
 		p.ResponseCode(session, code.EnterSceneFail)
 		return
 	}
-	b := &protocol.MoveBroadcast{
-		Uid: session.Uid,
-		X:   req.X,
-		Y:   req.Y,
-		Z:   req.Z,
+	// 坐标先写入场景再回包。周围的人由广播队列稍后推送，同一人未推完的旧坐标只留最新一档。
+	if world.SetPosition(session.Uid, req.X, req.Y, req.Z) {
+		p.Response(session, &emptypb.Empty{})
+		broadcast.EnqueueMove(session.Uid)
+		return
 	}
-	before := world.NearbyUIDs(session.Uid)
-	world.BroadcastMove(p, session.Uid, b)
-	combat.PublishMove(p, session.Uid, before)
 	p.Response(session, &emptypb.Empty{})
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/example/mmo-server/internal/protocol"
 )
 
-// ActorSession 登录服父 Actor，路径 {node}.session。只处理调时间，签发由工人并行处理。
+// ActorSession 登录服父 Actor，路径 {node}.session。只处理调时间。签发在 pwd 工人。
 type ActorSession struct {
 	cactor.Base
 }
@@ -54,59 +54,15 @@ func (p *ActorSession) OnFindChild(msg *cfacade.Message) (cfacade.IActor, bool) 
 	return child, true
 }
 
-// ActorSessionWorker 处理签发、校验、刷新和登出。每个工人独占一个 goroutine。
+// ActorSessionWorker 处理校验、刷新和登出。密码哈希在 pwd 工人，不占这里的邮箱。
 type ActorSessionWorker struct {
 	cactor.Base
 }
 
 func (p *ActorSessionWorker) OnInit() {
-	p.Remote().Register("issueToken", p.issueToken)
 	p.Remote().Register("authToken", p.authToken)
 	p.Remote().Register("refreshToken", p.refreshToken)
 	p.Remote().Register("logout", p.logout)
-}
-
-func (p *ActorSessionWorker) issueToken(req *protocol.IssueTokenRequest) (*protocol.IssueTokenResponse, int32) {
-	if req == nil || strings.TrimSpace(req.Nickname) == "" || strings.TrimSpace(req.Password) == "" {
-		return nil, code.LoginFail
-	}
-	if c := rejectIfMaintenance(); c != code.OK {
-		return nil, c
-	}
-	if blocked, err := persistence.IsLoginBlocked(req.ClientIp, req.Nickname); err == nil && blocked {
-		return nil, code.LoginRateLimited
-	}
-
-	deviceID := strings.TrimSpace(req.DeviceId)
-	if deviceID == "" {
-		return nil, code.DeviceIDRequired
-	}
-
-	uid, err := persistence.LoginOrCreateAccount(req.Nickname, req.Password)
-	if err != nil || uid < 1 {
-		clog.Warnf("issueToken account fail nickname=%s uid=%d err=%v", req.Nickname, uid, err)
-		_ = persistence.RecordLoginFailure(req.ClientIp, req.Nickname)
-		if errors.Is(err, persistence.ErrInvalidPassword) {
-			return nil, code.InvalidPassword
-		}
-		return nil, code.LoginFail
-	}
-	if c := rejectIfBanned(uid); c != code.OK {
-		return nil, c
-	}
-	_ = persistence.ClearLoginFailure(req.ClientIp, req.Nickname)
-	accessToken, accessExpireAt, refreshToken, refreshExpireAt, err := persistence.IssueTokenPair(uid, deviceID)
-	if err != nil {
-		clog.Warnf("issueToken pair fail uid=%d err=%v", uid, err)
-		return nil, code.LoginFail
-	}
-	return &protocol.IssueTokenResponse{
-		Uid:             uid,
-		AccessToken:     accessToken,
-		AccessExpireAt:  accessExpireAt,
-		RefreshToken:    refreshToken,
-		RefreshExpireAt: refreshExpireAt,
-	}, code.OK
 }
 
 func (p *ActorSessionWorker) authToken(req *protocol.TokenLoginRequest) (*protocol.TokenLoginResponse, int32) {

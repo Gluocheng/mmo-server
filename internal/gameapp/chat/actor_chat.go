@@ -7,6 +7,7 @@ import (
 	"github.com/cherry-game/cherry/net/parser/pomelo"
 	cproto "github.com/cherry-game/cherry/net/proto"
 	"github.com/example/mmo-server/internal/code"
+	"github.com/example/mmo-server/internal/gameapp/broadcast"
 	"github.com/example/mmo-server/internal/gameapp/world"
 	"github.com/example/mmo-server/internal/persistence"
 	"github.com/example/mmo-server/internal/protocol"
@@ -42,16 +43,16 @@ func (p *actorChat) send(session *cproto.Session, req *protocol.ChatSendRequest)
 		return
 	}
 
-	b := &protocol.ChatBroadcast{
-		Uid:  session.Uid,
-		Text: strings.TrimSpace(req.Text),
-	}
+	text := strings.TrimSpace(req.Text)
 	sceneID := world.DefaultSceneID
 	if sid, ok := world.SceneID(session.Uid); ok {
 		sceneID = sid
 	}
-	world.BroadcastChat(p, session.Uid, sceneID, b)
-
-	clog.Debugf("chat send uid=%d len=%d", session.Uid, len(b.Text))
+	// 先占广播名额再回成功。队列满了这次不算发出去。
+	if err := broadcast.EnqueueChat(session.Uid, sceneID, text); err != nil {
+		p.ResponseCode(session, code.ChatBusy)
+		return
+	}
+	clog.Debugf("chat send uid=%d len=%d", session.Uid, len(text))
 	p.Response(session, &emptypb.Empty{})
 }

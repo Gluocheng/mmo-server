@@ -26,6 +26,24 @@ func TestNextSessionPathCoversNodesAndWorkers(t *testing.T) {
 	}
 }
 
+func TestNextPasswordPathUsesPwdActor(t *testing.T) {
+	ResetForTest()
+	nodes := []string{"login-1", "login-2"}
+	seen := map[string]int{}
+	for i := 0; i < 12; i++ {
+		seen[NextPasswordPath(nodes, 6)]++
+	}
+	if len(seen) != 12 {
+		t.Fatalf("paths %v", seen)
+	}
+	if seen["login-1.pwd.0"] != 1 || seen["login-2.pwd.5"] != 1 {
+		t.Fatalf("paths %v", seen)
+	}
+	if NextPasswordPath(nil, 6) != "" {
+		t.Fatal("empty nodes")
+	}
+}
+
 func itoa(n int) string {
 	if n == 0 {
 		return "0"
