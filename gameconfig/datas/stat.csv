@@ -2,8 +2,8 @@
 ,1,hp,生命,true,true,true
 ,2,attack,攻击,true,true,true
 ,3,defense,防御,true,true,true
-,4,crit_rate,暴击率,false,true,false
-,5,crit_damage,暴击伤害,false,true,false
+,4,crit_rate,暴击率,false,true,true
+,5,crit_damage,暴击伤害,false,true,true
 ,6,hit,命中,false,true,false
 ,7,dodge,躲闪,false,true,false
 ,8,parry,招架,false,true,false
@@ -13,11 +13,11 @@
 ,12,attack_speed,攻击速度,false,true,false
 ,13,move_speed,移动速度,false,true,false
 ,14,cooldown_reduction,冷却缩短,false,true,false
-,15,penetrate,穿透,false,true,false
-,16,damage_bonus,伤害加成,false,true,false
-,17,damage_reduction,受伤减免,false,true,false
+,15,penetrate,穿透,false,true,true
+,16,damage_bonus,伤害加成,false,true,true
+,17,damage_reduction,受伤减免,false,true,true
 ,18,heal_bonus,治疗加成,false,true,false
-,19,lifesteal,吸血,true,true,false
+,19,lifesteal,吸血,true,true,true
 ,20,max_mana,最大法力,true,false,false
 ,21,mana_regen,法力回复,true,true,false
 ,22,hp_regen,生命回复,true,true,false

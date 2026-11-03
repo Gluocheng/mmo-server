@@ -21,6 +21,7 @@ type Hit struct {
 	Heal      bool  // true 表示治疗或复活回血
 	TargetHP  int32 // 结算后目标当前生命
 	Dead      bool  // 这次结算后目标是否死亡
+	Crit      bool  // 这一下已经按暴击乘数算过
 }
 
 // BuffView 是快照里的一条 Buff。
@@ -38,22 +39,34 @@ type BuffChange struct {
 	ExpireAt int64 // 到期毫秒，卸下时为 0
 }
 
-// StatChange 是生命上限、攻击或防御相对上一拍变了的单位。
+// StatChange 是三项属性或六项百分比相对上一拍变了的单位。
 type StatChange struct {
-	UID     int64 // 单位
-	HP      int32 // 当前生命
-	MaxHP   int32 // 最终生命上限
-	Attack  int32 // 最终攻击
-	Defense int32 // 最终防御
+	UID             int64 // 单位
+	HP              int32 // 当前生命
+	MaxHP           int32 // 最终生命上限
+	Attack          int32 // 最终攻击
+	Defense         int32 // 最终防御
+	CritRate        int32 // 最终暴击率
+	CritDamage      int32 // 最终暴击伤害
+	Penetrate       int32 // 最终穿透
+	DamageBonus     int32 // 最终伤害加成
+	DamageReduction int32 // 最终受伤减免
+	Lifesteal       int32 // 最终吸血
 }
 
 // SelfView 是截断时单独保留的观众自己的战斗外观。
 type SelfView struct {
-	HP      int32      // 当前生命
-	MaxHP   int32      // 最终生命上限
-	Attack  int32      // 最终攻击
-	Defense int32      // 最终防御
-	Buffs   []BuffView // 自己身上的全部 Buff
+	HP              int32      // 当前生命
+	MaxHP           int32      // 最终生命上限
+	Attack          int32      // 最终攻击
+	Defense         int32      // 最终防御
+	CritRate        int32      // 最终暴击率
+	CritDamage      int32      // 最终暴击伤害
+	Penetrate       int32      // 最终穿透
+	DamageBonus     int32      // 最终伤害加成
+	DamageReduction int32      // 最终受伤减免
+	Lifesteal       int32      // 最终吸血
+	Buffs           []BuffView // 自己身上的全部 Buff
 }
 
 // Frame 是一名观众这一拍要收到的合并包。
@@ -103,22 +116,34 @@ type buffInst struct {
 
 // unit 是战斗里的一名玩家或一只怪物。离场即删，不落库。
 type unit struct {
-	hp          int32       // 当前生命
-	maxHP       int32       // 最终生命上限，含属性 Buff
-	attack      int32       // 最终攻击
-	defense     int32       // 最终防御
-	eqHPFlat    int32       // 穿着提供的生命固定值
-	eqAtkFlat   int32       // 穿着提供的攻击固定值
-	eqDefFlat   int32       // 穿着提供的防御固定值
-	eqHPPct     int32       // 穿着提供的生命百分比
-	eqAtkPct    int32       // 穿着提供的攻击百分比
-	eqDefPct    int32       // 穿着提供的防御百分比
-	baseMaxHP   int32       // 进场或刷出时拷下的生命上限
-	baseAttack  int32       // 进场或刷出时拷下的攻击
-	baseDefense int32       // 进场或刷出时拷下的防御
-	dead        bool        // 是否已死亡
-	deadAt      int64       // 死亡时的毫秒时间
-	buffs       []*buffInst // 身上还没到期的 Buff
+	hp                int32       // 当前生命
+	maxHP             int32       // 最终生命上限，含属性 Buff
+	attack            int32       // 最终攻击
+	defense           int32       // 最终防御
+	eqHPFlat          int32       // 穿着提供的生命固定值
+	eqAtkFlat         int32       // 穿着提供的攻击固定值
+	eqDefFlat         int32       // 穿着提供的防御固定值
+	eqHPPct           int32       // 穿着提供的生命百分比
+	eqAtkPct          int32       // 穿着提供的攻击百分比
+	eqDefPct          int32       // 穿着提供的防御百分比
+	eqCritRate        int32       // 穿着提供的暴击率百分点
+	eqCritDamage      int32       // 穿着提供的暴击伤害百分点
+	eqPenetrate       int32       // 穿着提供的穿透百分点
+	eqDamageBonus     int32       // 穿着提供的伤害加成百分点
+	eqDamageReduction int32       // 穿着提供的受伤减免百分点
+	eqLifesteal       int32       // 穿着提供的吸血百分点
+	critRate          int32       // 最终暴击率，0 到 100
+	critDamage        int32       // 最终暴击伤害，最低 0
+	penetrate         int32       // 最终穿透，0 到 100
+	damageBonus       int32       // 最终伤害加成，最低 0
+	damageReduction   int32       // 最终受伤减免，0 到 75
+	lifesteal         int32       // 最终吸血，0 到 100
+	baseMaxHP         int32       // 进场或刷出时拷下的生命上限
+	baseAttack        int32       // 进场或刷出时拷下的攻击
+	baseDefense       int32       // 进场或刷出时拷下的防御
+	dead              bool        // 是否已死亡
+	deadAt            int64       // 死亡时的毫秒时间
+	buffs             []*buffInst // 身上还没到期的 Buff
 
 	monster        bool               // true 表示怪物，不走玩家进场
 	templateID     int32              // 怪物模板 id
@@ -167,12 +192,18 @@ type KillSnap struct {
 	Hits       []Hurt // 这一条命的伤害榜
 }
 
-// appearance 记下上一拍同步出去的三项属性和 Buff，用来算这一拍的变化。
+// appearance 记下上一拍同步出去的属性和 Buff，用来算这一拍的变化。
 type appearance struct {
-	maxHP   int32
-	attack  int32
-	defense int32
-	buffs   map[int32]BuffView
+	maxHP           int32
+	attack          int32
+	defense         int32
+	critRate        int32
+	critDamage      int32
+	penetrate       int32
+	damageBonus     int32
+	damageReduction int32
+	lifesteal       int32
+	buffs           map[int32]BuffView
 }
 
 var (
@@ -198,6 +229,7 @@ func ResetForTest() {
 	tickSeq = 0
 	nowFn = func() int64 { return gtime.Now().UnixMilli() }
 	storeMonsterSteps(nil)
+	resetCritRoll()
 }
 
 // SetClockForTest 固定当前毫秒，便于步进心跳。仅测试调用。
@@ -450,7 +482,7 @@ func hitOne(src, dst int64, sk skillSnap, now int64) []Hit {
 	if !inRange(src, dst, sk.castRange) {
 		return nil
 	}
-	return []Hit{applyHit(src, dst, tgt, sk, now)}
+	return applyHit(src, dst, tgt, sk, now)
 }
 
 func hitAOE(src int64, sk skillSnap, now int64) []Hit {
@@ -479,21 +511,47 @@ func hitAOE(src int64, sk skillSnap, now int64) []Hit {
 		if distance(sp.X, sp.Z, tp.X, tp.Z) > float32(sk.radius) {
 			continue
 		}
-		hits = append(hits, applyHit(src, uid, tgt, sk, now))
+		hits = append(hits, applyHit(src, uid, tgt, sk, now)...)
 	}
 	return hits
 }
 
-func applyHit(src, dst int64, tgt *unit, sk skillSnap, now int64) Hit {
-	dmg := strikeDamage(units[src], sk.damage, sk.factor, tgt, now)
+func applyHit(src, dst int64, tgt *unit, sk skillSnap, now int64) []Hit {
+	dmg, crit := strikeDamage(units[src], sk.damage, sk.factor, tgt, now)
 	applyDamage(tgt, dst, src, dmg, now)
-	h := Hit{SourceUID: src, TargetUID: dst, SkillID: sk.id, Amount: dmg, TargetHP: tgt.hp, Dead: tgt.dead}
+	hits := []Hit{{
+		SourceUID: src, TargetUID: dst, SkillID: sk.id, Amount: dmg,
+		TargetHP: tgt.hp, Dead: tgt.dead, Crit: crit,
+	}}
+	if amount, hp, ok := leech(units[src], dmg); ok {
+		hits = append(hits, Hit{
+			SourceUID: src, TargetUID: src, SkillID: sk.id,
+			Amount: amount, Heal: true, TargetHP: hp,
+		})
+	}
 	if !tgt.dead && sk.buffID > 0 {
 		if def, ok := gcruntime.Buff(sk.buffID); ok && validBuff(def) {
 			applyBuff(tgt, src, def, now)
 		}
 	}
-	return h
+	return hits
+}
+
+// leech 按最终伤害回复攻击方。回复为 0 或攻击方已死亡时不产生治疗。
+func leech(attacker *unit, damage int32) (int32, int32, bool) {
+	if attacker == nil || attacker.dead || attacker.lifesteal < 1 || damage < 1 {
+		return 0, 0, false
+	}
+	n := int32(int64(damage) * int64(attacker.lifesteal) / 100)
+	missing := attacker.maxHP - attacker.hp
+	if n > missing {
+		n = missing
+	}
+	if n < 1 {
+		return 0, attacker.hp, false
+	}
+	applyHeal(attacker, n)
+	return n, attacker.hp, true
 }
 
 func applyBuff(u *unit, source int64, def gcruntime.BuffDef, now int64) {
@@ -827,12 +885,17 @@ func trimFrame(hits []Hit, buffs []BuffChange, stats []StatChange, capN int) ([]
 	return hits, buffs, stats
 }
 
-// selfOf 抄下截断时要单独保留的自己的生命、三项属性和全部 Buff。
+// selfOf 抄下截断时要单独保留的自己的生命、属性和全部 Buff。
 func selfOf(u *unit) *SelfView {
 	if u == nil {
 		return &SelfView{}
 	}
-	return &SelfView{HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense, Buffs: buffViews(u)}
+	return &SelfView{
+		HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense,
+		CritRate: u.critRate, CritDamage: u.critDamage, Penetrate: u.penetrate,
+		DamageBonus: u.damageBonus, DamageReduction: u.damageReduction, Lifesteal: u.lifesteal,
+		Buffs: buffViews(u),
+	}
 }
 
 // buffViews 抄下单位身上还没卸下的 Buff，按 id 排序。
@@ -851,7 +914,8 @@ func buffViews(u *unit) []BuffView {
 	return out
 }
 
-// collectDiffs 对比上一拍记下的外观。Buff 挂上、叠层、刷新或卸下各一条；三项属性变了才记属性。
+// collectDiffs 对比上一拍记下的外观。Buff 挂上、叠层、刷新或卸下各一条。
+// 三项属性或六项百分比变了才记一条属性变化。
 func collectDiffs() (buffs []BuffChange, stats []StatChange) {
 	ids := make([]int64, 0, len(units))
 	for uid := range units {
@@ -878,8 +942,10 @@ func collectDiffs() (buffs []BuffChange, stats []StatChange) {
 				buffs = append(buffs, BuffChange{UID: uid, ID: id, Stacks: 0})
 			}
 		}
-		if prev.maxHP != u.maxHP || prev.attack != u.attack || prev.defense != u.defense {
-			stats = append(stats, StatChange{UID: uid, HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense})
+		if prev.maxHP != u.maxHP || prev.attack != u.attack || prev.defense != u.defense ||
+			prev.critRate != u.critRate || prev.critDamage != u.critDamage || prev.penetrate != u.penetrate ||
+			prev.damageBonus != u.damageBonus || prev.damageReduction != u.damageReduction || prev.lifesteal != u.lifesteal {
+			stats = append(stats, statChangeOf(uid, u))
 		}
 	}
 	return buffs, stats
@@ -892,7 +958,7 @@ func commitAll() {
 	}
 }
 
-// commitAppearance 记下这个单位当前的生命上限、攻击、防御和 Buff。调用方须已持有战斗锁。
+// commitAppearance 记下这个单位当前的属性和 Buff。调用方须已持有战斗锁。
 func commitAppearance(uid int64) {
 	u := units[uid]
 	if u == nil {
@@ -904,7 +970,20 @@ func commitAppearance(uid int64) {
 	for _, b := range views {
 		buffs[b.ID] = b
 	}
-	published[uid] = appearance{maxHP: u.maxHP, attack: u.attack, defense: u.defense, buffs: buffs}
+	published[uid] = appearance{
+		maxHP: u.maxHP, attack: u.attack, defense: u.defense,
+		critRate: u.critRate, critDamage: u.critDamage, penetrate: u.penetrate,
+		damageBonus: u.damageBonus, damageReduction: u.damageReduction, lifesteal: u.lifesteal,
+		buffs: buffs,
+	}
+}
+
+func statChangeOf(uid int64, u *unit) StatChange {
+	return StatChange{
+		UID: uid, HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense,
+		CritRate: u.critRate, CritDamage: u.critDamage, Penetrate: u.penetrate,
+		DamageBonus: u.damageBonus, DamageReduction: u.damageReduction, Lifesteal: u.lifesteal,
+	}
 }
 
 func sceneAllowsCombat(uid int64) bool {

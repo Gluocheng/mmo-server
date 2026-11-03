@@ -10,7 +10,7 @@ message CombatCastRequest {
   int64 target_uid = 2 [json_name = "targetUid"];
 }
 
-// CombatHit 一拍内的一次命中或跳伤/治疗。
+// CombatHit 一拍内的一次命中或跳伤/治疗。crit 表示这一下已经按暴击乘数算过。
 message CombatHit {
   int64 source_uid = 1 [json_name = "sourceUid"];
   int64 target_uid = 2 [json_name = "targetUid"];
@@ -20,6 +20,7 @@ message CombatHit {
   bool heal = 6 [json_name = "heal"];
   int32 target_hp = 7 [json_name = "targetHp"];
   bool dead = 8 [json_name = "dead"];
+  bool crit = 9 [json_name = "crit"];
 }
 
 // CombatBuff 身上的一条 Buff。层数为 0 表示卸下。
@@ -38,6 +39,12 @@ message CombatSnapshot {
   int32 defense = 5 [json_name = "defense"];
   bool dead = 6 [json_name = "dead"];
   repeated CombatBuff buffs = 7 [json_name = "buffs"];
+  int32 crit_rate = 8 [json_name = "critRate"];
+  int32 crit_damage = 9 [json_name = "critDamage"];
+  int32 penetrate = 10 [json_name = "penetrate"];
+  int32 damage_bonus = 11 [json_name = "damageBonus"];
+  int32 damage_reduction = 12 [json_name = "damageReduction"];
+  int32 lifesteal = 13 [json_name = "lifesteal"];
 }
 
 // CombatBuffChange 这一拍某个单位的 Buff 变化。
@@ -48,13 +55,19 @@ message CombatBuffChange {
   int64 expire_at = 4 [json_name = "expireAt"];
 }
 
-// CombatStat 生命上限、攻击或防御变了的单位。带三项最终值和当前生命。
+// CombatStat 属性相对上一拍变了的单位。带三项和六项百分比的最终值，以及当前生命。
 message CombatStat {
   int64 uid = 1 [json_name = "uid"];
   int32 hp = 2 [json_name = "hp"];
   int32 max_hp = 3 [json_name = "maxHp"];
   int32 attack = 4 [json_name = "attack"];
   int32 defense = 5 [json_name = "defense"];
+  int32 crit_rate = 6 [json_name = "critRate"];
+  int32 crit_damage = 7 [json_name = "critDamage"];
+  int32 penetrate = 8 [json_name = "penetrate"];
+  int32 damage_bonus = 9 [json_name = "damageBonus"];
+  int32 damage_reduction = 10 [json_name = "damageReduction"];
+  int32 lifesteal = 11 [json_name = "lifesteal"];
 }
 
 // CombatSelf 合包截断时单独留下的自己的生命、属性和 Buff。
@@ -64,6 +77,12 @@ message CombatSelf {
   int32 attack = 3 [json_name = "attack"];
   int32 defense = 4 [json_name = "defense"];
   repeated CombatBuff buffs = 5 [json_name = "buffs"];
+  int32 crit_rate = 6 [json_name = "critRate"];
+  int32 crit_damage = 7 [json_name = "critDamage"];
+  int32 penetrate = 8 [json_name = "penetrate"];
+  int32 damage_bonus = 9 [json_name = "damageBonus"];
+  int32 damage_reduction = 10 [json_name = "damageReduction"];
+  int32 lifesteal = 11 [json_name = "lifesteal"];
 }
 
 // CombatGone 离开视野。客户端丢掉该 uid 的生命和 Buff。

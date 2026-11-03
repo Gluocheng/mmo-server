@@ -294,7 +294,8 @@ func attrProto(itemID, level int32) []*protocol.EquipAttr {
 	return out
 }
 
-// bonusOf 把当前穿着里生命、攻击、防御的固定值和百分比加总。其它属性名忽略。
+// bonusOf 把当前穿着的属性加成加总。生命、攻击、防御按模式分开。
+// 暴击率、暴击伤害、穿透、伤害加成、受伤减免和吸血的数值都是百分点。
 func bonusOf(playerID int64) combat.EquipBonus {
 	s := sheets[playerID]
 	var b combat.EquipBonus
@@ -312,7 +313,8 @@ func bonusOf(playerID int64) combat.EquipBonus {
 	return b
 }
 
-// addBonus 按属性名和模式累加。percent 进百分比，其余进固定值。
+// addBonus 按属性名累加。生命、攻击、防御的 percent 进百分比，其余进固定值。
+// 后六项的 flat 和 percent 都是百分点。
 func addBonus(b *combat.EquipBonus, stat, mode string, value int32) {
 	switch stat {
 	case "hp":
@@ -333,6 +335,18 @@ func addBonus(b *combat.EquipBonus, stat, mode string, value int32) {
 		} else {
 			b.DefFlat += value
 		}
+	case "crit_rate":
+		b.CritRate += value
+	case "crit_damage":
+		b.CritDamage += value
+	case "penetrate":
+		b.Penetrate += value
+	case "damage_bonus":
+		b.DamageBonus += value
+	case "damage_reduction":
+		b.DamageReduction += value
+	case "lifesteal":
+		b.Lifesteal += value
 	}
 }
 

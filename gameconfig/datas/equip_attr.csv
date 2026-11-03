@@ -3,3 +3,7 @@
 ,2,2002,hp,flat,20
 ,3,2002,defense,flat,3
 ,4,2003,attack,flat,1
+,5,2001,crit_rate,percent,10
+,6,2002,damage_reduction,percent,5
+,7,2003,lifesteal,percent,5
+,8,2004,crit_damage,percent,20

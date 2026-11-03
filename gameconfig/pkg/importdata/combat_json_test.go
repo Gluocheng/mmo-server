@@ -32,7 +32,7 @@ func TestLoadCombatSeedJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stats) != 33 || !stats[1].Settle || stats[1].Name != "attack" || stats[1].Desc != "攻击" || stats[3].Settle {
+	if len(stats) != 33 || !stats[1].Settle || stats[1].Name != "attack" || stats[1].Desc != "攻击" || !stats[3].Settle || stats[3].Name != "crit_rate" || stats[6].Settle {
 		t.Fatalf("stats %+v", stats[:4])
 	}
 }

@@ -23,7 +23,7 @@ func seedAttr(t *testing.T) {
 			{ID: 5, Name: "战意", DurationMs: 5000, Effect: "attr", Value: 5, MaxStack: 1, Stat: "attack", Mode: "flat"},
 			{ID: 6, Name: "怒意", DurationMs: 5000, Effect: "attr", Value: 20, MaxStack: 1, Stat: "attack", Mode: "percent"},
 			{ID: 7, Name: "强壮", DurationMs: 5000, Effect: "attr", Value: 50, MaxStack: 1, Stat: "hp", Mode: "flat"},
-			{ID: 9, Name: "会心", DurationMs: 5000, Effect: "attr", Value: 10, MaxStack: 1, Stat: "crit_rate", Mode: "percent"},
+			{ID: 9, Name: "躲闪", DurationMs: 5000, Effect: "attr", Value: 10, MaxStack: 1, Stat: "dodge", Mode: "percent"},
 		},
 		gcruntime.CombatConst{MaxHP: 100, TickMs: 100, RespawnMs: 5000, FrameEventCap: 64, Attack: 10, Defense: 0},
 	)
@@ -31,7 +31,7 @@ func seedAttr(t *testing.T) {
 		{ID: 1, Name: "hp", Desc: "生命", AllowFlat: true, AllowPercent: true, Settle: true},
 		{ID: 2, Name: "attack", Desc: "攻击", AllowFlat: true, AllowPercent: true, Settle: true},
 		{ID: 3, Name: "defense", Desc: "防御", AllowFlat: true, AllowPercent: true, Settle: true},
-		{ID: 4, Name: "crit_rate", Desc: "暴击率", AllowPercent: true},
+		{ID: 4, Name: "dodge", Desc: "躲闪", AllowPercent: true},
 	})
 }
 
@@ -173,6 +173,6 @@ func TestUnsettledStatBuffRejected(t *testing.T) {
 	seedAttr(t)
 	join(t, 91401, 0)
 	if c := ApplyBuff(91401, 9); c != code.CombatBuffInvalid {
-		t.Fatalf("crit buff %d", c)
+		t.Fatalf("dodge buff %d", c)
 	}
 }

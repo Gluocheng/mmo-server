@@ -79,6 +79,7 @@ func toProto(f Frame) *protocol.CombatFrame {
 			Heal:      h.Heal,
 			TargetHp:  h.TargetHP,
 			Dead:      h.Dead,
+			Crit:      h.Crit,
 		})
 	}
 	for _, b := range f.Buffs {
@@ -89,10 +90,16 @@ func toProto(f Frame) *protocol.CombatFrame {
 	for _, s := range f.Stats {
 		msg.Stats = append(msg.Stats, &protocol.CombatStat{
 			Uid: s.UID, Hp: s.HP, MaxHp: s.MaxHP, Attack: s.Attack, Defense: s.Defense,
+			CritRate: s.CritRate, CritDamage: s.CritDamage, Penetrate: s.Penetrate,
+			DamageBonus: s.DamageBonus, DamageReduction: s.DamageReduction, Lifesteal: s.Lifesteal,
 		})
 	}
 	if f.Self != nil {
-		self := &protocol.CombatSelf{Hp: f.Self.HP, MaxHp: f.Self.MaxHP, Attack: f.Self.Attack, Defense: f.Self.Defense}
+		self := &protocol.CombatSelf{
+			Hp: f.Self.HP, MaxHp: f.Self.MaxHP, Attack: f.Self.Attack, Defense: f.Self.Defense,
+			CritRate: f.Self.CritRate, CritDamage: f.Self.CritDamage, Penetrate: f.Self.Penetrate,
+			DamageBonus: f.Self.DamageBonus, DamageReduction: f.Self.DamageReduction, Lifesteal: f.Self.Lifesteal,
+		}
 		for _, b := range f.Self.Buffs {
 			self.Buffs = append(self.Buffs, &protocol.CombatBuff{Id: b.ID, Stacks: b.Stacks, ExpireAt: b.ExpireAt})
 		}

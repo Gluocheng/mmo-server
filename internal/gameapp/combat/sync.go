@@ -38,13 +38,19 @@ func takeSeen() []seenBefore {
 
 // Snap 是推给客户端的一份战斗外观。
 type Snap struct {
-	UID     int64
-	HP      int32
-	MaxHP   int32
-	Attack  int32
-	Defense int32
-	Dead    bool
-	Buffs   []BuffView
+	UID             int64
+	HP              int32
+	MaxHP           int32
+	Attack          int32
+	Defense         int32
+	CritRate        int32
+	CritDamage      int32
+	Penetrate       int32
+	DamageBonus     int32
+	DamageReduction int32
+	Lifesteal       int32
+	Dead            bool
+	Buffs           []BuffView
 }
 
 // PublishEnter 在进场或切图成功后，给自己推自己和附近单位，并给附近玩家推自己。
@@ -164,6 +170,8 @@ func readSnap(uid int64) (Snap, bool) {
 	}
 	return Snap{
 		UID: uid, HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense,
+		CritRate: u.critRate, CritDamage: u.critDamage, Penetrate: u.penetrate,
+		DamageBonus: u.damageBonus, DamageReduction: u.damageReduction, Lifesteal: u.lifesteal,
 		Dead: u.dead, Buffs: buffViews(u),
 	}, true
 }
@@ -181,6 +189,8 @@ func pushSnap(sender cfacade.IActor, viewer int64, snap Snap) {
 	pomelo.PushWithUID(sender, path, viewer, "onCombatSnapshot", &protocol.CombatSnapshot{
 		Uid: snap.UID, Hp: snap.HP, MaxHp: snap.MaxHP, Attack: snap.Attack, Defense: snap.Defense,
 		Dead: snap.Dead, Buffs: buffs,
+		CritRate: snap.CritRate, CritDamage: snap.CritDamage, Penetrate: snap.Penetrate,
+		DamageBonus: snap.DamageBonus, DamageReduction: snap.DamageReduction, Lifesteal: snap.Lifesteal,
 	})
 }
 

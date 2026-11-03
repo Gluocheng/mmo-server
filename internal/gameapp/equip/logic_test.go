@@ -25,6 +25,7 @@ func TestWearSwordRaisesAttackAndStrike(t *testing.T) {
 		t.Fatalf("attack=%d", atk)
 	}
 	combat.Enter(8)
+	combat.SetCritRollsForTest(false)
 	if c := combat.Cast(9, 1, 8); c != code.OK {
 		t.Fatal(c)
 	}
@@ -211,16 +212,21 @@ func seedEquip(t *testing.T) {
 	}
 	gcruntime.BuildEquip(slots, []gcruntime.EquipAttrDef{
 		{ItemID: 2001, Stat: "attack", Mode: "flat", Value: 5},
+		{ItemID: 2001, Stat: "crit_rate", Mode: "percent", Value: 10},
 		{ItemID: 2011, Stat: "attack", Mode: "flat", Value: 7},
 		{ItemID: 2002, Stat: "hp", Mode: "flat", Value: 20},
 		{ItemID: 2002, Stat: "defense", Mode: "flat", Value: 3},
+		{ItemID: 2002, Stat: "damage_reduction", Mode: "percent", Value: 5},
 		{ItemID: 2003, Stat: "attack", Mode: "flat", Value: 1},
+		{ItemID: 2003, Stat: "lifesteal", Mode: "percent", Value: 5},
+		{ItemID: 2004, Stat: "crit_damage", Mode: "percent", Value: 20},
 	}, []gcruntime.ItemDef{
 		{ID: 1001, Type: "consumable", MaxStack: 99, BagType: 2},
 		{ID: 2001, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 1},
 		{ID: 2011, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 1},
 		{ID: 2002, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 4},
 		{ID: 2003, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 10},
+		{ID: 2004, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 10},
 	})
 	rules := make([]gcruntime.EnhanceRule, 0, 10)
 	for lv := int32(1); lv <= 7; lv++ {

@@ -18,7 +18,7 @@ func TestEnhancePlusOneRaisesAttack(t *testing.T) {
 	if c != code.OK || !out.Success || out.Dropped || out.ProtectUsed || out.Level != 1 {
 		t.Fatalf("code=%d out=%+v", c, out)
 	}
-	if len(out.Attrs) != 1 || out.Attrs[0].Value != 6 {
+	if attackAttr(out.Attrs) != 6 {
 		t.Fatalf("attrs=%v", out.Attrs)
 	}
 	_, _, atk, _, _ := combat.Stats(9)
@@ -27,6 +27,10 @@ func TestEnhancePlusOneRaisesAttack(t *testing.T) {
 	}
 	if mat.n[stoneItem] != 0 || mat.n[protectItem] != 1 {
 		t.Fatalf("mat=%v", mat.n)
+	}
+	cr, _, _, _, _, _, ok := combat.Rates(9)
+	if !ok || cr != 11 {
+		t.Fatalf("crit=%d", cr)
 	}
 }
 
@@ -151,6 +155,15 @@ func TestEnhancePushesStatsNextTick(t *testing.T) {
 	if !ok || atk != 16 {
 		t.Fatalf("attack=%d ok=%v frames=%d", atk, ok, len(frames))
 	}
+}
+
+func attackAttr(attrs []*protocol.EquipAttr) int32 {
+	for _, attr := range attrs {
+		if attr.Stat == "attack" {
+			return attr.Value
+		}
+	}
+	return -1
 }
 
 func wearSword(t *testing.T) {
