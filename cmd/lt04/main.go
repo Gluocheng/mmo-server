@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	n         = 50
-	nearCount = 25
+	n         = 200
+	nearCount = 100
 	aoiFarZ   = float32(80)
 )
 

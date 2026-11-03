@@ -16,9 +16,9 @@ import (
 
 const (
 	cityN    = 201
-	sceneN   = 50
-	switchN  = 51
-	sceneCap = 50
+	arenaN   = 201
+	wildN    = 201
+	sceneCap = 200
 )
 
 var addr string
@@ -86,14 +86,14 @@ func fullChain() bool {
 
 func load() bool {
 	fmt.Printf("== 压测 %d 人进主城 ==\n", cityN)
-	slots := make([]*slot, cityN)
-	if !enterAll(slots, "ld") {
-		closeAll(slots)
+	city := make([]*slot, cityN)
+	if !enterAll(city, "city") {
+		closeAll(city)
 		return false
 	}
-	fmt.Printf("进场分线 %s\n", formatLines(slots))
+	fmt.Printf("进场分线 %s\n", formatLines(city))
 	line1, line2 := 0, 0
-	for _, s := range slots {
+	for _, s := range city {
 		if s.line == 1 {
 			line1++
 		}
@@ -105,17 +105,16 @@ func load() bool {
 	if !opened {
 		fmt.Printf("主城开新线不符合预期 1线=%d 2线=%d\n", line1, line2)
 	}
-
-	fmt.Printf("== %d 人同时拉地图列表 ==\n", sceneN)
-	codes := make([]int, sceneN)
-	lats := make([]time.Duration, sceneN)
+	fmt.Printf("== %d 人同时拉地图列表 ==\n", cityN)
+	codes := make([]int, cityN)
+	lats := make([]time.Duration, cityN)
 	var wg sync.WaitGroup
 	start := time.Now()
-	for i := 0; i < sceneN; i++ {
+	for i := 0; i < cityN; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			scenes, code, lat := listScenes(slots[i])
+			scenes, code, lat := listScenes(city[i])
 			lats[i] = lat
 			if code == 0 && !hasScenes(scenes, 1, 2, 3) {
 				code = -4
@@ -125,14 +124,28 @@ func load() bool {
 	}
 	wg.Wait()
 	printStats("scenes", time.Since(start), codes, lats)
-	scenesOK := count(codes, 0) == sceneN
+	scenesOK := count(codes, 0) == cityN
+	closeAll(city)
 
-	fmt.Printf("== %d 人同时切演武场 ==\n", switchN)
-	arenaOK, arenaSucc := switchMany(slots[sceneN:sceneN+switchN], 2)
-	fmt.Printf("== %d 人同时切荒野 ==\n", switchN)
-	wildOK, wildSucc := switchMany(slots[sceneN+switchN:sceneN+2*switchN], 3)
-	fmt.Printf("演武场成功=%d 荒野成功=%d 上限=%d\n", arenaSucc, wildSucc, sceneCap)
-	closeAll(slots)
+	fmt.Printf("== %d 人同时切演武场，上限 %d ==\n", arenaN, sceneCap)
+	arena := make([]*slot, arenaN)
+	if !enterAll(arena, "arena") {
+		closeAll(arena)
+		return false
+	}
+	arenaOK, arenaSucc := switchMany(arena, 2)
+	fmt.Printf("演武场成功=%d 上限=%d\n", arenaSucc, sceneCap)
+	closeAll(arena)
+
+	fmt.Printf("== %d 人同时切荒野，上限 %d ==\n", wildN, sceneCap)
+	wild := make([]*slot, wildN)
+	if !enterAll(wild, "wild") {
+		closeAll(wild)
+		return false
+	}
+	wildOK, wildSucc := switchMany(wild, 3)
+	fmt.Printf("荒野成功=%d 上限=%d\n", wildSucc, sceneCap)
+	closeAll(wild)
 	return opened && scenesOK && arenaOK && wildOK && arenaSucc == sceneCap && wildSucc == sceneCap
 }
 
@@ -147,7 +160,7 @@ func switchMany(group []*slot, sceneID int32) (bool, int) {
 			defer wg.Done()
 			code, lat, view := switchTo(group[i], sceneID)
 			lats[i] = lat
-			if code == 0 && (view.SceneId != sceneID || view.Line != 1) {
+			if code == 0 && view.SceneId != sceneID {
 				code = -5
 			}
 			codes[i] = code

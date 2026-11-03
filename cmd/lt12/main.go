@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	loadN      = 50         // 压测人数
+	loadN      = 200        // 一条主城线的上限。公告按这条线全员推送
 	mainScene  = int32(1)   // 主城
 	wildScene  = int32(3)   // 荒野，用来验证公告按场景隔离
 	emptyScene = int32(999) // 无人场景，用来验证公告推送人数为 0

@@ -18,7 +18,7 @@ import (
 	"github.com/example/mmo-server/internal/protocol"
 )
 
-const loadN = 50
+const loadN = 200
 
 var (
 	addr    string

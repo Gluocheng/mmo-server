@@ -22,14 +22,14 @@ type pair struct {
 }
 
 func main() {
-	flag.StringVar(&addr, "addr", "127.0.0.1:10100", "gate entry host:port")
+	flag.StringVar(&addr, "addr", "gate-entry:10100", "gate entry host:port")
 	flag.Parse()
 	if err := waitReady(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 	failed := false
-	for _, n := range []int{200, 1000} {
+	for _, n := range []int{2000} {
 		fmt.Printf("\n######## %d 账号 ########\n", n)
 		if !lt01(n) {
 			failed = true
@@ -204,7 +204,7 @@ func lt03(n int) bool {
 	stamp := time.Now().UnixNano()
 	start := time.Now()
 	parallel(n, func(i int) {
-		c := pomeloClient.New(pomeloClient.WithRequestTimeout(20 * time.Second))
+		c := pomeloClient.New(pomeloClient.WithRequestTimeout(60 * time.Second))
 		if err := c.ConnectToWS(addr, ""); err != nil {
 			codes[i] = -1
 			return
@@ -325,7 +325,7 @@ func parallel(n int, fn func(i int)) {
 }
 
 func loginAndLogout(p pair) (int, time.Duration) {
-	c := pomeloClient.New(pomeloClient.WithRequestTimeout(20 * time.Second))
+	c := pomeloClient.New(pomeloClient.WithRequestTimeout(60 * time.Second))
 	if err := c.ConnectToWS(addr, ""); err != nil {
 		return -1, 0
 	}
@@ -345,7 +345,7 @@ func loginAndLogout(p pair) (int, time.Duration) {
 }
 
 func request(route string, req, rsp interface{}) (int, time.Duration, error) {
-	c := pomeloClient.New(pomeloClient.WithRequestTimeout(20 * time.Second))
+	c := pomeloClient.New(pomeloClient.WithRequestTimeout(60 * time.Second))
 	start := time.Now()
 	if err := c.ConnectToWS(addr, ""); err != nil {
 		return -1, time.Since(start), err

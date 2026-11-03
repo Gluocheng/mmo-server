@@ -16,7 +16,7 @@ import (
 	"github.com/example/mmo-server/internal/protocol"
 )
 
-const loadN = 50
+const loadN = 150
 
 var addr string
 
@@ -125,20 +125,21 @@ func load() bool {
 		closeAll(slots)
 		return false
 	}
-	line1, line2, wolves := 0, 0, 0
+	lines := map[int32]int{}
+	wolves := 0
 	for _, s := range slots {
-		if s.line == 1 {
-			line1++
-		}
-		if s.line == 2 {
-			line2++
-		}
+		lines[s.line]++
 		if s.wolf > 0 {
 			wolves++
 		}
 	}
-	fmt.Printf("分线 1=%d 2=%d 看到狼=%d\n", line1, line2, wolves)
-	ok := line1 == 30 && line2 == 20 && wolves == loadN
+	fmt.Printf("分线 %v 看到狼=%d\n", lines, wolves)
+	ok := wolves == loadN
+	for line := int32(1); line <= 5; line++ {
+		if lines[line] != 30 {
+			ok = false
+		}
+	}
 
 	codes := make([]int, loadN)
 	lats := make([]time.Duration, loadN)
