@@ -11,10 +11,10 @@ import (
 
 func TestEnhancePlusOneRaisesAttack(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
-	wearSword(t)
+	sh := OpenTest(1, 0)
+	wearSword(t, sh)
 	mat := newMat(1, 1)
-	out, c := Enhance(1, 9, 1, true, mat)
+	out, c := sh.Enhance(9, 1, true, mat)
 	if c != code.OK || !out.Success || out.Dropped || out.ProtectUsed || out.Level != 1 {
 		t.Fatalf("code=%d out=%+v", c, out)
 	}
@@ -36,41 +36,41 @@ func TestEnhancePlusOneRaisesAttack(t *testing.T) {
 
 func TestEnhanceNotWornKeepsStones(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	mat := newMat(1, 0)
-	_, c := Enhance(1, 9, 1, false, mat)
+	_, c := sh.Enhance(9, 1, false, mat)
 	if c != code.EquipNotWorn {
 		t.Fatalf("code=%d", c)
 	}
 	if mat.n[stoneItem] != 1 {
 		t.Fatalf("stones=%d", mat.n[stoneItem])
 	}
-	if _, c := Enhance(1, 9, 99, false, mat); c != code.EquipSlotInvalid {
+	if _, c := sh.Enhance(9, 99, false, mat); c != code.EquipSlotInvalid {
 		t.Fatalf("bad slot %d", c)
 	}
 }
 
 func TestEnhanceLevelFollowsItem(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(32)
 	bag.set(0, 2001)
-	if c := Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
-	if _, c := Enhance(1, 9, 1, false, newMat(1, 0)); c != code.OK {
+	if _, c := sh.Enhance(9, 1, false, newMat(1, 0)); c != code.OK {
 		t.Fatal(c)
 	}
-	if c := Mutate(&protocol.EquipApply{PlayerId: 1, Uid: 9, Op: opUnwear, BagType: BagType, TargetSlot: 1}, bag); c != code.OK {
+	if c := sh.Mutate(&protocol.EquipApply{PlayerId: 1, Uid: 9, Op: opUnwear, BagType: BagType, TargetSlot: 1}, bag); c != code.OK {
 		t.Fatal(c)
 	}
 	if bag.slots[0].level != 1 {
 		t.Fatalf("bag level=%d", bag.slots[0].level)
 	}
-	if c := Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
-	st, _ := State(1)
+	st, _ := sh.State()
 	if st.Slots[0].EnhanceLevel != 1 || st.Slots[0].ItemId != 2001 {
 		t.Fatalf("state=%+v", st.Slots[0])
 	}
@@ -82,12 +82,12 @@ func TestEnhanceLevelFollowsItem(t *testing.T) {
 
 func TestEnhanceFailDropsLevel(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
-	wearSword(t)
-	sheets[1].slots[1] = piece{item: 2001, level: 7}
+	sh := OpenTest(1, 0)
+	wearSword(t, sh)
+	sh.SetWorn(1, 2001, 7)
 	mat := newMat(8, 0)
 	SetRollsForTest(false, true)
-	out, c := Enhance(1, 9, 1, false, mat)
+	out, c := sh.Enhance(9, 1, false, mat)
 	if c != code.OK || out.Success || !out.Dropped || out.ProtectUsed || out.Level != 6 {
 		t.Fatalf("code=%d out=%+v", c, out)
 	}
@@ -98,12 +98,12 @@ func TestEnhanceFailDropsLevel(t *testing.T) {
 
 func TestEnhanceProtectBlocksDrop(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
-	wearSword(t)
-	sheets[1].slots[1] = piece{item: 2001, level: 7}
+	sh := OpenTest(1, 0)
+	wearSword(t, sh)
+	sh.SetWorn(1, 2001, 7)
 	mat := newMat(8, 1)
 	SetRollsForTest(false, true)
-	out, c := Enhance(1, 9, 1, true, mat)
+	out, c := sh.Enhance(9, 1, true, mat)
 	if c != code.OK || out.Success || out.Dropped || !out.ProtectUsed || out.Level != 7 {
 		t.Fatalf("code=%d out=%+v", c, out)
 	}
@@ -114,26 +114,26 @@ func TestEnhanceProtectBlocksDrop(t *testing.T) {
 
 func TestEnhanceMissingProtect(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
-	wearSword(t)
-	sheets[1].slots[1] = piece{item: 2001, level: 7}
+	sh := OpenTest(1, 0)
+	wearSword(t, sh)
+	sh.SetWorn(1, 2001, 7)
 	mat := newMat(8, 0)
-	_, c := Enhance(1, 9, 1, true, mat)
+	_, c := sh.Enhance(9, 1, true, mat)
 	if c != code.BagItemNotEnough {
 		t.Fatalf("code=%d", c)
 	}
-	if mat.n[stoneItem] != 8 || sheets[1].slots[1].level != 7 {
-		t.Fatalf("stones=%d level=%d", mat.n[stoneItem], sheets[1].slots[1].level)
+	if mat.n[stoneItem] != 8 || mustLevel(sh, 1) != 7 {
+		t.Fatalf("stones=%d level=%d", mat.n[stoneItem], mustLevel(sh, 1))
 	}
 }
 
 func TestEnhanceMaxLevel(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
-	wearSword(t)
-	sheets[1].slots[1] = piece{item: 2001, level: 10}
+	sh := OpenTest(1, 0)
+	wearSword(t, sh)
+	sh.SetWorn(1, 2001, 10)
 	mat := newMat(10, 0)
-	_, c := Enhance(1, 9, 1, false, mat)
+	_, c := sh.Enhance(9, 1, false, mat)
 	if c != code.EquipLevelMax {
 		t.Fatalf("code=%d", c)
 	}
@@ -144,10 +144,10 @@ func TestEnhanceMaxLevel(t *testing.T) {
 
 func TestEnhancePushesStatsNextTick(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
-	wearSword(t)
+	sh := OpenTest(1, 0)
+	wearSword(t, sh)
 	combat.Tick()
-	if _, c := Enhance(1, 9, 1, false, newMat(1, 0)); c != code.OK {
+	if _, c := sh.Enhance(9, 1, false, newMat(1, 0)); c != code.OK {
 		t.Fatal(c)
 	}
 	frames := combat.Tick()
@@ -166,11 +166,11 @@ func attackAttr(attrs []*protocol.EquipAttr) int32 {
 	return -1
 }
 
-func wearSword(t *testing.T) {
+func wearSword(t *testing.T, sh *Sheet) {
 	t.Helper()
 	bag := newFake(32)
 	bag.set(0, 2001)
-	if c := Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
 }

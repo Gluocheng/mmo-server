@@ -108,6 +108,8 @@ type (
 	EquipEnhanceApply     = pb.EquipEnhanceApply
 	EquipEnhanceResult    = pb.EquipEnhanceResult
 	EquipApply            = pb.EquipApply
+	EquipApplyResult      = pb.EquipApplyResult
+	EquipStateRequest     = pb.EquipStateRequest
 )
 
 // None 表示无请求体（如 select），与 google.protobuf.Empty 兼容。

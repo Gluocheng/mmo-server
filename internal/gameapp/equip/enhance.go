@@ -46,6 +46,11 @@ func defaultRoll(percent int32) bool {
 
 func resetRoll() { rollFn = defaultRoll }
 
+// ResetForTest 恢复掷点函数。仅测试调用。
+func ResetForTest() {
+	resetRoll()
+}
+
 // SetRollsForTest 按顺序返回固定掷点，用完后再掷都失败。仅测试调用。
 func SetRollsForTest(hits ...bool) {
 	i := 0
@@ -61,15 +66,14 @@ func SetRollsForTest(hits ...bool) {
 
 // Enhance 强化指定穿着部位。材料不够或还没穿上时不掷点、不扣材料。
 // 已经开始掷点后，强化石无论成败都扣。成功不消耗保护符。
-func Enhance(playerID, uid int64, slotID int32, useProtect bool, mat Material) (Result, int32) {
-	if playerID < 1 || mat == nil {
+func (s *Sheet) Enhance(uid int64, slotID int32, useProtect bool, mat Material) (Result, int32) {
+	if s.PlayerID < 1 || mat == nil {
 		return Result{}, code.PlayerNotEntered
 	}
 	if uid > 0 {
-		uidByPlayer[playerID] = uid
+		s.UID = uid
 	}
-	s, c := prepare(playerID)
-	if c != code.OK {
+	if c := s.prepare(); c != code.OK {
 		return Result{}, c
 	}
 	if !knownSlot(slotID) {
@@ -121,7 +125,7 @@ func Enhance(playerID, uid int64, slotID int32, useProtect bool, mat Material) (
 		cur.level = level
 		s.slots[slotID] = cur
 		s.dirty = true
-		syncCombat(playerID)
+		s.syncCombat()
 	}
 	return Result{
 		Success: success, Dropped: dropped, ProtectUsed: protectUsed,

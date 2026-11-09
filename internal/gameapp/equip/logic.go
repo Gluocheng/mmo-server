@@ -43,72 +43,116 @@ type piece struct {
 	level int32
 }
 
-// sheet 是一个角色的穿着内存。slots 的键是部位 id，空部位不在表里。
+// Sheet 是一个角色的穿着内存。slots 的键是部位 id，空部位不在表里。
 // dirty 表示有尚未落库的穿脱。loaded 表示已经从库载入，或测试直接建好，避免重复读库。
-type sheet struct {
-	slots  map[int32]piece
-	dirty  bool
-	loaded bool
+//
+// Sheet 归调用它的 Actor 独占，只在该 Actor 的邮箱里被读写，所以自身不加锁。
+// 目前唯一的持有者是背包 Actor（sheet 与背包格子同属一个邮箱，穿脱和落库天然一致）。
+type Sheet struct {
+	PlayerID int64
+	UID      int64
+	slots    map[int32]piece
+	dirty    bool
+	loaded   bool
 }
 
-// sheets 按 playerID 保存穿着。uidByPlayer 把角色映射到账号，穿脱后用来刷新战斗属性。
-var (
-	sheets      = map[int64]*sheet{}
-	uidByPlayer = map[int64]int64{}
-)
-
-// ResetForTest 清空穿着内存。仅测试调用。
-func ResetForTest() {
-	sheets = map[int64]*sheet{}
-	uidByPlayer = map[int64]int64{}
-	resetRoll()
+// NewSheet 建一个尚未载入的空穿着。
+func NewSheet() *Sheet {
+	return &Sheet{slots: map[int32]piece{}}
 }
 
 // OpenTest 准备一个不读库的空穿着。仅测试调用。
-func OpenTest(playerID int64) {
-	sheets[playerID] = &sheet{slots: map[int32]piece{}, loaded: true}
+func OpenTest(playerID, uid int64) *Sheet {
+	return &Sheet{PlayerID: playerID, UID: uid, slots: map[int32]piece{}, loaded: true}
+}
+
+// SetWorn 直接写一个部位的穿着，仅测试调用。
+func (s *Sheet) SetWorn(slotID, itemID, level int32) {
+	if s.slots == nil {
+		s.slots = map[int32]piece{}
+	}
+	s.slots[slotID] = piece{item: itemID, level: level}
+	s.loaded = true
+}
+
+// Worn 读一个部位的穿着，仅测试调用。
+func (s *Sheet) Worn(slotID int32) (itemID, level int32) {
+	p := s.slots[slotID]
+	return p.item, p.level
+}
+
+// load 从库读一次穿着，填进 sheet。
+func (s *Sheet) load() int32 {
+	rows, err := persistence.LoadEquipment(context.Background(), s.PlayerID)
+	if err != nil {
+		return code.BagLoadFail
+	}
+	s.slots = map[int32]piece{}
+	for _, row := range rows {
+		if row.ItemID > 0 {
+			s.slots[row.SlotID] = piece{item: row.ItemID, level: row.Level}
+		}
+	}
+	s.loaded = true
+	return code.OK
+}
+
+// prepare 取出已载入的穿着。还没载入时从库读一次，读失败返回 40020。
+func (s *Sheet) prepare() int32 {
+	if s.loaded {
+		if s.slots == nil {
+			s.slots = map[int32]piece{}
+		}
+		return code.OK
+	}
+	return s.load()
 }
 
 // Mutate 按 EquipApply 穿上或脱下。失败时格子和穿着都不变。
-func Mutate(req *protocol.EquipApply, stock Stock) int32 {
+func (s *Sheet) Mutate(req *protocol.EquipApply, stock Stock) int32 {
 	if req == nil || req.PlayerId < 1 || stock == nil {
 		return code.PlayerNotEntered
 	}
 	if req.Uid > 0 {
-		uidByPlayer[req.PlayerId] = req.Uid
+		s.UID = req.Uid
+	}
+	s.PlayerID = req.PlayerId
+	if c := s.prepare(); c != code.OK {
+		return c
 	}
 	switch req.Op {
 	case opWear:
-		return wear(req.PlayerId, stock, req.BagType, req.BagSlot, req.TargetSlot)
+		return s.wear(stock, req.BagType, req.BagSlot, req.TargetSlot)
 	case opUnwear:
-		return unwear(req.PlayerId, stock, req.TargetSlot)
+		return s.unwear(stock, req.TargetSlot)
 	default:
 		return code.EquipInvalid
 	}
 }
 
 // Attach 进场或切图后把已保存的穿着叠到战斗单位上，并记成下一拍的比较基准。
-func Attach(uid, playerID int64) {
+func (s *Sheet) Attach(uid, playerID int64) {
 	if uid < 1 || playerID < 1 {
 		return
 	}
-	uidByPlayer[playerID] = uid
-	if _, c := prepare(playerID); c != code.OK {
+	s.UID = uid
+	s.PlayerID = playerID
+	if c := s.prepare(); c != code.OK {
 		return
 	}
-	combat.SetEquipBonus(uid, bonusOf(playerID), true)
+	combat.SetEquipBonus(uid, s.bonus(), true)
 }
 
 // Unload 丢掉这个角色的穿着内存。调用前应已经落库。
-func Unload(playerID int64) {
-	delete(sheets, playerID)
-	delete(uidByPlayer, playerID)
+func (s *Sheet) Unload() {
+	s.slots = map[int32]piece{}
+	s.dirty = false
+	s.loaded = false
 }
 
 // PeekDirty 返回尚未落库的完整穿着。没有变更时 dirty 为 false。
-func PeekDirty(playerID int64) ([]Row, bool) {
-	s, ok := sheets[playerID]
-	if !ok || !s.dirty {
+func (s *Sheet) PeekDirty() ([]Row, bool) {
+	if !s.dirty {
 		return nil, false
 	}
 	rows := make([]Row, 0, len(s.slots))
@@ -122,19 +166,16 @@ func PeekDirty(playerID int64) ([]Row, bool) {
 }
 
 // AckDirty 落库成功后清掉脏标记。
-func AckDirty(playerID int64) {
-	if s, ok := sheets[playerID]; ok {
-		s.dirty = false
-	}
+func (s *Sheet) AckDirty() {
+	s.dirty = false
 }
 
 // State 按部位 id 顺序列出穿着。空部位的道具 id 为 0。
-func State(playerID int64) (*protocol.EquipState, int32) {
-	s, c := prepare(playerID)
-	if c != code.OK {
+func (s *Sheet) State() (*protocol.EquipState, int32) {
+	if c := s.prepare(); c != code.OK {
 		return nil, c
 	}
-	ids := slotIDs(s)
+	ids := s.slotIDs()
 	msg := &protocol.EquipState{Slots: make([]*protocol.EquipSlotState, 0, len(ids))}
 	for _, id := range ids {
 		p := s.slots[id]
@@ -147,13 +188,9 @@ func State(playerID int64) (*protocol.EquipState, int32) {
 
 // wear 从装备背包穿到部位。失败时背包格子和穿着都保持原样。
 // 部位上已有装备时，旧装备放回刚空出的背包格。
-func wear(playerID int64, stock Stock, bagType, bagSlot, target int32) int32 {
+func (s *Sheet) wear(stock Stock, bagType, bagSlot, target int32) int32 {
 	if bagType != BagType {
 		return code.EquipInvalid
-	}
-	s, c := prepare(playerID)
-	if c != code.OK {
-		return c
 	}
 	itemID, count, _, ok := stock.Peek(bagSlot)
 	if !ok {
@@ -186,16 +223,12 @@ func wear(playerID int64, stock Stock, bagType, bagSlot, target int32) int32 {
 	}
 	s.slots[slotID] = piece{item: taken, level: takenLevel}
 	s.dirty = true
-	syncCombat(playerID)
+	s.syncCombat()
 	return code.OK
 }
 
 // unwear 把部位上的装备放进装备背包第一个空格。背包满时穿着不变。
-func unwear(playerID int64, stock Stock, slotID int32) int32 {
-	s, c := prepare(playerID)
-	if c != code.OK {
-		return c
-	}
+func (s *Sheet) unwear(stock Stock, slotID int32) int32 {
 	cur := s.slots[slotID]
 	if cur.item < 1 {
 		return code.EquipSlotInvalid
@@ -205,7 +238,7 @@ func unwear(playerID int64, stock Stock, slotID int32) int32 {
 	}
 	delete(s.slots, slotID)
 	s.dirty = true
-	syncCombat(playerID)
+	s.syncCombat()
 	return code.OK
 }
 
@@ -236,30 +269,8 @@ func pickSlot(group, target int32, worn map[int32]piece) (int32, int32) {
 	return 0, code.EquipSlotInvalid
 }
 
-// prepare 取出已载入的穿着。还没载入时从库读一次，读失败返回 40020。
-func prepare(playerID int64) (*sheet, int32) {
-	if s, ok := sheets[playerID]; ok && s.loaded {
-		if s.slots == nil {
-			s.slots = map[int32]piece{}
-		}
-		return s, code.OK
-	}
-	rows, err := persistence.LoadEquipment(context.Background(), playerID)
-	if err != nil {
-		return nil, code.BagLoadFail
-	}
-	s := &sheet{slots: map[int32]piece{}, loaded: true}
-	for _, row := range rows {
-		if row.ItemID > 0 {
-			s.slots[row.SlotID] = piece{item: row.ItemID, level: row.Level}
-		}
-	}
-	sheets[playerID] = s
-	return s, code.OK
-}
-
 // slotIDs 返回要展示的部位。先放配表里的全部部位，再补上配表已删但仍穿着的部位，按 id 排序。
-func slotIDs(s *sheet) []int32 {
+func (s *Sheet) slotIDs() []int32 {
 	seen := map[int32]struct{}{}
 	var ids []int32
 	for _, slot := range gcruntime.EquipSlots() {
@@ -294,14 +305,10 @@ func attrProto(itemID, level int32) []*protocol.EquipAttr {
 	return out
 }
 
-// bonusOf 把当前穿着的属性加成加总。生命、攻击、防御按模式分开。
+// bonus 把当前穿着的属性加成加总。生命、攻击、防御按模式分开。
 // 暴击率、暴击伤害、穿透、伤害加成、受伤减免和吸血的数值都是百分点。
-func bonusOf(playerID int64) combat.EquipBonus {
-	s := sheets[playerID]
+func (s *Sheet) bonus() combat.EquipBonus {
 	var b combat.EquipBonus
-	if s == nil {
-		return b
-	}
 	for _, p := range s.slots {
 		if p.item < 1 {
 			continue
@@ -351,12 +358,11 @@ func addBonus(b *combat.EquipBonus, stat, mode string, value int32) {
 }
 
 // syncCombat 把加成写到战斗单位，但不提交外观。下一拍有变化时才推属性帧。没有账号时跳过。
-func syncCombat(playerID int64) {
-	uid := uidByPlayer[playerID]
-	if uid < 1 {
+func (s *Sheet) syncCombat() {
+	if s.UID < 1 {
 		return
 	}
-	combat.SetEquipBonus(uid, bonusOf(playerID), false)
+	combat.SetEquipBonus(s.UID, s.bonus(), false)
 }
 
 // bagCode 把背包错误转成协议码。对不上的按加载失败。

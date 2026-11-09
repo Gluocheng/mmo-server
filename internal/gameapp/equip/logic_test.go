@@ -14,10 +14,10 @@ import (
 
 func TestWearSwordRaisesAttackAndStrike(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(32)
 	bag.set(0, 2001)
-	if c := Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
 	_, _, atk, _, ok := combat.Stats(9)
@@ -34,7 +34,7 @@ func TestWearSwordRaisesAttackAndStrike(t *testing.T) {
 	if hp != 85 {
 		t.Fatalf("hp=%d", hp)
 	}
-	if c := Mutate(&protocol.EquipApply{PlayerId: 1, Uid: 9, Op: opUnwear, BagType: BagType, TargetSlot: 1}, bag); c != code.OK {
+	if c := sh.Mutate(&protocol.EquipApply{PlayerId: 1, Uid: 9, Op: opUnwear, BagType: BagType, TargetSlot: 1}, bag); c != code.OK {
 		t.Fatal(c)
 	}
 	_, _, atk, _, _ = combat.Stats(9)
@@ -45,10 +45,10 @@ func TestWearSwordRaisesAttackAndStrike(t *testing.T) {
 
 func TestSwordAndBuffStack(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(32)
 	bag.set(0, 2001)
-	if c := Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
 	if c := combat.ApplyBuff(9, 5); c != code.OK {
@@ -62,17 +62,17 @@ func TestSwordAndBuffStack(t *testing.T) {
 
 func TestClothRaisesHPThenClamp(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(32)
 	bag.set(0, 2002)
-	if c := Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
 	hp, maxHP, _, def, _ := combat.Stats(9)
 	if hp != 120 || maxHP != 120 || def != 3 {
 		t.Fatalf("hp=%d max=%d def=%d", hp, maxHP, def)
 	}
-	if c := Mutate(&protocol.EquipApply{PlayerId: 1, Uid: 9, Op: opUnwear, BagType: BagType, TargetSlot: 4}, bag); c != code.OK {
+	if c := sh.Mutate(&protocol.EquipApply{PlayerId: 1, Uid: 9, Op: opUnwear, BagType: BagType, TargetSlot: 4}, bag); c != code.OK {
 		t.Fatal(c)
 	}
 	hp, maxHP, _, def, _ = combat.Stats(9)
@@ -83,14 +83,14 @@ func TestClothRaisesHPThenClamp(t *testing.T) {
 
 func TestSwapReturnsOldToFreedSlot(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(32)
 	bag.set(3, 2001)
-	if c := Mutate(wearReq(1, 9, 3, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 3, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
 	bag.set(4, 2011)
-	if c := Mutate(wearReq(1, 9, 4, 1), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 4, 1), bag); c != code.OK {
 		t.Fatal(c)
 	}
 	if bag.slots[4].item != 2001 {
@@ -104,17 +104,17 @@ func TestSwapReturnsOldToFreedSlot(t *testing.T) {
 
 func TestUnwearFullBag(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(1)
 	bag.set(0, 2001)
-	if c := Mutate(wearReq(1, 0, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 0, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
 	bag.set(0, 2003)
-	if c := Mutate(&protocol.EquipApply{PlayerId: 1, Op: opUnwear, BagType: BagType, TargetSlot: 1}, bag); c != code.BagFull {
+	if c := sh.Mutate(&protocol.EquipApply{PlayerId: 1, Op: opUnwear, BagType: BagType, TargetSlot: 1}, bag); c != code.BagFull {
 		t.Fatalf("code=%d", c)
 	}
-	st, _ := State(1)
+	st, _ := sh.State()
 	if st.Slots[0].ItemId != 2001 {
 		t.Fatalf("still worn %+v", st.Slots[0])
 	}
@@ -122,14 +122,14 @@ func TestUnwearFullBag(t *testing.T) {
 
 func TestRingsAndWrongSlot(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(32)
 	bag.set(0, 2003)
 	bag.set(1, 2003)
-	if c := Mutate(wearReq(1, 9, 0, 10), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 0, 10), bag); c != code.OK {
 		t.Fatal(c)
 	}
-	if c := Mutate(wearReq(1, 9, 1, 11), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(1, 9, 1, 11), bag); c != code.OK {
 		t.Fatal(c)
 	}
 	_, _, atk, _, _ := combat.Stats(9)
@@ -137,23 +137,23 @@ func TestRingsAndWrongSlot(t *testing.T) {
 		t.Fatalf("attack=%d", atk)
 	}
 	bag.set(2, 2003)
-	if c := Mutate(wearReq(1, 9, 2, 1), bag); c != code.EquipSlotInvalid {
+	if c := sh.Mutate(wearReq(1, 9, 2, 1), bag); c != code.EquipSlotInvalid {
 		t.Fatalf("code=%d", c)
 	}
 }
 
 func TestRejectPotionAndEmpty(t *testing.T) {
 	seedEquip(t)
-	OpenTest(1)
+	sh := OpenTest(1, 0)
 	bag := newFake(32)
 	bag.set(0, 1001)
-	if c := Mutate(wearReq(1, 0, 0, 0), bag); c != code.EquipInvalid {
+	if c := sh.Mutate(wearReq(1, 0, 0, 0), bag); c != code.EquipInvalid {
 		t.Fatalf("potion %d", c)
 	}
-	if c := Mutate(wearReq(1, 0, 3, 0), bag); c != code.BagSlotInvalid {
+	if c := sh.Mutate(wearReq(1, 0, 3, 0), bag); c != code.BagSlotInvalid {
 		t.Fatalf("empty %d", c)
 	}
-	if c := Mutate(wearReq(1, 0, 0, 99), bag); c != code.EquipInvalid && c != code.EquipSlotInvalid {
+	if c := sh.Mutate(wearReq(1, 0, 0, 99), bag); c != code.EquipInvalid && c != code.EquipSlotInvalid {
 		t.Fatalf("bad slot %d", c)
 	}
 }
@@ -161,22 +161,22 @@ func TestRejectPotionAndEmpty(t *testing.T) {
 func TestWearPersistsAcrossReload(t *testing.T) {
 	persistence.UseMemoryDBForTest(t)
 	seedEquip(t)
-	OpenTest(7)
+	sh := OpenTest(7, 0)
 	bag := newFake(32)
 	bag.set(0, 2001)
-	if c := Mutate(wearReq(7, 0, 0, 0), bag); c != code.OK {
+	if c := sh.Mutate(wearReq(7, 0, 0, 0), bag); c != code.OK {
 		t.Fatal(c)
 	}
-	rows, dirty := PeekDirty(7)
+	rows, dirty := sh.PeekDirty()
 	if !dirty || len(rows) != 1 {
 		t.Fatalf("dirty=%v rows=%v", dirty, rows)
 	}
 	if err := persistence.FlushPlayer(context.Background(), 7, nil, []persistence.EquipRow{{SlotID: rows[0].SlotID, ItemID: rows[0].ItemID}}, true); err != nil {
 		t.Fatal(err)
 	}
-	AckDirty(7)
-	Unload(7)
-	st, c := State(7)
+	sh.AckDirty()
+	sh.Unload()
+	st, c := sh.State()
 	if c != code.OK || st.Slots[0].ItemId != 2001 {
 		t.Fatalf("code=%d state=%v", c, st)
 	}
@@ -304,4 +304,10 @@ func (f *fakeStock) PutFirst(item, level int32) (int32, error) {
 		}
 	}
 	return 0, persistence.ErrBagFull
+}
+
+// mustLevel 读一个部位的强化等级，测试用。
+func mustLevel(s *Sheet, slotID int32) int32 {
+	_, lv := s.Worn(slotID)
+	return lv
 }

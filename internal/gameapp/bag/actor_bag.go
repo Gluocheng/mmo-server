@@ -38,6 +38,7 @@ type actorBag struct {
 
 	playerID     int64             // 当前服务的角色 id（懒加载时确定）
 	bags         map[int32]*memBag // bagType -> 内存背包
+	sheet        *equip.Sheet      // 穿着内存。与背包格子同属本 Actor，单线程读写
 	offlineTimer uint64            // 离线卸载倒计时定时器 id，0 表示无
 }
 
@@ -59,6 +60,8 @@ func (p *actorBag) OnInit() {
 	p.Remote().Register("rewardClaim", p.rewardClaim)
 	p.Remote().Register("equipApply", p.equipApply)
 	p.Remote().Register("equipEnhance", p.equipEnhance)
+	p.Remote().Register("equipState", p.equipState)
+	p.Remote().Register("equipAttach", p.equipAttach)
 }
 
 // playerIDFromSession 从已进场的 session 取出角色 id。
@@ -116,7 +119,10 @@ func (p *actorBag) offline() {
 	p.offlineTimer = p.Timer().AddOnce(offlineUnloadAfter(), func() {
 		p.offlineTimer = 0
 		p.flushDirty()
-		equip.Unload(p.playerID)
+		if p.sheet != nil {
+			p.sheet.Unload()
+			p.sheet = nil
+		}
 		p.bags = make(map[int32]*memBag)
 		p.playerID = 0
 	})
@@ -356,7 +362,19 @@ func bagErrorCode(err error) int32 {
 	}
 }
 
-// flushDirty 把当前角色的脏背包和脏穿着放进同一次事务。
+// peekEquipDirty 取本 Actor 的脏穿着。穿着与背包同属本 Actor，直接本地读，不再跨 Actor。
+func (p *actorBag) peekEquipDirty() ([]persistence.EquipRow, bool) {
+	if p.sheet == nil {
+		return nil, false
+	}
+	rows, dirty := p.sheet.PeekDirty()
+	out := make([]persistence.EquipRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, persistence.EquipRow{SlotID: row.SlotID, ItemID: row.ItemID, Level: row.Level})
+	}
+	return out, dirty
+}
+
 func (p *actorBag) flushDirty() {
 	if p.playerID < 1 {
 		return
@@ -377,7 +395,7 @@ func (p *actorBag) flushDirty() {
 			dirtyBags = append(dirtyBags, mb)
 		}
 	}
-	worn, equipDirty := equip.PeekDirty(p.playerID)
+	worn, equipDirty := p.peekEquipDirty()
 	if len(diffs) == 0 && !equipDirty {
 		return
 	}
@@ -393,7 +411,7 @@ func (p *actorBag) flushDirty() {
 		mb.clearTouched()
 	}
 	if equipDirty {
-		equip.AckDirty(p.playerID)
+		p.sheet.AckDirty()
 	}
 }
 

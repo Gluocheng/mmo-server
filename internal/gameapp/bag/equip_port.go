@@ -66,8 +66,23 @@ func (m *memMat) Take(itemID, count int32) error {
 	return m.mb.removeByItemID(equip.MaterialBag, itemID, count)
 }
 
-// equipApply 在背包 Actor 里一次做完穿脱引起的格子变化，再改穿着。
-func (p *actorBag) equipApply(req *protocol.EquipApply) (*protocol.BagListResponse, int32) {
+// ensureSheet 取出穿着内存，首次使用时按请求里的玩家建好。
+func (p *actorBag) ensureSheet(playerID, uid int64) *equip.Sheet {
+	if p.sheet == nil {
+		p.sheet = equip.NewSheet()
+	}
+	if playerID > 0 {
+		p.sheet.PlayerID = playerID
+	}
+	if uid > 0 {
+		p.sheet.UID = uid
+	}
+	return p.sheet
+}
+
+// equipApply 在背包 Actor 内一次做完穿脱引起的格子变更和穿着变更。
+// 两者同属本 Actor 的邮箱，任何一步失败都不会留下半套状态。
+func (p *actorBag) equipApply(req *protocol.EquipApply) (*protocol.EquipApplyResult, int32) {
 	if req == nil || req.PlayerId < 1 {
 		return nil, code.PlayerNotEntered
 	}
@@ -79,14 +94,18 @@ func (p *actorBag) equipApply(req *protocol.EquipApply) (*protocol.BagListRespon
 	if err != nil {
 		return nil, code.BagLoadFail
 	}
-	c := equip.Mutate(req, &memStock{mb: mb, bagType: bagType})
+	sheet := p.ensureSheet(req.PlayerId, req.Uid)
+	if c := sheet.Mutate(req, &memStock{mb: mb, bagType: bagType}); c != code.OK {
+		return nil, c
+	}
+	state, c := sheet.State()
 	if c != code.OK {
 		return nil, c
 	}
-	return mb.toProto(bagType), code.OK
+	return &protocol.EquipApplyResult{State: state, Bag: mb.toProto(bagType)}, code.OK
 }
 
-// equipEnhance 在背包 Actor 里扣材料并改穿着等级。失败时两边都不变。
+// equipEnhance 在背包 Actor 内扣材料并改穿着等级。失败时两边都不变。
 func (p *actorBag) equipEnhance(req *protocol.EquipEnhanceApply) (*protocol.EquipEnhanceResult, int32) {
 	if req == nil || req.PlayerId < 1 {
 		return nil, code.PlayerNotEntered
@@ -95,12 +114,34 @@ func (p *actorBag) equipEnhance(req *protocol.EquipEnhanceApply) (*protocol.Equi
 	if err != nil {
 		return nil, code.BagLoadFail
 	}
-	out, c := equip.Enhance(req.PlayerId, req.Uid, req.SlotId, req.UseProtect, &memMat{mb: mb})
+	sheet := p.ensureSheet(req.PlayerId, req.Uid)
+	out, c := sheet.Enhance(req.Uid, req.SlotId, req.UseProtect, &memMat{mb: mb})
 	if c != code.OK {
 		return nil, c
 	}
+	state, sc := sheet.State()
+	if sc != code.OK {
+		return nil, sc
+	}
 	return &protocol.EquipEnhanceResult{
 		Success: out.Success, Dropped: out.Dropped, ProtectUsed: out.ProtectUsed,
-		Level: out.Level, Attrs: out.Attrs, Bag: mb.toProto(equip.MaterialBag),
+		Level: out.Level, Attrs: out.Attrs, Bag: mb.toProto(equip.MaterialBag), State: state,
 	}, code.OK
+}
+
+// equipState 返回穿着。穿脱和落库都在本 Actor，读到的必然是一致的快照。
+func (p *actorBag) equipState(req *protocol.EquipStateRequest) (*protocol.EquipState, int32) {
+	if req == nil || req.PlayerId < 1 {
+		return nil, code.PlayerNotEntered
+	}
+	return p.ensureSheet(req.PlayerId, req.Uid).State()
+}
+
+// equipAttach 进场或切图后把穿着叠到战斗单位上。
+func (p *actorBag) equipAttach(req *protocol.EquipStateRequest) int32 {
+	if req == nil || req.PlayerId < 1 {
+		return code.PlayerNotEntered
+	}
+	p.ensureSheet(req.PlayerId, req.Uid).Attach(req.Uid, req.PlayerId)
+	return code.OK
 }

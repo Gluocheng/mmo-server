@@ -61,7 +61,7 @@ message EquipEnhanceApply {
   bool use_protect = 4 [json_name = "useProtect"];
 }
 
-// EquipEnhanceResult 把强化结果和材料背包一起带回 equip Actor，由它再拆成客户端响应和推送。
+// EquipEnhanceResult 把强化结果、材料背包和最新穿着一起带回 equip Actor，由它再拆成客户端响应和推送。
 message EquipEnhanceResult {
   bool success = 1 [json_name = "success"];
   bool dropped = 2 [json_name = "dropped"];
@@ -69,6 +69,7 @@ message EquipEnhanceResult {
   int32 level = 4 [json_name = "level"];
   repeated EquipAttr attrs = 5 [json_name = "attrs"];
   BagListResponse bag = 6 [json_name = "bag"];
+  EquipState state = 7 [json_name = "state"];
 }
 
 // EquipApply 是 equip Actor 交给背包 Actor 的一次穿脱。在背包 Actor 内一次做完格子变更。
@@ -79,4 +80,16 @@ message EquipApply {
   int32 bag_type = 4 [json_name = "bagType"];
   int32 bag_slot = 5 [json_name = "bagSlot"];
   int32 target_slot = 6 [json_name = "targetSlot"];
+}
+
+// EquipApplyResult 是背包 Actor 做完穿脱后带回的穿着和背包。
+message EquipApplyResult {
+  EquipState state = 1 [json_name = "state"];
+  BagListResponse bag = 2 [json_name = "bag"];
+}
+
+// EquipStateRequest 查询穿着。穿着和背包同属背包 Actor，由它回。
+message EquipStateRequest {
+  int64 player_id = 1 [json_name = "playerId"];
+  int64 uid = 2 [json_name = "uid"];
 }
