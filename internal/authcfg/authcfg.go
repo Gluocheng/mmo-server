@@ -67,17 +67,17 @@ func PasswordWorkers() int {
 
 // EnabledLoginNodeIDs 返回 profile 里启用的登录节点，按 node id 升序。读不到时退回 login-1。
 func EnabledLoginNodeIDs() []string {
-	raw := cprofile.GetConfig("node", "login")
-	if raw == nil || raw.Size() < 1 {
+	raw := cprofile.GetConfig("node").GetConfig("login")
+	if raw == nil || raw.LastError() != nil || raw.Size() < 1 {
 		return []string{"login-1"}
 	}
 	ids := make([]string, 0, raw.Size())
 	for i := 0; i < raw.Size(); i++ {
-		item := raw.Get(i)
-		if item == nil || item.LastError() != nil || !item.Get("enable").ToBool() {
+		item := raw.GetConfig(i)
+		if item == nil || item.LastError() != nil || !item.GetBool("enable") {
 			continue
 		}
-		id := strings.TrimSpace(item.Get("node_id").ToString())
+		id := strings.TrimSpace(item.GetString("node_id"))
 		if id != "" {
 			ids = append(ids, id)
 		}
