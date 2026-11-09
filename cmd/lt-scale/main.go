@@ -14,7 +14,11 @@ import (
 	"github.com/example/mmo-server/internal/protocol"
 )
 
-var addr string
+var (
+	addr  string
+	only  string
+	retry bool
+)
 
 type pair struct {
 	access  string
@@ -23,6 +27,8 @@ type pair struct {
 
 func main() {
 	flag.StringVar(&addr, "addr", "gate-entry:10100", "gate entry host:port")
+	flag.StringVar(&only, "only", "", "只跑其中一项：lt01 / lt02 / lt03，留空跑全部")
+	flag.BoolVar(&retry, "retry", false, "收到 40036 时退避重试，验证客户端重试能否吃掉全部")
 	flag.Parse()
 	if err := waitReady(); err != nil {
 		fmt.Println(err)
@@ -31,14 +37,20 @@ func main() {
 	failed := false
 	for _, n := range []int{2000} {
 		fmt.Printf("\n######## %d 账号 ########\n", n)
-		if !lt01(n) {
-			failed = true
+		if only == "" || only == "lt01" {
+			if !lt01(n, retry) {
+				failed = true
+			}
 		}
-		if !lt02(n) {
-			failed = true
+		if only == "" || only == "lt02" {
+			if !lt02(n) {
+				failed = true
+			}
 		}
-		if !lt03(n) {
-			failed = true
+		if only == "" || only == "lt03" {
+			if !lt03(n) {
+				failed = true
+			}
 		}
 	}
 	if failed {
@@ -63,34 +75,73 @@ func waitReady() error {
 	return fmt.Errorf("入口未就绪: %v", last)
 }
 
-func lt01(n int) bool {
-	fmt.Printf("== LT-01 同时签发 %d ==\n", n)
+func lt01(n int, retry bool) bool {
+	fmt.Printf("== LT-01 同时签发 %d（重试=%v）==\n", n, retry)
 	codes := make([]int, n)
 	lats := make([]time.Duration, n)
+	attempts := make([]int, n)
 	stamp := time.Now().UnixNano()
 	var sample error
 	var once sync.Once
 	start := time.Now()
 	parallel(n, func(i int) {
-		var rsp protocol.IssueTokenResponse
-		code, lat, err := request("gate.user.issueToken", &protocol.IssueTokenRequest{
-			Nickname: fmt.Sprintf("a%d-%d", stamp, i),
-			Password: "123456",
-			DeviceId: "lt-scale",
-		}, &rsp)
-		codes[i], lats[i] = code, lat
-		if err != nil {
-			once.Do(func() { sample = err })
-		}
-		if err == nil && (rsp.AccessToken == "" || rsp.RefreshToken == "") {
-			codes[i] = -3
+		nick := fmt.Sprintf("a%d-%d", stamp, i)
+		backoff := 100 * time.Millisecond
+		total := time.Duration(0)
+		for try := 0; ; try++ {
+			var rsp protocol.IssueTokenResponse
+			t := time.Now()
+			code, _, err := request("gate.user.issueToken", &protocol.IssueTokenRequest{
+				Nickname: nick, Password: "123456", DeviceId: "lt-scale",
+			}, &rsp)
+			spent := time.Since(t)
+			total += spent
+			attempts[i] = try + 1
+			if err != nil {
+				once.Do(func() { sample = err })
+			}
+			if code == 0 && err == nil && rsp.AccessToken != "" && rsp.RefreshToken != "" {
+				codes[i] = 0
+				lats[i] = total
+				return
+			}
+			if err == nil && code == 0 {
+				code = -3
+			}
+			codes[i] = code
+			if !retry || code != 40036 || try >= 12 {
+				lats[i] = total
+				return
+			}
+			time.Sleep(backoff)
+			if backoff < 2*time.Second {
+				backoff *= 2
+			}
 		}
 	})
 	if sample != nil && count(codes, 0) != n {
 		fmt.Printf("失败样例: %v\n", sample)
 	}
 	printStats("issueToken", time.Since(start), codes, lats)
-	return count(codes, 0) == n
+	// 40036 是排队已满的快速拒绝，和 40005（网关等登录服超时）不是一回事，
+	// 单独看它自己的耗时，确认没有挂到 request_timeout。
+	var busyLats []time.Duration
+	for i, c := range codes {
+		if c == 40036 {
+			busyLats = append(busyLats, lats[i])
+		}
+	}
+	sort.Slice(busyLats, func(i, j int) bool { return busyLats[i] < busyLats[j] })
+	if len(busyLats) > 0 {
+		fmt.Printf("40036 繁忙=%d 耗时 p50=%s p95=%s max=%s\n", len(busyLats),
+			pct(busyLats, 50), pct(busyLats, 95), busyLats[len(busyLats)-1].Round(time.Millisecond))
+	}
+	fmt.Printf("签发判定 成功=%d 繁忙40036=%d 网关超时40005=%d 其他=%d\n",
+		count(codes, 0), count(codes, 40036), count(codes, 40005),
+		n-count(codes, 0)-count(codes, 40036)-count(codes, 40005))
+	// 判据：不许再出现 40005，也不许出现连不上；成功 + 繁忙必须等于总数。
+	return count(codes, 40005) == 0 && count(codes, -1) == 0 &&
+		count(codes, 0)+count(codes, 40036) == n
 }
 
 func lt02(n int) bool {
