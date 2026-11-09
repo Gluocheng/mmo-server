@@ -428,7 +428,7 @@ Go 类型入口：`internal/protocol/types.go`（别名至 `internal/protocolpb/
 | 40033 | `AccountBanned`       | 账号已封禁（登录/刷新/鉴权） |
 | 40034 | `ChatMuted`           | 账号禁言中（发聊天） |
 | 40035 | `ServerMaintenance`   | 服务器维护中（登录/刷新/鉴权） |
-| 40036 | `LoginBusy`           | 签发排队已满，应退避后重试 |
+| 40036 | `LoginBusy`           | 签发排队已满，客户端应退避重试（建议 200ms 起指数退避、上限 2s），不要显示成登录失败 |
 | 40037 | `ChatBusy`            | 聊天广播队列已满，这次没有发出去 |
 | 40040 | `CombatSkillInvalid`  | 技能不存在或目标方式非法 |
 | 40041 | `CombatBuffInvalid`   | Buff 不存在或效果非法 |
