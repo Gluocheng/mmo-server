@@ -1,12 +1,14 @@
 package authcfg
 
 import (
-	"runtime"
 	"sort"
 	"strings"
 
 	cprofile "github.com/cherry-game/cherry/profile"
 )
+
+// maxPasswordWorkers 是每个登录进程密码工人数的上限，与 session 工人上限一致，避免单进程开过多连接。
+const maxPasswordWorkers = 16
 
 // SessionWorkers 返回每个登录节点的 session 工人数。未配置时为 8，上限 16，以免超过单进程 MySQL 连接池。
 func SessionWorkers() int {
@@ -26,30 +28,22 @@ func SessionWorkers() int {
 }
 
 // PasswordWorkersFrom 计算每个登录进程的密码工人数。
-// 先按核数平分到登录节点，至少 2 个；再留给 session 工人和其余数据库调用 4 条连接。
-func PasswordWorkersFrom(cpu, nodes, openConns, sessionWorkers int) int {
-	if nodes < 1 {
-		nodes = 1
-	}
-	if cpu < 1 {
-		cpu = 1
-	}
-	n := cpu / nodes
-	if n < 2 {
-		n = 2
-	}
+// 按可用数据库连接数决定，留给 session 工人和其余数据库调用 4 条连接，上限 16。
+// 不再按核数平分：bcrypt 是纯 CPU 活，连接够就该多开工人，
+// 否则 2000 人同时签发的吞吐被工人数卡死（实测每请求约 196ms，20 秒窗口需要 ≥14 并发）。
+func PasswordWorkersFrom(openConns, sessionWorkers int) int {
 	if openConns < 1 {
 		openConns = 20
 	}
 	if sessionWorkers < 1 {
 		sessionWorkers = 8
 	}
-	room := openConns - sessionWorkers - 4
-	if room < 2 {
-		room = 2
+	n := openConns - sessionWorkers - 4
+	if n < 2 {
+		n = 2
 	}
-	if n > room {
-		n = room
+	if n > maxPasswordWorkers {
+		n = maxPasswordWorkers
 	}
 	return n
 }
@@ -62,7 +56,7 @@ func PasswordWorkers() int {
 			openConns = v
 		}
 	}
-	return PasswordWorkersFrom(runtime.NumCPU(), len(EnabledLoginNodeIDs()), openConns, SessionWorkers())
+	return PasswordWorkersFrom(openConns, SessionWorkers())
 }
 
 // EnabledLoginNodeIDs 返回 profile 里启用的登录节点，按 node id 升序。读不到时退回 login-1。

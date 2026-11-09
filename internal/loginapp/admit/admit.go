@@ -3,7 +3,9 @@ package admit
 import "sync/atomic"
 
 // QueueLimit 每个密码工人同时占住的名额，含正在算哈希的那一条。
-const QueueLimit int32 = 32
+// 16 工人 × 64 = 1024/节点，两个登录节点合计 2048，能一次吃下 2000 人同时签发。
+// 名额只是排队上限，不是并发数：真正同时算哈希的仍只有工人数个。
+const QueueLimit int32 = 64
 
 // Gate 按工人计数。满了的工人不再接收，调用方改试下一个。
 type Gate struct {

@@ -135,7 +135,7 @@ func TestFindOrCreateAccountInTxCreatesAndFinds(t *testing.T) {
 	var uid int64
 	if err := WithinTx(ctx, func(txCtx context.Context) error {
 		var err error
-		uid, err = findOrCreateAccountInTx(txCtx, "hero", "secret")
+		uid, err = findOrCreateAccountInTx(txCtx, "hero", "secret", "")
 		return err
 	}); err != nil {
 		t.Fatalf("create account: %v", err)
@@ -145,7 +145,7 @@ func TestFindOrCreateAccountInTxCreatesAndFinds(t *testing.T) {
 	}
 
 	if err := WithinTx(ctx, func(txCtx context.Context) error {
-		got, err := findOrCreateAccountInTx(txCtx, "hero", "secret")
+		got, err := findOrCreateAccountInTx(txCtx, "hero", "secret", "")
 		if err != nil {
 			return err
 		}
@@ -165,7 +165,7 @@ func TestFindOrCreateAccountInTxUsesGeneratedUID(t *testing.T) {
 	var uid int64
 	if err := WithinTx(ctx, func(txCtx context.Context) error {
 		var err error
-		uid, err = findOrCreateAccountInTx(txCtx, "generated", "secret")
+		uid, err = findOrCreateAccountInTx(txCtx, "generated", "secret", "")
 		return err
 	}); err != nil {
 		t.Fatalf("create account: %v", err)
@@ -181,14 +181,14 @@ func TestFindOrCreateAccountInTxInvalidPassword(t *testing.T) {
 	ctx := context.Background()
 
 	if err := WithinTx(ctx, func(txCtx context.Context) error {
-		_, err := findOrCreateAccountInTx(txCtx, "hero", "secret")
+		_, err := findOrCreateAccountInTx(txCtx, "hero", "secret", "")
 		return err
 	}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
 
 	err := WithinTx(ctx, func(txCtx context.Context) error {
-		_, err := findOrCreateAccountInTx(txCtx, "hero", "wrong")
+		_, err := findOrCreateAccountInTx(txCtx, "hero", "wrong", "")
 		return err
 	})
 	if !errors.Is(err, ErrInvalidPassword) {

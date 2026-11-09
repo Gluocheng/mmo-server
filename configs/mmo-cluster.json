@@ -138,8 +138,8 @@
   },
   "mysql": {
     "dsn": "root:123456@tcp(127.0.0.1:3306)/mmo?charset=utf8mb4&parseTime=True&loc=Local",
-    "max_open_conns": 20,
-    "max_idle_conns": 10
+    "max_open_conns": 40,
+    "max_idle_conns": 40
   },
   "gate_entry": {
     "listen": ":10100",

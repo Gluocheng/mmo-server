@@ -97,7 +97,9 @@ func scheduleAccountCacheRefresh(ctx context.Context, nickname string, uid int64
 
 }
 
-func findOrCreateAccountInTx(ctx context.Context, nickname, password string) (int64, error) {
+// findOrCreateAccountInTx 在事务内查号或建号。passwordHash 是调用方在事务外算好的哈希，
+// 只在需要新建时使用；账号已存在时丢弃，改用库里已有的哈希校验。
+func findOrCreateAccountInTx(ctx context.Context, nickname, password, passwordHash string) (int64, error) {
 
 	var acc model.Account
 
@@ -123,12 +125,12 @@ func findOrCreateAccountInTx(ctx context.Context, nickname, password string) (in
 
 	}
 
-	passwordHash, err := hashPassword(password)
-
-	if err != nil {
-
-		return 0, err
-
+	if passwordHash == "" {
+		var hErr error
+		passwordHash, hErr = hashPassword(password)
+		if hErr != nil {
+			return 0, hErr
+		}
 	}
 
 	uid, err := nextUID()

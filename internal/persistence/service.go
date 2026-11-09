@@ -34,10 +34,17 @@ func LoginOrCreateAccountContext(parent context.Context, nickname, password stri
 		}
 	}
 
+	// 哈希在事务外算。bcrypt 一次约 57ms，放事务里会一直占着 MySQL 连接。
+	// 账号若已存在，这份哈希会被事务内的校验分支丢弃，属于可接受的浪费。
+	passwordHash, err := hashPassword(password)
+	if err != nil {
+		return 0, err
+	}
+
 	var uid int64
-	err := WithinTx(ctx, func(txCtx context.Context) error {
+	err = WithinTx(ctx, func(txCtx context.Context) error {
 		var innerErr error
-		uid, innerErr = findOrCreateAccountInTx(txCtx, nickname, password)
+		uid, innerErr = findOrCreateAccountInTx(txCtx, nickname, password, passwordHash)
 		return innerErr
 	})
 	return uid, err
