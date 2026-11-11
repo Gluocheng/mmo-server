@@ -181,7 +181,7 @@ func TestLifestealCapsAtMissingHP(t *testing.T) {
 	}
 }
 
-func TestDotDoesNotLifesteal(t *testing.T) {
+func TestDotUsesStrikeTail(t *testing.T) {
 	seedAttr(t)
 	join(t, 92701, 0)
 	setPoints(92701, 0, 0, 0, 0, 0, 100)
@@ -190,10 +190,77 @@ func TestDotDoesNotLifesteal(t *testing.T) {
 	}
 	SetClockForTest(1000)
 	frames := Tick()
-	if _, ok := healHit(frames, 92701); ok {
-		t.Fatal("dot healed")
+	hit, ok := buffHit(frames, 92701, 92701, false)
+	if !ok || hit.Amount != 4 || hit.Crit || hit.BuffID != 1 {
+		t.Fatalf("dot %+v", hit)
 	}
-	if hp, _, _, _ := Snapshot(92701); hp != 96 {
-		t.Fatalf("dot %d", hp)
+	heal, ok := buffHit(frames, 92701, 92701, true)
+	if !ok || heal.Amount != 4 || heal.BuffID != 1 {
+		t.Fatalf("leech %+v", heal)
 	}
+	if hp, _, _, _ := Snapshot(92701); hp != 100 {
+		t.Fatalf("hp %d", hp)
+	}
+}
+
+func TestDotCritPenBonusAndReduction(t *testing.T) {
+	seedAttr(t)
+	join(t, 92801, 0)
+	join(t, 92802, 0)
+	if c := ApplyBuff(92802, 1); c != code.OK {
+		t.Fatal(c)
+	}
+	mu.Lock()
+	units[92802].buffs[0].source = 92801
+	units[92802].baseDefense = 5
+	mu.Unlock()
+	setPoints(92801, 100, 0, 100, 100, 0, 0)
+	setPoints(92802, 0, 0, 0, 0, 50, 0)
+	SetClockForTest(1000)
+	frames := Tick()
+	hit, ok := buffHit(frames, 92801, 92802, false)
+	// 4 暴击成 6，穿透后不减 5 防，加成翻倍成 12，减免 50% 成 6。
+	if !ok || !hit.Crit || hit.Amount != 6 {
+		t.Fatalf("dot %+v", hit)
+	}
+}
+
+func TestHotCritAndBonusIgnoreReduction(t *testing.T) {
+	seedAttr(t)
+	join(t, 92901, 0)
+	if c := ApplyBuff(92901, 8); c != code.OK {
+		t.Fatal(c)
+	}
+	mu.Lock()
+	units[92901].hp = 50
+	mu.Unlock()
+	setPoints(92901, 0, 0, 100, 0, 75, 100)
+	SetClockForTest(1000)
+	frames := Tick()
+	heal, ok := buffHit(frames, 92901, 92901, true)
+	if !ok || heal.Crit || heal.Amount != 10 || heal.TargetHP != 60 {
+		t.Fatalf("plain %+v", heal)
+	}
+	mu.Lock()
+	units[92901].hp = 40
+	mu.Unlock()
+	setPoints(92901, 100, 0, 0, 100, 75, 0)
+	SetClockForTest(2000)
+	frames = Tick()
+	heal, ok = buffHit(frames, 92901, 92901, true)
+	// 10 暴击成 15，伤害加成再翻倍成 30。减免和吸血不改治疗。
+	if !ok || !heal.Crit || heal.Amount != 30 || heal.TargetHP != 70 {
+		t.Fatalf("amped %+v", heal)
+	}
+}
+
+func buffHit(frames []Frame, src, dst int64, heal bool) (Hit, bool) {
+	for _, f := range frames {
+		for _, h := range f.Hits {
+			if h.SourceUID == src && h.TargetUID == dst && h.Heal == heal && h.BuffID != 0 {
+				return h, true
+			}
+		}
+	}
+	return Hit{}, false
 }

@@ -216,6 +216,15 @@ func strikeDamage(attacker *unit, skillDamage, factor int32, defender *unit, now
 	if raw <= 0 {
 		return 0, false
 	}
+	return finishOutgoing(attacker, defender, raw)
+}
+
+// finishOutgoing 从已算好的基数走暴击、穿透减防、伤害加成和受伤减免。
+// 基数小于等于 0 时造成 0。基数大于 0 时，减防和减免之后至少为 1。来源为空则暴击、穿透和加成为 0。
+func finishOutgoing(attacker, defender *unit, raw int64) (int32, bool) {
+	if raw <= 0 {
+		return 0, false
+	}
 	outgoing := raw
 	crit := false
 	if attacker != nil && critRoll(attacker.critRate) {
@@ -223,32 +232,14 @@ func strikeDamage(attacker *unit, skillDamage, factor int32, defender *unit, now
 		crit = true
 	}
 	if outgoing > 0 && defender != nil {
-		pen := int64(0)
-		if attacker != nil {
-			pen = int64(attacker.penetrate)
-		}
-		if pen < 0 {
-			pen = 0
-		}
-		if pen > 100 {
-			pen = 100
-		}
-		effDef := int64(defender.defense) * (100 - pen) / 100
+		effDef := int64(defender.defense) * (100 - clampPct(attackerPenetrate(attacker))) / 100
 		outgoing -= effDef
 		if outgoing < 1 {
 			outgoing = 1
 		}
 	}
-	bonus := int64(0)
-	if attacker != nil {
-		bonus = int64(attacker.damageBonus)
-	}
-	reduction := int64(0)
-	if defender != nil {
-		reduction = int64(defender.damageReduction)
-	}
-	outgoing = outgoing * (100 + bonus) / 100
-	outgoing = outgoing * (100 - reduction) / 100
+	outgoing = outgoing * (100 + attackerBonus(attacker)) / 100
+	outgoing = outgoing * (100 - defenderReduction(defender)) / 100
 	if outgoing < 1 {
 		outgoing = 1
 	}
@@ -256,6 +247,62 @@ func strikeDamage(attacker *unit, skillDamage, factor int32, defender *unit, now
 		outgoing = math.MaxInt32
 	}
 	return int32(outgoing), crit
+}
+
+// amplifyHeal 用来源的暴击和伤害加成放大治疗。穿透、受伤减免和吸血不参与。
+// 基数小于 1 时不治疗。来源为空则不暴击、不加成。
+func amplifyHeal(source *unit, raw int32) (int32, bool) {
+	if raw < 1 {
+		return 0, false
+	}
+	outgoing := int64(raw)
+	crit := false
+	if source != nil && critRoll(source.critRate) {
+		outgoing = outgoing * (150 + int64(source.critDamage)) / 100
+		crit = true
+	}
+	outgoing = outgoing * (100 + attackerBonus(source)) / 100
+	if outgoing < 1 {
+		outgoing = 1
+	}
+	if outgoing > math.MaxInt32 {
+		outgoing = math.MaxInt32
+	}
+	return int32(outgoing), crit
+}
+
+func attackerPenetrate(attacker *unit) int64 {
+	if attacker == nil {
+		return 0
+	}
+	return clampPct(int64(attacker.penetrate))
+}
+
+func attackerBonus(attacker *unit) int64 {
+	if attacker == nil || attacker.damageBonus < 0 {
+		return 0
+	}
+	return int64(attacker.damageBonus)
+}
+
+func defenderReduction(defender *unit) int64 {
+	if defender == nil || defender.damageReduction < 0 {
+		return 0
+	}
+	if defender.damageReduction > 100 {
+		return 100
+	}
+	return int64(defender.damageReduction)
+}
+
+func clampPct(v int64) int64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
 }
 
 // critRoll 按暴击率掷点。测试可换成固定结果。

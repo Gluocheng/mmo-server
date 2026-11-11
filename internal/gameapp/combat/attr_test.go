@@ -19,6 +19,7 @@ func seedAttr(t *testing.T) {
 		},
 		[]gcruntime.BuffDef{
 			{ID: 1, Name: "撕裂", DurationMs: 3000, IntervalMs: 1000, Effect: "dot", Value: 4, MaxStack: 1},
+			{ID: 8, Name: "愈合", DurationMs: 3000, IntervalMs: 1000, Effect: "hot", Value: 10, MaxStack: 1},
 			{ID: 3, Name: "禁手", DurationMs: 2000, Effect: "stun", MaxStack: 1},
 			{ID: 5, Name: "战意", DurationMs: 5000, Effect: "attr", Value: 5, MaxStack: 1, Stat: "attack", Mode: "flat"},
 			{ID: 6, Name: "怒意", DurationMs: 5000, Effect: "attr", Value: 20, MaxStack: 1, Stat: "attack", Mode: "percent"},

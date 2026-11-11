@@ -696,12 +696,35 @@ func tickBuffs(now int64) []Hit {
 				if amt < 1 {
 					amt = b.value
 				}
-				if b.effect == effectHot {
+				src := units[b.source]
+				refreshAttrs(src, now)
+				refreshAttrs(u, now)
+				switch b.effect {
+				case effectHot:
+					// 治疗只被来源的暴击和伤害加成放大。穿透、减免和吸血不改这个数字。
+					healed, crit := amplifyHeal(src, amt)
 					before := u.hp
-					applyHeal(u, amt)
+					applyHeal(u, healed)
 					got := u.hp - before
-					hits = append(hits, Hit{SourceUID: b.source, TargetUID: uid, BuffID: b.id, Amount: got, Heal: true, TargetHP: u.hp})
-				} else {
+					hits = append(hits, Hit{
+						SourceUID: b.source, TargetUID: uid, BuffID: b.id,
+						Amount: got, Heal: true, Crit: crit, TargetHP: u.hp,
+					})
+				case effectDot:
+					// 跳伤基数是配表数值乘层数，之后与普攻同一套暴击、穿透、加减伤。
+					dmg, crit := finishOutgoing(src, u, int64(amt))
+					applyDamage(u, uid, b.source, dmg, now)
+					hits = append(hits, Hit{
+						SourceUID: b.source, TargetUID: uid, BuffID: b.id,
+						Amount: dmg, Crit: crit, TargetHP: u.hp, Dead: u.dead,
+					})
+					if amount, hp, ok := leech(src, dmg); ok {
+						hits = append(hits, Hit{
+							SourceUID: b.source, TargetUID: b.source, BuffID: b.id,
+							Amount: amount, Heal: true, TargetHP: hp,
+						})
+					}
+				default:
 					applyDamage(u, uid, b.source, amt, now)
 					hits = append(hits, Hit{SourceUID: b.source, TargetUID: uid, BuffID: b.id, Amount: amt, TargetHP: u.hp, Dead: u.dead})
 				}
