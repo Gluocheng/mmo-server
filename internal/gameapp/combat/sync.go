@@ -49,6 +49,7 @@ type Snap struct {
 	DamageBonus     int32
 	DamageReduction int32
 	Lifesteal       int32
+	DodgeRate       int32
 	Dead            bool
 	Buffs           []BuffView
 }
@@ -172,7 +173,8 @@ func readSnap(uid int64) (Snap, bool) {
 		UID: uid, HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense,
 		CritRate: u.critRate, CritDamage: u.critDamage, Penetrate: u.penetrate,
 		DamageBonus: u.damageBonus, DamageReduction: u.damageReduction, Lifesteal: u.lifesteal,
-		Dead: u.dead, Buffs: buffViews(u),
+		DodgeRate: u.dodge,
+		Dead:      u.dead, Buffs: buffViews(u),
 	}, true
 }
 
@@ -190,6 +192,7 @@ func pushSnap(sender cfacade.IActor, viewer int64, snap Snap) {
 		Uid: snap.UID, Hp: snap.HP, MaxHp: snap.MaxHP, Attack: snap.Attack, Defense: snap.Defense,
 		Dead: snap.Dead, Buffs: buffs,
 		CritRate: snap.CritRate, CritDamage: snap.CritDamage, Penetrate: snap.Penetrate,
+		DodgeRate:   snap.DodgeRate,
 		DamageBonus: snap.DamageBonus, DamageReduction: snap.DamageReduction, Lifesteal: snap.Lifesteal,
 	})
 }

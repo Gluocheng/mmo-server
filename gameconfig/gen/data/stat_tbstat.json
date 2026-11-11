@@ -5,7 +5,7 @@
   {"id": 4, "name": "crit_rate", "desc": "暴击率", "allow_flat": false, "allow_percent": true, "settle": true},
   {"id": 5, "name": "crit_damage", "desc": "暴击伤害", "allow_flat": false, "allow_percent": true, "settle": true},
   {"id": 6, "name": "hit", "desc": "命中", "allow_flat": false, "allow_percent": true, "settle": false},
-  {"id": 7, "name": "dodge", "desc": "躲闪", "allow_flat": false, "allow_percent": true, "settle": false},
+  {"id": 7, "name": "dodge", "desc": "躲闪", "allow_flat": false, "allow_percent": true, "settle": true},
   {"id": 8, "name": "parry", "desc": "招架", "allow_flat": false, "allow_percent": true, "settle": false},
   {"id": 9, "name": "block_rate", "desc": "格挡率", "allow_flat": false, "allow_percent": true, "settle": false},
   {"id": 10, "name": "block_value", "desc": "格挡值", "allow_flat": true, "allow_percent": false, "settle": false},

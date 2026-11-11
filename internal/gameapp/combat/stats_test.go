@@ -254,6 +254,109 @@ func TestHotCritAndBonusIgnoreReduction(t *testing.T) {
 	}
 }
 
+func setDodge(uid int64, rate int32) {
+	mu.Lock()
+	defer mu.Unlock()
+	u := units[uid]
+	u.eqDodge = rate
+	refreshAttrs(u, nowFn())
+}
+
+func TestNoDodgeMatchesOldDamage(t *testing.T) {
+	seedAttr(t)
+	join(t, 93001, 0)
+	join(t, 93002, 0)
+	placeWolf(t, 93003)
+	if c := Cast(93001, 1, 93002); c != code.OK {
+		t.Fatal(c)
+	}
+	frames := Tick()
+	hit, ok := damageHit(frames, 93001, 93002)
+	if !ok || hit.Dodge || hit.Amount != 10 {
+		t.Fatalf("player %+v", hit)
+	}
+	if hp, _, _, _ := Snapshot(93002); hp != 90 {
+		t.Fatalf("hp %d", hp)
+	}
+	SetClockForTest(1000)
+	if c := Cast(93001, 1, 93003); c != code.OK {
+		t.Fatal(c)
+	}
+	Tick()
+	if hp, _, _, _ := Snapshot(93003); hp != 72 {
+		t.Fatalf("wolf %d", hp)
+	}
+}
+
+func TestDodgeSkipsDamageCritAndLeech(t *testing.T) {
+	seedAttr(t)
+	join(t, 93101, 0)
+	join(t, 93102, 0)
+	setDodge(93102, 10000)
+	setPoints(93101, 100, 0, 0, 0, 0, 100)
+	SetCritRollsForTest(true)
+	if c := Cast(93101, 1, 93102); c != code.OK {
+		t.Fatal(c)
+	}
+	frames := Tick()
+	hit, ok := damageHit(frames, 93101, 93102)
+	if !ok || !hit.Dodge || hit.Crit || hit.Amount != 0 {
+		t.Fatalf("dodged %+v", hit)
+	}
+	if _, healed := healHit(frames, 93101); healed {
+		t.Fatal("dodged hit leeched")
+	}
+	if hp, _, _, _ := Snapshot(93102); hp != 100 {
+		t.Fatalf("hp %d", hp)
+	}
+	setDodge(93102, 0)
+	SetClockForTest(1000)
+	if c := Cast(93101, 1, 93102); c != code.OK {
+		t.Fatal(c)
+	}
+	frames = Tick()
+	hit, ok = damageHit(frames, 93101, 93102)
+	if !ok || hit.Dodge || !hit.Crit || hit.Amount != 15 {
+		t.Fatalf("crit after dodge %+v", hit)
+	}
+}
+
+func TestZeroDamageSkillDoesNotDodge(t *testing.T) {
+	seedAttr(t)
+	join(t, 93201, 0)
+	join(t, 93202, 0)
+	setDodge(93202, 10000)
+	if c := Cast(93201, 4, 93202); c != code.OK {
+		t.Fatal(c)
+	}
+	frames := Tick()
+	hit, ok := damageHit(frames, 93201, 93202)
+	if !ok || hit.Dodge || hit.Amount != 0 {
+		t.Fatalf("stun %+v", hit)
+	}
+}
+
+func TestAoeDodgeStillAppliesDot(t *testing.T) {
+	seedAttr(t)
+	join(t, 93301, 0)
+	join(t, 93302, 0)
+	setDodge(93302, 10000)
+	if c := Cast(93301, 2, 93302); c != code.OK {
+		t.Fatal(c)
+	}
+	frames := Tick()
+	hit, ok := damageHit(frames, 93301, 93302)
+	if !ok || !hit.Dodge || hit.Amount != 0 {
+		t.Fatalf("aoe %+v", hit)
+	}
+	SetClockForTest(1000)
+	frames = Tick()
+	dot, ok := buffHit(frames, 93301, 93302, false)
+	if !ok || dot.Dodge || dot.Amount != 4 || dot.BuffID != 1 {
+		t.Fatalf("dot %+v", dot)
+	}
+}
+
 func buffHit(frames []Frame, src, dst int64, heal bool) (Hit, bool) {
 	for _, f := range frames {
 		for _, h := range f.Hits {

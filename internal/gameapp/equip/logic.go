@@ -354,6 +354,8 @@ func addBonus(b *combat.EquipBonus, stat, mode string, value int32) {
 		b.DamageReduction += value
 	case "lifesteal":
 		b.Lifesteal += value
+	case "dodge":
+		b.Dodge += value
 	}
 }
 

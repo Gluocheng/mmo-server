@@ -5,7 +5,7 @@
 ,4,crit_rate,暴击率,false,true,true
 ,5,crit_damage,暴击伤害,false,true,true
 ,6,hit,命中,false,true,false
-,7,dodge,躲闪,false,true,false
+,7,dodge,躲闪,false,true,true
 ,8,parry,招架,false,true,false
 ,9,block_rate,格挡率,false,true,false
 ,10,block_value,格挡值,true,false,false

@@ -56,6 +56,7 @@
 | done | 装备属性扩充 | [2026-11-03-equip-stats-design.md](2026-11-03-equip-stats-design.md) | 实施 [2026-11-03-equip-stats.md](2026-11-03-equip-stats.md)。结算暴击率、暴击伤害、穿透、伤害加成、受伤减免、吸血 |
 | done | 登录过载与广播回包 | [2026-11-03-auth-shed-broadcast-design.md](2026-11-03-auth-shed-broadcast-design.md) | 实施 [2026-11-03-auth-shed-broadcast.md](2026-11-03-auth-shed-broadcast.md)。签发和刷新拆开。密码队列满了立刻 `40036`。移动、聊天先回包再广播 |
 | done | 登录签发吞吐提升 | [2026-11-09-login-issue-throughput-design.md](2026-11-09-login-issue-throughput-design.md) | 实施 [2026-11-09-login-issue-throughput.md](2026-11-09-login-issue-throughput.md)。哈希移出事务、工人数与连接池重配，目标 20 秒内吃下 2000 个全新建号 |
+| done | 躲闪 | [2026-11-11-dodge-design.md](2026-11-11-dodge-design.md) | 实施 [2026-11-11-dodge.md](2026-11-11-dodge.md)。万分比整数。出手前掷点，持续伤害不躲 |
 | planned | GM 运营后台其余 P2 | [backlog-gm-ops.md](backlog-gm-ops.md) | 清背包、改名、邮件/礼包码、细权限等 |
 | planned | DB 版本化迁移 | [backlog-db-migrate.md](backlog-db-migrate.md) | 替代仅 AutoMigrate |
 | done | 背包内存化 | [2026-10-26-bag-inmemory-design.md](2026-10-26-bag-inmemory-design.md) | 实施 [2026-10-26-bag-inmemory.md](2026-10-26-bag-inmemory.md)。进场加载内存，定时与断线落库，离线卸载秒数读 `bag.offline_unload_seconds`，默认 300 |

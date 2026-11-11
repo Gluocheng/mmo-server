@@ -263,11 +263,15 @@ func tickMonsters(now int64) ([]MonsterStep, []Hit) {
 		if foe == nil || foe.dead {
 			continue
 		}
-		dmg, crit := strikeDamage(u, 0, 100, foe, now)
-		applyDamage(foe, target, uid, dmg, now)
-		hits = append(hits, Hit{SourceUID: uid, TargetUID: target, Amount: dmg, TargetHP: foe.hp, Dead: foe.dead, Crit: crit})
-		if amount, hp, ok := leech(u, dmg); ok {
-			hits = append(hits, Hit{SourceUID: uid, TargetUID: uid, Amount: amount, Heal: true, TargetHP: hp})
+		dmg, crit, dodged := resolveStrike(u, foe, 0, 100, now)
+		if !dodged {
+			applyDamage(foe, target, uid, dmg, now)
+		}
+		hits = append(hits, Hit{SourceUID: uid, TargetUID: target, Amount: dmg, TargetHP: foe.hp, Dead: foe.dead, Crit: crit, Dodge: dodged})
+		if !dodged {
+			if amount, hp, ok := leech(u, dmg); ok {
+				hits = append(hits, Hit{SourceUID: uid, TargetUID: uid, Amount: amount, Heal: true, TargetHP: hp})
+			}
 		}
 		u.nextAttack = now + u.attackInterval
 	}

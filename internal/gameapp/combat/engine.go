@@ -22,6 +22,7 @@ type Hit struct {
 	TargetHP  int32 // 结算后目标当前生命
 	Dead      bool  // 这次结算后目标是否死亡
 	Crit      bool  // 这一下已经按暴击乘数算过
+	Dodge     bool  // 这一下被躲开，没有掉血也没有暴击
 }
 
 // BuffView 是快照里的一条 Buff。
@@ -52,6 +53,7 @@ type StatChange struct {
 	DamageBonus     int32 // 最终伤害加成
 	DamageReduction int32 // 最终受伤减免
 	Lifesteal       int32 // 最终吸血
+	DodgeRate       int32 // 最终躲闪率，万分比
 }
 
 // SelfView 是截断时单独保留的观众自己的战斗外观。
@@ -66,6 +68,7 @@ type SelfView struct {
 	DamageBonus     int32      // 最终伤害加成
 	DamageReduction int32      // 最终受伤减免
 	Lifesteal       int32      // 最终吸血
+	DodgeRate       int32      // 最终躲闪率，万分比
 	Buffs           []BuffView // 自己身上的全部 Buff
 }
 
@@ -138,6 +141,8 @@ type unit struct {
 	damageBonus       int32       // 最终伤害加成，最低 0
 	damageReduction   int32       // 最终受伤减免，0 到 75
 	lifesteal         int32       // 最终吸血，0 到 100
+	dodge             int32       // 最终躲闪率，万分比，0 到 10000
+	eqDodge           int32       // 穿着提供的躲闪率万分比
 	baseMaxHP         int32       // 进场或刷出时拷下的生命上限
 	baseAttack        int32       // 进场或刷出时拷下的攻击
 	baseDefense       int32       // 进场或刷出时拷下的防御
@@ -203,6 +208,7 @@ type appearance struct {
 	damageBonus     int32
 	damageReduction int32
 	lifesteal       int32
+	dodge           int32
 	buffs           map[int32]BuffView
 }
 
@@ -230,6 +236,7 @@ func ResetForTest() {
 	nowFn = func() int64 { return gtime.Now().UnixMilli() }
 	storeMonsterSteps(nil)
 	resetCritRoll()
+	resetDodgeRoll()
 }
 
 // SetClockForTest 固定当前毫秒，便于步进心跳。仅测试调用。
@@ -517,17 +524,21 @@ func hitAOE(src int64, sk skillSnap, now int64) []Hit {
 }
 
 func applyHit(src, dst int64, tgt *unit, sk skillSnap, now int64) []Hit {
-	dmg, crit := strikeDamage(units[src], sk.damage, sk.factor, tgt, now)
-	applyDamage(tgt, dst, src, dmg, now)
+	dmg, crit, dodged := resolveStrike(units[src], tgt, sk.damage, sk.factor, now)
+	if !dodged {
+		applyDamage(tgt, dst, src, dmg, now)
+	}
 	hits := []Hit{{
 		SourceUID: src, TargetUID: dst, SkillID: sk.id, Amount: dmg,
-		TargetHP: tgt.hp, Dead: tgt.dead, Crit: crit,
+		TargetHP: tgt.hp, Dead: tgt.dead, Crit: crit, Dodge: dodged,
 	}}
-	if amount, hp, ok := leech(units[src], dmg); ok {
-		hits = append(hits, Hit{
-			SourceUID: src, TargetUID: src, SkillID: sk.id,
-			Amount: amount, Heal: true, TargetHP: hp,
-		})
+	if !dodged {
+		if amount, hp, ok := leech(units[src], dmg); ok {
+			hits = append(hits, Hit{
+				SourceUID: src, TargetUID: src, SkillID: sk.id,
+				Amount: amount, Heal: true, TargetHP: hp,
+			})
+		}
 	}
 	if !tgt.dead && sk.buffID > 0 {
 		if def, ok := gcruntime.Buff(sk.buffID); ok && validBuff(def) {
@@ -917,7 +928,8 @@ func selfOf(u *unit) *SelfView {
 		HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense,
 		CritRate: u.critRate, CritDamage: u.critDamage, Penetrate: u.penetrate,
 		DamageBonus: u.damageBonus, DamageReduction: u.damageReduction, Lifesteal: u.lifesteal,
-		Buffs: buffViews(u),
+		DodgeRate: u.dodge,
+		Buffs:     buffViews(u),
 	}
 }
 
@@ -967,7 +979,8 @@ func collectDiffs() (buffs []BuffChange, stats []StatChange) {
 		}
 		if prev.maxHP != u.maxHP || prev.attack != u.attack || prev.defense != u.defense ||
 			prev.critRate != u.critRate || prev.critDamage != u.critDamage || prev.penetrate != u.penetrate ||
-			prev.damageBonus != u.damageBonus || prev.damageReduction != u.damageReduction || prev.lifesteal != u.lifesteal {
+			prev.damageBonus != u.damageBonus || prev.damageReduction != u.damageReduction || prev.lifesteal != u.lifesteal ||
+			prev.dodge != u.dodge {
 			stats = append(stats, statChangeOf(uid, u))
 		}
 	}
@@ -997,6 +1010,7 @@ func commitAppearance(uid int64) {
 		maxHP: u.maxHP, attack: u.attack, defense: u.defense,
 		critRate: u.critRate, critDamage: u.critDamage, penetrate: u.penetrate,
 		damageBonus: u.damageBonus, damageReduction: u.damageReduction, lifesteal: u.lifesteal,
+		dodge: u.dodge,
 		buffs: buffs,
 	}
 }
@@ -1006,6 +1020,7 @@ func statChangeOf(uid int64, u *unit) StatChange {
 		UID: uid, HP: u.hp, MaxHP: u.maxHP, Attack: u.attack, Defense: u.defense,
 		CritRate: u.critRate, CritDamage: u.critDamage, Penetrate: u.penetrate,
 		DamageBonus: u.damageBonus, DamageReduction: u.damageReduction, Lifesteal: u.lifesteal,
+		DodgeRate: u.dodge,
 	}
 }
 

@@ -6,5 +6,6 @@
   {"id": 5, "item_id": 2001, "stat": "crit_rate", "mode": "percent", "value": 10},
   {"id": 6, "item_id": 2002, "stat": "damage_reduction", "mode": "percent", "value": 5},
   {"id": 7, "item_id": 2003, "stat": "lifesteal", "mode": "percent", "value": 5},
-  {"id": 8, "item_id": 2004, "stat": "crit_damage", "mode": "percent", "value": 20}
+  {"id": 8, "item_id": 2004, "stat": "crit_damage", "mode": "percent", "value": 20},
+  {"id": 9, "item_id": 2005, "stat": "dodge", "mode": "percent", "value": 2000}
 ]

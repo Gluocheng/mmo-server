@@ -201,6 +201,7 @@ func seedEquip(t *testing.T) {
 		{ID: 1, Name: "hp", Settle: true, AllowFlat: true, AllowPercent: true},
 		{ID: 2, Name: "attack", Settle: true, AllowFlat: true, AllowPercent: true},
 		{ID: 3, Name: "defense", Settle: true, AllowFlat: true, AllowPercent: true},
+		{ID: 7, Name: "dodge", Settle: true, AllowPercent: true},
 	})
 	slots := make([]gcruntime.EquipSlotDef, 0, 12)
 	for id := int32(1); id <= 12; id++ {
@@ -220,6 +221,7 @@ func seedEquip(t *testing.T) {
 		{ItemID: 2003, Stat: "attack", Mode: "flat", Value: 1},
 		{ItemID: 2003, Stat: "lifesteal", Mode: "percent", Value: 5},
 		{ItemID: 2004, Stat: "crit_damage", Mode: "percent", Value: 20},
+		{ItemID: 2005, Stat: "dodge", Mode: "percent", Value: 2000},
 	}, []gcruntime.ItemDef{
 		{ID: 1001, Type: "consumable", MaxStack: 99, BagType: 2},
 		{ID: 2001, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 1},
@@ -227,6 +229,7 @@ func seedEquip(t *testing.T) {
 		{ID: 2002, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 4},
 		{ID: 2003, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 10},
 		{ID: 2004, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 10},
+		{ID: 2005, Type: "equipment", MaxStack: 1, BagType: 4, EquipSlot: 8},
 	})
 	rules := make([]gcruntime.EnhanceRule, 0, 10)
 	for lv := int32(1); lv <= 7; lv++ {

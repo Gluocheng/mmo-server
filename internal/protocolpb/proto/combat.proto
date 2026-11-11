@@ -10,7 +10,7 @@ message CombatCastRequest {
   int64 target_uid = 2 [json_name = "targetUid"];
 }
 
-// CombatHit 一拍内的一次命中或跳伤/治疗。crit 表示这一下已经按暴击乘数算过。
+// CombatHit 一拍内的一次命中或跳伤/治疗。crit 表示这一下已经按暴击乘数算过。dodge 表示这一下被躲开。
 message CombatHit {
   int64 source_uid = 1 [json_name = "sourceUid"];
   int64 target_uid = 2 [json_name = "targetUid"];
@@ -21,6 +21,7 @@ message CombatHit {
   int32 target_hp = 7 [json_name = "targetHp"];
   bool dead = 8 [json_name = "dead"];
   bool crit = 9 [json_name = "crit"];
+  bool dodge = 10 [json_name = "dodge"];
 }
 
 // CombatBuff 身上的一条 Buff。层数为 0 表示卸下。
@@ -45,6 +46,7 @@ message CombatSnapshot {
   int32 damage_bonus = 11 [json_name = "damageBonus"];
   int32 damage_reduction = 12 [json_name = "damageReduction"];
   int32 lifesteal = 13 [json_name = "lifesteal"];
+  int32 dodge_rate = 14 [json_name = "dodgeRate"];
 }
 
 // CombatBuffChange 这一拍某个单位的 Buff 变化。
@@ -68,6 +70,7 @@ message CombatStat {
   int32 damage_bonus = 9 [json_name = "damageBonus"];
   int32 damage_reduction = 10 [json_name = "damageReduction"];
   int32 lifesteal = 11 [json_name = "lifesteal"];
+  int32 dodge_rate = 12 [json_name = "dodgeRate"];
 }
 
 // CombatSelf 合包截断时单独留下的自己的生命、属性和 Buff。
@@ -83,6 +86,7 @@ message CombatSelf {
   int32 damage_bonus = 9 [json_name = "damageBonus"];
   int32 damage_reduction = 10 [json_name = "damageReduction"];
   int32 lifesteal = 11 [json_name = "lifesteal"];
+  int32 dodge_rate = 12 [json_name = "dodgeRate"];
 }
 
 // CombatGone 离开视野。客户端丢掉该 uid 的生命和 Buff。

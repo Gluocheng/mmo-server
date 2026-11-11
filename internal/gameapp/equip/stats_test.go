@@ -48,4 +48,19 @@ func TestSeedGearStats(t *testing.T) {
 	if cd != 20 || steal != 5 {
 		t.Fatalf("sharp cd=%d steal=%d", cd, steal)
 	}
+	bag.set(4, 2005)
+	if c := sh.Mutate(wearReq(1, 9, 4, 8), bag); c != code.OK {
+		t.Fatal(c)
+	}
+	dodge, ok := combat.DodgeRate(9)
+	if !ok || dodge != 2000 {
+		t.Fatalf("shoes %d", dodge)
+	}
+	if _, c := sh.Enhance(9, 8, false, newMat(1, 0)); c != code.OK {
+		t.Fatal(c)
+	}
+	dodge, _ = combat.DodgeRate(9)
+	if dodge != 2200 {
+		t.Fatalf("enhanced shoes %d", dodge)
+	}
 }
