@@ -17,7 +17,8 @@ import (
 var (
 	addr  string
 	only  string
-	retry bool
+	retry  bool
+	scaleN int
 )
 
 type pair struct {
@@ -28,6 +29,7 @@ type pair struct {
 func main() {
 	flag.StringVar(&addr, "addr", "gate-entry:10100", "gate entry host:port")
 	flag.StringVar(&only, "only", "", "只跑其中一项：lt01 / lt02 / lt03，留空跑全部")
+	flag.IntVar(&scaleN, "n", 2000, "账号数")
 	flag.BoolVar(&retry, "retry", false, "收到 40036 时退避重试，验证客户端重试能否吃掉全部")
 	flag.Parse()
 	if err := waitReady(); err != nil {
@@ -35,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 	failed := false
-	for _, n := range []int{2000} {
+	for _, n := range []int{scaleN} {
 		fmt.Printf("\n######## %d 账号 ########\n", n)
 		if only == "" || only == "lt01" {
 			if !lt01(n, retry) {
