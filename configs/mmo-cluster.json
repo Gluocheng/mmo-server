@@ -154,7 +154,7 @@
     "address": "127.0.0.1:6379",
     "password": "",
     "db": 3,
-    "pool_size": 16,
+    "pool_size": 64,
     "dial_timeout": 3,
     "read_timeout": 2,
     "write_timeout": 2,
