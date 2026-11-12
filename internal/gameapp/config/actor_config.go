@@ -30,7 +30,7 @@ func (p *actorConfig) reload(session *cproto.Session, _ *protocol.None) {
 		return
 	}
 	ctx := context.Background()
-	db, err := persistence.DB()
+	db, err := persistence.ConfigDB()
 	if err != nil {
 		clog.Warnf("config reload db: %v", err)
 		p.ResponseCode(session, code.ConfigReloadFail)

@@ -100,20 +100,20 @@ flowchart TB
 - Go 1.24+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)（本地 Docker CI/CD 可选）
 - [NATS Server](https://github.com/nats-io/nats-server)（默认 `nats://127.0.0.1:4222`）
-- MySQL 8+（库名 `mmo`，DSN 见 `configs/mmo-cluster.json`）
+- MySQL 8+（玩家库 `mmo`，配置库 `mmo_cfg`，DSN 见 `configs/mmo-cluster.json`）
 - Redis 7+（默认 `127.0.0.1:6379`）
 
 ## 快速启动
 
 ### 前置
 
-1. 创建 MySQL 库：`mmo`（表由服务 `AutoMigrate` 自动创建）
+1. 创建 MySQL 库：`mmo`（玩家表由服务 `AutoMigrate` 自动创建）和 `mmo_cfg`（配置表由导入工具和游戏节点自动创建）
 2. 启动 Redis
 3. 启动 NATS：`nats-server`，或使用脚本通过 Docker 拉起（见下）
-4. 导入策划配表（可选，game 节点启动时若 `cfg_items` 表为空会跳过配表加载但不影响启动）
+4. 导入策划配表到 `mmo_cfg`（可选，game 节点启动时若配置库 `cfg_item` 为空会跳过配表加载但不影响启动）
 
 ```powershell
-# 导入演示道具到 MySQL
+# 导入演示道具到配置库 mmo_cfg
 go run ./gameconfig/cmd/import -profile configs/mmo-cluster.json
 ```
 
@@ -522,10 +522,10 @@ profile 中 `gameconfig.allow_reload` 设为 `true` 后：
 
 | 存储                               | 内容                                                            |
 | -------------------------------- | ------------------------------------------------------------- |
-| MySQL `accounts`                 | 昵称、`bcrypt` 密码哈希                                              |
-| MySQL `players`                  | 每 Uid 一条角色                                                    |
-| MySQL `inventory_items`          | 每角色 `player_id + item_id` 堆叠数量                                |
-| MySQL `cfg_items`、`cfg_versions` | 策划配置表（gameconfig）                                             |
+| MySQL `mmo.accounts`         | 昵称、`bcrypt` 密码哈希                                              |
+| MySQL `mmo.players`          | 每 Uid 一条角色                                                    |
+| MySQL `mmo.inventory_items`  | 每角色 `player_id + item_id` 堆叠数量                                |
+| MySQL `mmo_cfg.cfg_*`        | 策划配置表（gameconfig）。与玩家库分开，导入只写这个库                          |
 | Redis                            | 帐号昵称缓存、角色/背包 protojson 缓存、access/refresh Token、登录限流、设备会话、时间偏置 |
 
 
@@ -534,7 +534,7 @@ profile 中 `gameconfig.allow_reload` 设为 `true` 后：
 - 写路径经 `persistence.WithinTx`：MySQL 事务提交后通过 `AfterCommit` 刷新 Redis，避免脏缓存
 - 帐号缓存值格式：`uid|passwordHash`；角色缓存为 **protojson**（与 Pomelo 包体编码独立）
 - Token TTL：`redis.access_ttl_seconds`（默认 900）、`redis.refresh_ttl_seconds`（默认 86400）
-- 首次 `persistence.Init()` 时 `AutoMigrate` 建表（含 gameconfig 配置表）
+- 首次 `persistence.Init()` 时在玩家库 `AutoMigrate` 建玩家表。配置表在 `mmo_cfg` 上单独迁移
 
 ## 时间（gtime）
 
@@ -606,7 +606,7 @@ CI：`.github/workflows/go.yml`（`go test` + 五节点 `go build` + Docker 镜�
 
 - `cluster.nats.address` / `master_node_id`
 - `node.gate[].address` → `gate-1` 为 `:10110`，`gate-2` 为 `:10111`。对外 `10100` 由 `gate_entry.listen` 转发，按当前连接数选择网关
-- `mysql.dsn`
+- `mysql.dsn`（玩家库 `mmo`）、`mysql.config_dsn`（配置库 `mmo_cfg`）
 - `auth.session_policy`（`kick_old` / `coexist` / `device_limit`）、`auth.max_devices_per_uid`
 - `redis.`*（TTL、限流、`key_prefix`）
 - `gameconfig.allow_reload`（是否允许热更）、`gameconfig.import_data_dir`

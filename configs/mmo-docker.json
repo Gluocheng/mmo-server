@@ -138,8 +138,11 @@
   },
   "mysql": {
     "dsn": "root:123456@tcp(host.docker.internal:3306)/mmo?charset=utf8mb4&parseTime=True&loc=Local",
+    "config_dsn": "root:123456@tcp(host.docker.internal:3306)/mmo_cfg?charset=utf8mb4&parseTime=True&loc=Local",
     "max_open_conns": 40,
-    "max_idle_conns": 40
+    "max_idle_conns": 40,
+    "config_max_open_conns": 4,
+    "config_max_idle_conns": 2
   },
   "gate_entry": {
     "listen": ":10100",

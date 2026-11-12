@@ -22,9 +22,9 @@ func main() {
 	flag.Parse()
 
 	cprofile.Init(*profilePath, "10001")
-	dsn := cprofile.GetConfig("mysql").GetString("dsn", "")
+	dsn := cprofile.GetConfig("mysql").GetString("config_dsn", "")
 	if dsn == "" {
-		fmt.Fprintln(os.Stderr, "mysql.dsn is empty in profile")
+		fmt.Fprintln(os.Stderr, "mysql.config_dsn is empty in profile")
 		os.Exit(1)
 	}
 

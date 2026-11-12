@@ -40,7 +40,7 @@ func (p *actorGMConfig) doReload(tableName string) (*protocol.GmReloadResponse, 
 		return nil, code.ConfigReloadDenied
 	}
 	ctx := context.Background()
-	db, err := persistence.DB()
+	db, err := persistence.ConfigDB()
 	if err != nil {
 		clog.Warnf("gm config reload db: %v", err)
 		return nil, code.ConfigReloadFail

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// UseMemoryDBForTest 将全局 DB 换成内存 SQLite，并清空内存会话。仅测试调用。
+// UseMemoryDBForTest 将玩家库和配置库都换成同一个内存 SQLite，并清空内存会话。仅测试调用。
 func UseMemoryDBForTest(t *testing.T) *gorm.DB {
 	t.Helper()
 	gdb, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
@@ -24,17 +24,25 @@ func UseMemoryDBForTest(t *testing.T) *gorm.DB {
 	if err := autoMigrateModels(gdb); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
+	if err := autoMigrateConfig(gdb); err != nil {
+		t.Fatalf("migrate config: %v", err)
+	}
 
 	resetPlayerIDBatch()
 
 	oldDB := db
 	oldRDB := rdb
 	oldInitErr := initErr
+	oldCfgDB := cfgDB
+	oldCfgErr := cfgInitErr
 	hadInit := oldDB != nil
 	db = gdb
+	cfgDB = gdb
 	rdb = nil
 	once = sync.Once{}
+	cfgOnce = sync.Once{}
 	initErr = nil
+	cfgInitErr = nil
 
 	gmSessMu.Lock()
 	gmSessMem = map[string]memSess{}
@@ -42,9 +50,12 @@ func UseMemoryDBForTest(t *testing.T) *gorm.DB {
 
 	t.Cleanup(func() {
 		db = oldDB
+		cfgDB = oldCfgDB
 		rdb = oldRDB
 		initErr = oldInitErr
+		cfgInitErr = oldCfgErr
 		once = sync.Once{}
+		cfgOnce = sync.Once{}
 		if hadInit {
 			once.Do(func() {})
 		}

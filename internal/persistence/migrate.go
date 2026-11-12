@@ -22,9 +22,6 @@ func autoMigrateModels(db *gorm.DB) error {
 	); err != nil {
 		return err
 	}
-	if err := db.AutoMigrate(schema.Models()...); err != nil {
-		return err
-	}
 	if err := initializePlayerIDSequence(db); err != nil {
 		return err
 	}
@@ -35,6 +32,11 @@ func autoMigrateModels(db *gorm.DB) error {
 		return err
 	}
 	return migrateInventorySlots(db)
+}
+
+// autoMigrateConfig 在配置库上建 cfg_*。玩家库不调用。
+func autoMigrateConfig(db *gorm.DB) error {
+	return db.AutoMigrate(schema.Models()...)
 }
 
 // downgradePlayerUIDUniqueIndex 将 players.uid 由唯一索引降级为普通索引，支持一账号多角。
@@ -128,9 +130,8 @@ func initializePlayerIDSequence(db *gorm.DB) error {
 	return nil
 }
 
-// migrateInventorySlots 将 v1（无 slot / 同 player 多行 slot=0）数据迁移为按 slot 递增，
-// 并按 cfg_item 表精确回填 bag_type。迁移早于 gameconfig 内存快照加载，故直接查 cfg_item 表
-// 而非依赖 runtime 快照；item 不在配表或配表未声明 bag_type 时回填通用背包(1)。
+// migrateInventorySlots 将 v1（无 slot / 同 player 多行 slot=0）数据迁移为按 slot 递增。
+// 玩家库里若还留着拆库前的 cfg_item，按它回填 bag_type。表不在，或道具未声明类型时，回填通用背包(1)。
 func migrateInventorySlots(db *gorm.DB) error {
 	bagTypeByItem, err := loadBagTypeByItem(db)
 	if err != nil {
@@ -171,8 +172,12 @@ func migrateInventorySlots(db *gorm.DB) error {
 	return nil
 }
 
-// loadBagTypeByItem 从 cfg_item 表读取 item_id -> bag_type 映射（仅 BagType>0 的项）。
+// loadBagTypeByItem 从玩家库残留的 cfg_item 读取 item_id -> bag_type（仅 BagType>0）。
+// 配置已经拆走、这张表不在时返回空映射。
 func loadBagTypeByItem(db *gorm.DB) (map[int32]int32, error) {
+	if !db.Migrator().HasTable(&schema.CfgItem{}) {
+		return map[int32]int32{}, nil
+	}
 	var cfgItems []schema.CfgItem
 	if err := db.Order("id asc").Find(&cfgItems).Error; err != nil {
 		return nil, err

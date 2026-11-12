@@ -22,7 +22,7 @@ Excel/CSV 策划数据经 Luban 导出 JSON 与 Go 代码，import 工具写入 
 # 1. 导表（需 .NET 6+，Luban 工具已随仓库提交于 tools/luban/）
 .\gameconfig\tools\gen.ps1
 
-# 2. 导入 MySQL（使用 configs/mmo-cluster.json 中的 DSN）
+# 2. 导入配置库 mmo_cfg（使用 configs/mmo-cluster.json 中的 config_dsn）
 go run ./gameconfig/cmd/import -profile configs/mmo-cluster.json
 
 # 3. 启动 game 节点（启动时自动 Load）

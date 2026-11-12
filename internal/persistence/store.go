@@ -16,8 +16,11 @@ import (
 
 type config struct {
 	mysqlDSN         string
+	configDSN        string
 	maxOpenConn      int
 	maxIdleConn      int
+	configMaxOpen    int
+	configMaxIdle    int
 	cacheTTL         time.Duration
 	opTimeout        time.Duration
 	accessTTL        time.Duration
@@ -34,11 +37,14 @@ type config struct {
 const defaultMaxCharacters = 3
 
 var (
-	once    sync.Once
-	initErr error
-	db      *gorm.DB
-	rdb     *redis.Client
-	cfg     config
+	once       sync.Once
+	initErr    error
+	db         *gorm.DB
+	cfgOnce    sync.Once
+	cfgInitErr error
+	cfgDB      *gorm.DB
+	rdb        *redis.Client
+	cfg        config
 )
 
 func Init() error {
@@ -49,9 +55,7 @@ func Init() error {
 			return
 		}
 
-		gdb, err := gorm.Open(mysql.Open(cfg.mysqlDSN), &gorm.Config{
-			Logger: logger.Default.LogMode(logger.Silent),
-		})
+		gdb, err := openMySQL(cfg.mysqlDSN, cfg.maxOpenConn, cfg.maxIdleConn)
 		if err != nil {
 			initErr = err
 			return
@@ -61,9 +65,6 @@ func Init() error {
 			initErr = err
 			return
 		}
-		sqlDB.SetMaxOpenConns(cfg.maxOpenConn)
-		sqlDB.SetMaxIdleConns(cfg.maxIdleConn)
-		sqlDB.SetConnMaxLifetime(time.Hour)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
@@ -107,10 +108,21 @@ func loadConfig() config {
 	if maxCharacters < 1 {
 		maxCharacters = 1
 	}
+	configOpen := my.GetInt("config_max_open_conns", 4)
+	if configOpen < 1 {
+		configOpen = 4
+	}
+	configIdle := my.GetInt("config_max_idle_conns", 2)
+	if configIdle < 1 || configIdle > configOpen {
+		configIdle = configOpen
+	}
 	return config{
 		mysqlDSN:         my.GetString("dsn", ""),
+		configDSN:        my.GetString("config_dsn", ""),
 		maxOpenConn:      my.GetInt("max_open_conns", 20),
 		maxIdleConn:      my.GetInt("max_idle_conns", 10),
+		configMaxOpen:    configOpen,
+		configMaxIdle:    configIdle,
 		cacheTTL:         time.Duration(rd.GetInt("cache_ttl_seconds", 600)) * time.Second,
 		opTimeout:        time.Duration(rd.GetInt("op_timeout_seconds", 2)) * time.Second,
 		accessTTL:        time.Duration(rd.GetInt("access_ttl_seconds", 900)) * time.Second,
@@ -165,12 +177,81 @@ func MaxCharacters() int {
 	return cfg.maxCharacters
 }
 
-// DB 返回全局 GORM 实例（会先 Init）。
+// DB 返回玩家库 GORM 实例（会先 Init）。
 func DB() (*gorm.DB, error) {
 	if err := ensureDB(); err != nil {
 		return nil, err
 	}
 	return db, nil
+}
+
+// ConfigDB 返回配置库连接，并在首次调用时迁移 cfg_*。
+// 登录节点不要调用。单测里两个句柄指向同一个 sqlite。
+func ConfigDB() (*gorm.DB, error) {
+	cfgOnce.Do(func() {
+		if cfgDB != nil {
+			return
+		}
+		dsn := cfg.configDSN
+		maxOpen := cfg.configMaxOpen
+		maxIdle := cfg.configMaxIdle
+		if dsn == "" {
+			my := cprofile.GetConfig("mysql")
+			dsn = my.GetString("config_dsn", "")
+			maxOpen = my.GetInt("config_max_open_conns", 4)
+			maxIdle = my.GetInt("config_max_idle_conns", 2)
+		}
+		if dsn == "" {
+			cfgInitErr = fmt.Errorf("mysql.config_dsn is empty in profile")
+			return
+		}
+		if maxOpen < 1 {
+			maxOpen = 4
+		}
+		if maxIdle < 1 || maxIdle > maxOpen {
+			maxIdle = maxOpen
+		}
+		gdb, err := openMySQL(dsn, maxOpen, maxIdle)
+		if err != nil {
+			cfgInitErr = err
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err = autoMigrateConfig(gdb.WithContext(ctx)); err != nil {
+			if sqlDB, dbErr := gdb.DB(); dbErr == nil {
+				_ = sqlDB.Close()
+			}
+			cfgInitErr = err
+			return
+		}
+		cfgDB = gdb
+	})
+	if cfgInitErr != nil {
+		return nil, cfgInitErr
+	}
+	if cfgDB == nil {
+		return nil, fmt.Errorf("config db unavailable")
+	}
+	return cfgDB, nil
+}
+
+// openMySQL 打开一个 MySQL 连接并套上连接池上限。
+func openMySQL(dsn string, maxOpen, maxIdle int) (*gorm.DB, error) {
+	gdb, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		return nil, err
+	}
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return nil, err
+	}
+	sqlDB.SetMaxOpenConns(maxOpen)
+	sqlDB.SetMaxIdleConns(maxIdle)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	return gdb, nil
 }
 
 // SaveTimeBias 将游戏时间偏置写入 Redis 并更新本进程；Redis 不可用则失败。

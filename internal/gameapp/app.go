@@ -46,14 +46,14 @@ func Run(profileFilePath, nodeID string) {
 	app.Startup()
 }
 
-// mustLoadGameConfig 初始化持久化并从 MySQL 加载策划配置。
+// mustLoadGameConfig 初始化玩家库，再从配置库加载策划配置。
 func mustLoadGameConfig() {
 	if err := persistence.Init(); err != nil {
 		panic("gameconfig: persistence init: " + err.Error())
 	}
-	db, err := persistence.DB()
+	db, err := persistence.ConfigDB()
 	if err != nil {
-		panic("gameconfig: get db: " + err.Error())
+		panic("gameconfig: get config db: " + err.Error())
 	}
 	gcruntime.MustLoad(context.Background(), db)
 }
